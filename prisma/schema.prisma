@@ -1,0 +1,63 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Blok ENUM sudah dihapus
+
+model User {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  password       String
+  name           String
+  role           String             @default("STAFF") // Diubah ke String
+  department     String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  splRequests    Spl[]              @relation("requester")
+  splApprovals   Spl[]              @relation("approver")
+  notifications  UserNotification[]
+
+  @@map("users")
+}
+
+model Spl {
+  id              String    @id @default(cuid())
+  requesterId     String
+  requester       User      @relation("requester", fields: [requesterId], references: [id])
+  date            DateTime
+  startTime       String
+  endTime         String
+  totalHours      Float
+  reason          String
+  projectName     String?
+  status          String    @default("PENDING") // Diubah ke String
+  approverId      String?
+  approver        User?     @relation("approver", fields: [approverId], references: [id])
+  approvalDate    DateTime?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("spls")
+}
+
+model UserNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@map("user_notifications")
+}
