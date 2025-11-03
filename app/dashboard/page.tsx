@@ -3,6 +3,8 @@
 import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
 import StatsCard from "@/components/dashboard/StatsCard"
+import NotificationToggle from "@/components/notifications/NotificationToggle"
+import NotificationTester from "@/components/notifications/NotificationTester"
 import { Spl, Role } from "@/types"
 import toast from "react-hot-toast"
 
@@ -60,6 +62,14 @@ export default function DashboardPage() {
           Selamat datang, {session?.user?.name}!
         </p>
       </div>
+
+      {/* Notification Settings */}
+      <NotificationToggle />
+
+      {/* Development Testing (Only in development) */}
+      {process.env.NODE_ENV === "development" && (
+        <NotificationTester />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard

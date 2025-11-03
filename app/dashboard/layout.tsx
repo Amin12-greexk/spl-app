@@ -1,4 +1,4 @@
-// app/(dashboard)/layout.tsx
+// app/dashboard/layout.tsx
 "use client"
 
 import { useSession } from "next-auth/react"
@@ -7,6 +7,7 @@ import { useEffect } from "react"
 import Header from "@/components/dashboard/Header"
 import Sidebar from "@/components/dashboard/Sidebar"
 import NotificationProvider from "@/components/notifications/NotificationProvider"
+import NotificationToggle from "@/components/notifications/NotificationToggle"
 
 export default function DashboardLayout({
   children,
@@ -55,7 +56,14 @@ export default function DashboardLayout({
         <div className="flex">
           <Sidebar />
           <main className="flex-1 p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">{children}</div>
+            <div className="max-w-7xl mx-auto">
+              {/* Notification Toggle - Tampil di semua halaman dashboard */}
+              <div className="mb-6">
+                <NotificationToggle />
+              </div>
+              
+              {children}
+            </div>
           </main>
         </div>
       </div>
