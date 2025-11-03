@@ -192,8 +192,8 @@ export default function PersetujuanPage() {
             Alasan Penolakan <span className="text-red-500">*</span>
           </label>
           <textarea
-            className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-            placeholder="Jelaskan alasan penolakan secara detail..."
+          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+          placeholder="Jelaskan alasan penolakan secara detail..."
             value={rejectionReason}
             onChange={(e) => setRejectionReason(e.target.value)}
             disabled={isProcessing}

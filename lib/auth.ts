@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "./prisma"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import { Role } from "@/types" // <-- 1. IMPORT TIPE ROLE DI SINI
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -41,7 +42,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: user.role as Role, // <-- 2. TAMBAHKAN 'as Role' DI SINI
           department: user.department
         }
       }
@@ -57,7 +58,7 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           id: user.id,
-          role: user.role,
+          role: user.role,       // Ini sudah benar karena 'user' sekarang memiliki tipe yang tepat
           department: user.department
         }
       }
@@ -69,8 +70,8 @@ export const authOptions: NextAuthOptions = {
         user: {
           ...session.user,
           id: token.id as string,
-          role: token.role as string,
-          department: token.department as string
+          role: token.role as Role, // Anda juga bisa perjelas tipe di sini
+          department: token.department as string | null
         }
       }
     }

@@ -56,7 +56,7 @@ export default function SplCard({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-md transition-shadow text-gray-900">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">

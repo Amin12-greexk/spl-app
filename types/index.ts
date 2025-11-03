@@ -61,10 +61,19 @@ export interface UpdateSplStatusInput {
 // memiliki properti kustom (id, role, department).
 
 declare module "next-auth" {
+  /**
+   * TAMBAHKAN INTERFACE INI
+   * Ini akan "menggabungkan" tipe Anda dengan tipe User bawaan NextAuth.
+   */
+  interface User {
+    role: Role
+    department?: string | null
+  }
+
   interface Session {
     user: User & {
       id: string
-      role: Role // <-- Menggunakan tipe Role
+      role: Role
       department?: string | null
     }
   }
