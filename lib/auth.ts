@@ -1,12 +1,22 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
-import { prisma } from "./prisma"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import { Role } from "@/types" // <-- 1. IMPORT TIPE ROLE DI SINI
+import { Role } from "@/types"
+
+// Import prisma with error handling
+let prisma: any
+try {
+  prisma = require("./prisma").prisma
+} catch (error) {
+  console.warn("Prisma client not available during build")
+  prisma = null
+}
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  // Only use PrismaAdapter if prisma is available
+  ...(prisma && { adapter: PrismaAdapter(prisma) as any }),
+  
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -15,35 +25,39 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email dan password harus diisi")
+        // Skip during build
+        if (!prisma || !credentials?.email || !credentials?.password) {
+          return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email }
+          })
+
+          if (!user || !user.password) {
+            return null
           }
-        })
 
-        if (!user || !user.password) {
-          throw new Error("User tidak ditemukan")
-        }
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
+          if (!isPasswordValid) {
+            return null
+          }
 
-        if (!isPasswordValid) {
-          throw new Error("Password salah")
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role as Role, // <-- 2. TAMBAHKAN 'as Role' DI SINI
-          department: user.department
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role as Role,
+            department: user.department
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
         }
       }
     })
@@ -58,7 +72,7 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           id: user.id,
-          role: user.role,       // Ini sudah benar karena 'user' sekarang memiliki tipe yang tepat
+          role: user.role,
           department: user.department
         }
       }
@@ -70,7 +84,7 @@ export const authOptions: NextAuthOptions = {
         user: {
           ...session.user,
           id: token.id as string,
-          role: token.role as Role, // Anda juga bisa perjelas tipe di sini
+          role: token.role as Role,
           department: token.department as string | null
         }
       }
