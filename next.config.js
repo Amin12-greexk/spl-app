@@ -5,13 +5,12 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals.push('@prisma/client')
+      config.externals.push({
+        '@prisma/client': 'commonjs @prisma/client',
+        'bcryptjs': 'commonjs bcryptjs'
+      })
     }
     return config
-  },
-  env: {
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   }
 }
 
