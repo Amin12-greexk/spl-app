@@ -17,9 +17,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const userRole = session?.user?.role as Role
   const [pendingCount, setPendingCount] = useState(0)
 
-  // Fetch pending SPL count for HR/Manager
+  // Ambil jumlah SPL pending hanya untuk Manager
   useEffect(() => {
-    if (userRole === "HR" || userRole === "MANAGER") {
+    if (userRole === "MANAGER") {
       const fetchPendingCount = async () => {
         try {
           const response = await fetch("/api/spl?status=PENDING")
@@ -71,6 +71,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       badge: null,
     },
     {
+      name: "Data & Laporan SPL",
+      href: "/dashboard/hr",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      roles: ["HR"],
+      badge: null,
+    },
+    {
       name: "Persetujuan SPL",
       href: "/dashboard/hr/persetujuan",
       icon: (
@@ -78,18 +89,18 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      roles: ["HR", "MANAGER"],
+      roles: ["MANAGER"],
       badge: pendingCount > 0 ? pendingCount : null,
     },
     {
       name: "Semua SPL",
-      href: "/dashboard/hr",
+      href: "/dashboard/manager",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
       ),
-      roles: ["HR", "MANAGER"],
+      roles: ["MANAGER"],
       badge: null,
     },
   ]
@@ -143,15 +154,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-green-100">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-bold">TE</span>
-              </div>
-              <div>
-                <h2 className="font-semibold text-green-900 text-sm">Menu Navigasi</h2>
-                <p className="text-xs text-green-600">PT Tunas Esta Indonesia</p>
-              </div>
-            </div>
+            <h2 className="font-semibold text-green-900 text-sm">Menu Navigasi</h2>
             <button
               onClick={onClose}
               className="p-2 rounded-lg text-gray-500 hover:bg-white hover:text-gray-700 transition-colors"
@@ -160,27 +163,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-          </div>
-
-          {/* User Info */}
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {session?.user?.name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2)}
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 text-sm">{session?.user?.name}</p>
-                <p className="text-xs text-gray-500">{session?.user?.department}</p>
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                  {session?.user?.role}
-                </span>
-              </div>
-            </div>
           </div>
 
           {/* Navigation */}

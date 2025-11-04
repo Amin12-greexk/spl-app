@@ -31,6 +31,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
   const [isSupported, setIsSupported] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [firebaseAvailable, setFirebaseAvailable] = useState(false)
 
   // Check if notifications are supported
   useEffect(() => {
@@ -44,77 +45,130 @@ export default function NotificationProvider({ children }: NotificationProviderP
     }
   }, [])
 
-  // Setup foreground message listener
+  // Check Firebase availability dengan cara yang lebih robust
+  useEffect(() => {
+    const checkFirebase = () => {
+      try {
+        // Check environment variables langsung dari window object (client-side)
+        const firebaseConfig = {
+          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+        }
+
+        // Log untuk debugging
+        console.log('🔍 Firebase Config Check:', {
+          apiKey: firebaseConfig.apiKey ? '✅' : '❌',
+          authDomain: firebaseConfig.authDomain ? '✅' : '❌',
+          projectId: firebaseConfig.projectId ? '✅' : '❌',
+          messagingSenderId: firebaseConfig.messagingSenderId ? '✅' : '❌',
+          appId: firebaseConfig.appId ? '✅' : '❌'
+        })
+
+        const requiredVars = [
+          firebaseConfig.apiKey,
+          firebaseConfig.authDomain,
+          firebaseConfig.projectId,
+          firebaseConfig.messagingSenderId,
+          firebaseConfig.appId
+        ]
+
+        const hasAllVars = requiredVars.every(Boolean)
+        
+        if (hasAllVars) {
+          console.log('✅ Firebase configuration complete')
+          setFirebaseAvailable(true)
+        } else {
+          console.warn('⚠️ Firebase configuration incomplete, using fallback mode')
+          setFirebaseAvailable(false)
+        }
+      } catch (error) {
+        console.warn('⚠️ Firebase check error:', error)
+        setFirebaseAvailable(false)
+      }
+    }
+
+    // Check immediately and after a delay to handle Next.js env loading
+    checkFirebase()
+    
+    // Fallback check after component mount
+    const timeoutId = setTimeout(checkFirebase, 1000)
+    
+    return () => clearTimeout(timeoutId)
+  }, [])
+
+  // Setup foreground message listener hanya jika Firebase tersedia
   useEffect(() => {
     if (!session || !isSupported) return
 
     const setupListener = async () => {
-      try {
-        // Try to setup Firebase listener if available
-        const { onMessageListener } = await import("@/lib/firebase")
-        
-        const messageListener = onMessageListener() // <--- 'await' DIHAPUS
-
-messageListener.then((payload: any) => {
-// ...
-          console.log("📬 Received foreground message:", payload)
+      if (firebaseAvailable) {
+        try {
+          const { onMessageListener } = await import("@/lib/firebase")
           
-          const title = payload.notification?.title || "Notifikasi Baru"
-          const body = payload.notification?.body || ""
+          const messagePromise = onMessageListener()
           
-          // Show custom toast notification
-          toast.custom(
-            (t) => (
-              <div
-                className={`${
-                  t.visible ? "animate-enter" : "animate-leave"
-                } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-              >
-                <div className="flex-1 w-0 p-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 pt-0.5">
-                      <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-blue-100 text-blue-600">
-                        🔔
-                      </span>
-                    </div>
-                    <div className="ml-3 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{title}</p>
-                      <p className="mt-1 text-sm text-gray-500">{body}</p>
+          messagePromise.then((payload: any) => {
+            console.log("📬 Received foreground message:", payload)
+            
+            const title = payload.notification?.title || "Notifikasi Baru"
+            const body = payload.notification?.body || ""
+            
+            // Show custom toast notification
+            toast.custom(
+              (t) => (
+                <div
+                  className={`${
+                    t.visible ? "animate-enter" : "animate-leave"
+                  } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                >
+                  <div className="flex-1 w-0 p-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 pt-0.5">
+                        <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-green-100 text-green-600">
+                          🔔
+                        </span>
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <p className="text-sm font-medium text-gray-900">{title}</p>
+                        <p className="mt-1 text-sm text-gray-500">{body}</p>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex border-l border-gray-200">
+                    <button
+                      onClick={() => {
+                        toast.dismiss(t.id)
+                        if (payload.data?.click_action) {
+                          window.location.href = payload.data.click_action
+                        }
+                      }}
+                      className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-green-600 hover:text-green-500 focus:outline-none"
+                    >
+                      Lihat
+                    </button>
+                  </div>
                 </div>
-                <div className="flex border-l border-gray-200">
-                  <button
-                    onClick={() => {
-                      toast.dismiss(t.id)
-                      // Redirect to appropriate page
-                      if (payload.data?.click_action) {
-                        window.location.href = payload.data.click_action
-                      }
-                    }}
-                    className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
-                  >
-                    Lihat
-                  </button>
-                </div>
-              </div>
-            ),
-            {
-              duration: 5000,
-              position: 'top-right',
-            }
-          )
-        }).catch((err: any) => {
-          console.log("❌ Failed to receive foreground message:", err)
-        })
+              ),
+              {
+                duration: 5000,
+                position: 'top-right',
+              }
+            )
+          }).catch((err: any) => {
+            console.log("❌ Failed to receive foreground message:", err)
+          })
 
-      } catch (err) {
-        console.log("Firebase not available, using fallback notification system")
+        } catch (err) {
+          console.log("Firebase message listener setup failed:", err)
+        }
       }
     }
 
     setupListener()
-  }, [session, isSupported])
+  }, [session, isSupported, firebaseAvailable])
 
   // Request permission for notifications
   const requestPermission = async (): Promise<boolean> => {
@@ -133,64 +187,66 @@ messageListener.then((payload: any) => {
       const permission = await Notification.requestPermission()
       
       if (permission === "granted") {
-        // Try to get real FCM token
-        try {
-          const { requestNotificationPermission } = await import("@/lib/firebase")
-          const fcmToken = await requestNotificationPermission()
-          
-          if (fcmToken) {
-            // Save real FCM token
-            const response = await fetch("/api/notifications/subscribe", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                endpoint: fcmToken,
-                keys: {
-                  p256dh: fcmToken,
-                  auth: fcmToken,
+        if (firebaseAvailable) {
+          try {
+            const { requestNotificationPermission } = await import("@/lib/firebase")
+            const fcmToken = await requestNotificationPermission()
+            
+            if (fcmToken) {
+              const response = await fetch("/api/notifications/subscribe", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
                 },
-              }),
-            })
+                body: JSON.stringify({
+                  endpoint: fcmToken,
+                  keys: {
+                    p256dh: fcmToken,
+                    auth: fcmToken,
+                  },
+                }),
+              })
 
-            if (response.ok) {
-              setIsSubscribed(true)
-              toast.success("Notifikasi berhasil diaktifkan!")
-              return true
+              if (response.ok) {
+                setIsSubscribed(true)
+                toast.success("Notifikasi berhasil diaktifkan dengan Firebase!")
+                return true
+              } else {
+                throw new Error("Gagal menyimpan FCM token")
+              }
             } else {
-              throw new Error("Gagal menyimpan token notifikasi")
+              throw new Error("Gagal mendapatkan FCM token")
             }
-          } else {
-            throw new Error("Gagal mendapatkan FCM token")
+          } catch (firebaseError) {
+            console.log("Firebase error, falling back to mock mode:", firebaseError)
+            // Fallback ke mock mode
           }
-        } catch (firebaseError) {
-          console.log("Firebase unavailable, using fallback subscription")
-          
-          // Fallback: create mock subscription for testing
-          const mockToken = `fallback-${session.user.id}-${Date.now()}`
-          
-          const response = await fetch("/api/notifications/subscribe", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+        }
+        
+        // Fallback mode (baik karena Firebase tidak tersedia atau error)
+        console.log("Using fallback notification mode")
+        const mockToken = `fallback-${session.user.id}-${Date.now()}`
+        
+        const response = await fetch("/api/notifications/subscribe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            endpoint: mockToken,
+            keys: {
+              p256dh: mockToken,
+              auth: mockToken,
             },
-            body: JSON.stringify({
-              endpoint: mockToken,
-              keys: {
-                p256dh: mockToken,
-                auth: mockToken,
-              },
-            }),
-          })
+          }),
+        })
 
-          if (response.ok) {
-            setIsSubscribed(true)
-            toast.success("Notifikasi diaktifkan (mode fallback)")
-            return true
-          } else {
-            throw new Error("Gagal menyimpan token notifikasi")
-          }
+        if (response.ok) {
+          setIsSubscribed(true)
+          toast.success(`Notifikasi diaktifkan ${firebaseAvailable ? '(Firebase mode)' : '(Fallback mode)'}`)
+          return true
+        } else {
+          throw new Error("Gagal menyimpan token notifikasi")
         }
       } else if (permission === "denied") {
         toast.error("Izin notifikasi ditolak. Silakan aktifkan di pengaturan browser.")
@@ -236,7 +292,7 @@ messageListener.then((payload: any) => {
       if (data.success) {
         toast.success(data.message || "Notifikasi test berhasil dikirim!")
         
-        // Also show browser notification for immediate feedback
+        // Show browser notification for immediate feedback
         if (Notification.permission === "granted") {
           new Notification(title, {
             body: message,

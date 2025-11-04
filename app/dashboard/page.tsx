@@ -4,7 +4,6 @@ import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
 import StatsCard from "@/components/dashboard/StatsCard"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
-import NotificationTester from "@/components/notifications/NotificationTester"
 import { Spl, Role } from "@/types"
 import toast from "react-hot-toast"
 
@@ -17,9 +16,10 @@ export default function DashboardPage() {
     rejected: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [recentSpls, setRecentSpls] = useState<Spl[]>([])
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
         const response = await fetch("/api/spl")
         if (!response.ok) {
@@ -34,6 +34,12 @@ export default function DashboardPage() {
           approved: data.filter((spl) => spl.status === "APPROVED").length,
           rejected: data.filter((spl) => spl.status === "REJECTED").length,
         })
+
+        // Get 3 most recent SPLs
+        const recent = data
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 3)
+        setRecentSpls(recent)
       } catch (error: any) {
         toast.error(error.message || "Terjadi kesalahan")
       } finally {
@@ -41,17 +47,20 @@ export default function DashboardPage() {
       }
     }
 
-    fetchStats()
+    fetchData()
   }, [])
 
   const userRole = session?.user?.role as Role
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[500px]">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-600"></div>
-          <p className="text-gray-600 text-sm">Memuat dashboard...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
+          <div className="text-center">
+            <p className="text-gray-700 font-medium">Memuat dashboard...</p>
+            <p className="text-gray-500 text-sm mt-1">Mohon tunggu sebentar</p>
+          </div>
         </div>
       </div>
     )
@@ -64,55 +73,82 @@ export default function DashboardPage() {
     return "Selamat sore"
   }
 
+  const getStatusBadge = (status: string) => {
+    const config = {
+      PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Menunggu" },
+      APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "Disetujui" },
+      REJECTED: { bg: "bg-red-100", text: "text-red-800", label: "Ditolak" },
+    }
+    const c = config[status as keyof typeof config] || config.PENDING
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${c.bg} ${c.text}`}>
+        {c.label}
+      </span>
+    )
+  }
+
   return (
-    <div className="space-y-6 sm:space-y-8">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-white shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div className="mb-4 sm:mb-0">
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-              {getGreeting()}, {session?.user?.name}! 👋
-            </h1>
-            <p className="text-green-100 text-sm sm:text-base">
-              Selamat datang di Sistem Pengajuan Surat Perintah Lembur
-            </p>
-            <div className="flex flex-wrap items-center gap-3 mt-3">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
-                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-                {session?.user?.role}
-              </span>
-              {session?.user?.department && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
-                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0z" clipRule="evenodd" />
+    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
+      {/* Enhanced Header Section */}
+      <div className="relative bg-gradient-to-br from-green-600 via-green-700 to-green-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-32 translate-x-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full translate-y-24 -translate-x-24"></div>
+        </div>
+        
+        <div className="relative z-10">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-6 lg:mb-0">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                  <span className="text-2xl">👋</span>
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
+                    {getGreeting()}!
+                  </h1>
+                  <p className="text-xl sm:text-2xl font-medium text-green-100 mt-1">
+                    {session?.user?.name}
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-green-100 text-sm sm:text-base mb-4 max-w-2xl">
+                Selamat datang di Sistem Pengajuan Surat Perintah Lembur PT Tunas Esta Indonesia
+              </p>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
-                  {session.user.department}
+                  {userRole === 'STAFF' ? 'Staff' : userRole === 'HR' ? 'Human Resources' : 'Manager'}
                 </span>
-              )}
+                {session?.user?.department && (
+                  <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0z" clipRule="evenodd" />
+                    </svg>
+                    {session.user.department}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="hidden sm:block w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                <span className="text-green-600 font-bold text-lg">TE</span>
+            
+            <div className="flex items-center space-x-4">
+              <div className="hidden sm:block w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                  <span className="text-green-600 font-bold text-2xl">TEI</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Notification Settings */}
-      <NotificationToggle />
-
-      {/* Development Testing */}
-      {process.env.NODE_ENV === "development" && (
-        <NotificationTester />
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* Enhanced Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatsCard
           title="Total SPL"
           value={stats.total}
@@ -121,11 +157,13 @@ export default function DashboardPage() {
           subtitle={
             userRole === "STAFF"
               ? "Total pengajuan Anda"
-              : "Total semua pengajuan"
+              : userRole === "HR"
+              ? "Semua pengajuan"
+              : "Total di sistem"
           }
         />
         <StatsCard
-          title="Menunggu Persetujuan"
+          title="Menunggu"
           value={stats.pending}
           icon="⏳"
           color="yellow"
@@ -136,142 +174,251 @@ export default function DashboardPage() {
           value={stats.approved}
           icon="✅"
           color="green"
-          subtitle="SPL yang disetujui"
+          subtitle="SPL approved"
         />
         <StatsCard
           title="Ditolak"
           value={stats.rejected}
           icon="❌"
           color="red"
-          subtitle="SPL yang ditolak"
+          subtitle="SPL rejected"
         />
       </div>
 
-      {/* Quick Actions & Account Info Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Account Information */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-          <div className="flex items-center mb-4">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Informasi Akun
-            </h2>
-          </div>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-gray-600 font-medium w-full sm:w-32 mb-1 sm:mb-0">Nama:</span>
-              <span className="text-gray-900 font-medium">{session?.user?.name}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-gray-600 font-medium w-full sm:w-32 mb-1 sm:mb-0">Email:</span>
-              <span className="text-gray-900 break-all">{session?.user?.email}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-gray-600 font-medium w-full sm:w-32 mb-1 sm:mb-0">Role:</span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                {session?.user?.role}
-              </span>
-            </div>
-            {session?.user?.department && (
-              <div className="flex flex-col sm:flex-row sm:items-center">
-                <span className="text-gray-600 font-medium w-full sm:w-32 mb-1 sm:mb-0">Departemen:</span>
-                <span className="text-gray-900 font-medium">{session.user.department}</span>
+      {/* Enhanced Two Column Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column - Actions & Profile */}
+        <div className="xl:col-span-2 space-y-6">
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
               </div>
-            )}
+              Aksi Cepat
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {userRole === "STAFF" && (
+                <>
+                  <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-blue-900">Buat SPL Baru</h3>
+                        <p className="text-blue-700 text-sm">Ajukan lembur sekarang</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/dashboard/staff/pengajuan"
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Buat Pengajuan
+                    </a>
+                  </div>
+
+                  <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-green-900">Riwayat SPL</h3>
+                        <p className="text-green-700 text-sm">Lihat pengajuan Anda</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/dashboard/staff"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Lihat Riwayat
+                    </a>
+                  </div>
+                </>
+              )}
+
+              {userRole === "HR" && (
+                <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-green-900">Data & Laporan</h3>
+                      <p className="text-green-700 text-sm">Export dan analisis SPL</p>
+                    </div>
+                  </div>
+                  <a
+                    href="/dashboard/hr"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Lihat Data
+                  </a>
+                </div>
+              )}
+
+              {userRole === "MANAGER" && (
+                <>
+                  <div className="group bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-purple-900">Persetujuan SPL</h3>
+                        <p className="text-purple-700 text-sm">{stats.pending} menunggu review</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/dashboard/hr/persetujuan"
+                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Review SPL
+                      {stats.pending > 0 && (
+                        <span className="ml-2 bg-white text-purple-600 px-2 py-1 rounded-full text-xs font-bold">
+                          {stats.pending}
+                        </span>
+                      )}
+                    </a>
+                  </div>
+
+                  <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-green-900">Semua SPL</h3>
+                        <p className="text-green-700 text-sm">Kelola seluruh data</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/dashboard/manager"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      Lihat Semua
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Notification Settings */}
+          <NotificationToggle />
         </div>
 
-        {/* Quick Actions */}
-        <div className="space-y-4">
-          {userRole === "STAFF" && (
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200">
-              <div className="flex items-center mb-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-900 mb-1">
-                    Buat Pengajuan SPL
-                  </h3>
-                  <p className="text-blue-700 text-sm">
-                    Ajukan Surat Perintah Lembur dengan mudah dan cepat
-                  </p>
-                </div>
-              </div>
-              <a
-                href="/dashboard/staff/pengajuan"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        {/* Right Column - Recent Activity & Profile */}
+        <div className="space-y-6">
+          {/* Account Information */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mr-3">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Buat Pengajuan Baru
-              </a>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Informasi Akun</h2>
             </div>
-          )}
-
-          {(userRole === "HR" || userRole === "MANAGER") && (
-            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200">
-              <div className="flex items-center mb-3">
-                <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center text-white font-bold">
+                  {session?.user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-green-900 mb-1">
-                    Review Pengajuan SPL
-                  </h3>
-                  <p className="text-green-700 text-sm">
-                    {stats.pending} pengajuan menunggu persetujuan Anda
-                  </p>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">{session?.user?.name}</p>
+                  <p className="text-sm text-gray-600">{session?.user?.email}</p>
                 </div>
               </div>
-              <a
-                href="/dashboard/hr/persetujuan"
-                className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Lihat Pengajuan
-                {stats.pending > 0 && (
-                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-green-600 bg-white rounded-full">
-                    {stats.pending}
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 font-medium">Role:</span>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    userRole === 'HR' ? 'bg-green-100 text-green-800' :
+                    userRole === 'MANAGER' ? 'bg-purple-100 text-purple-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {userRole === 'HR' ? 'Human Resources' : 
+                     userRole === 'MANAGER' ? 'Manager' : 'Staff'}
                   </span>
+                </div>
+                
+                {session?.user?.department && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 font-medium">Departemen:</span>
+                    <span className="text-gray-900 font-medium">{session.user.department}</span>
+                  </div>
                 )}
-              </a>
+              </div>
             </div>
-          )}
+          </div>
 
-          {/* Recent Activity Preview */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Aktivitas Terbaru</h3>
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          {/* Recent SPL Activity */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                Aktivitas Terbaru
+              </h3>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center text-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                <span className="text-gray-600">System ready untuk pengajuan SPL</span>
+            
+            {recentSpls.length > 0 ? (
+              <div className="space-y-3">
+                {recentSpls.map((spl) => (
+                  <div key={spl.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 text-sm">{spl.requester.name}</p>
+                      <p className="text-xs text-gray-500">{new Date(spl.createdAt).toLocaleDateString('id-ID')}</p>
+                    </div>
+                    {getStatusBadge(spl.status)}
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                <span className="text-gray-600">Notifikasi aktif dan berfungsi</span>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 text-sm">Belum ada aktivitas SPL</p>
               </div>
-              <div className="flex items-center text-sm">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full mr-3"></div>
-                <span className="text-gray-600">Dashboard siap digunakan</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
