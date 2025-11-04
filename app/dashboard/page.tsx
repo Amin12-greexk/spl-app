@@ -6,6 +6,7 @@ import StatsCard from "@/components/dashboard/StatsCard"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { Spl, Role } from "@/types"
 import toast from "react-hot-toast"
+import Link from "next/link" // <-- TAMBAHAN: Import Link
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -37,7 +38,10 @@ export default function DashboardPage() {
 
         // Get 3 most recent SPLs
         const recent = data
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
           .slice(0, 3)
         setRecentSpls(recent)
       } catch (error: any) {
@@ -75,69 +79,147 @@ export default function DashboardPage() {
 
   const getStatusBadge = (status: string) => {
     const config = {
-      PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Menunggu" },
-      APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "Disetujui" },
+      PENDING: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "Menunggu",
+      },
+      APPROVED: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Disetujui",
+      },
       REJECTED: { bg: "bg-red-100", text: "text-red-800", label: "Ditolak" },
     }
     const c = config[status as keyof typeof config] || config.PENDING
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${c.bg} ${c.text}`}>
+      <span
+        className={`px-2 py-1 text-xs font-medium rounded-full ${c.bg} ${c.text}`}
+      >
         {c.label}
       </span>
     )
   }
 
+  const getHeaderGradient = () => {
+    switch (userRole) {
+      case "HR":
+        return "from-green-600 via-green-700 to-green-800"
+      case "MANAGER":
+        return "from-purple-600 via-purple-700 to-purple-800"
+      default:
+        return "from-blue-600 via-blue-700 to-blue-800"
+    }
+  }
+
+  const getStatsSubtitle = () => {
+    switch (userRole) {
+      case "STAFF":
+        return "Total pengajuan Anda"
+      case "HR":
+        return "Semua pengajuan di sistem"
+      case "MANAGER":
+        return "Pengajuan yang perlu direview"
+      default:
+        return "Total di sistem"
+    }
+  }
+
+  const getHeaderIcon = () => {
+    switch (userRole) {
+      case "HR":
+        return "📊"
+      case "MANAGER":
+        return "👔"
+      default:
+        return "👋"
+    }
+  }
+
+  const getHeaderDescription = () => {
+    switch (userRole) {
+      case "HR":
+        return "Kelola data dan laporan SPL seluruh karyawan"
+      case "MANAGER":
+        return "Review dan setujui pengajuan lembur karyawan"
+      default:
+        return "Selamat datang di Sistem Pengajuan Surat Perintah Lembur"
+    }
+  }
+
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
       {/* Enhanced Header Section */}
-      <div className="relative bg-gradient-to-br from-green-600 via-green-700 to-green-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden">
+      <div
+        className={`relative bg-gradient-to-br ${getHeaderGradient()} rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden`}
+      >
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-32 translate-x-32"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full translate-y-24 -translate-x-24"></div>
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="mb-6 lg:mb-0">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                  <span className="text-2xl">👋</span>
+                  <span className="text-2xl">{getHeaderIcon()}</span>
                 </div>
                 <div>
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
                     {getGreeting()}!
                   </h1>
-                  <p className="text-xl sm:text-2xl font-medium text-green-100 mt-1">
+                  <p className="text-xl sm:text-2xl font-medium text-white/90 mt-1">
                     {session?.user?.name}
                   </p>
                 </div>
               </div>
-              
-              <p className="text-green-100 text-sm sm:text-base mb-4 max-w-2xl">
-                Selamat datang di Sistem Pengajuan Surat Perintah Lembur PT Tunas Esta Indonesia
+
+              <p className="text-white/80 text-sm sm:text-base mb-4 max-w-2xl">
+                {getHeaderDescription()}
               </p>
-              
+
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                      clipRule="evenodd"
+                    />
                   </svg>
-                  {userRole === 'STAFF' ? 'Staff' : userRole === 'HR' ? 'Human Resources' : 'Manager'}
+                  {userRole === "STAFF"
+                    ? "Staff"
+                    : userRole === "HR"
+                    ? "Human Resources"
+                    : "Manager"}
                 </span>
                 {session?.user?.department && (
                   <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0z" clipRule="evenodd" />
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     {session.user.department}
                   </span>
                 )}
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
-              <div className="hidden sm:block w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <div className="hidden sm:flex w-20 h-20 bg-white/20 rounded-2xl items-center justify-center backdrop-blur-sm">
                 <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-green-600 font-bold text-2xl">TEI</span>
                 </div>
@@ -154,13 +236,7 @@ export default function DashboardPage() {
           value={stats.total}
           icon="📊"
           color="blue"
-          subtitle={
-            userRole === "STAFF"
-              ? "Total pengajuan Anda"
-              : userRole === "HR"
-              ? "Semua pengajuan"
-              : "Total di sistem"
-          }
+          subtitle={getStatsSubtitle()}
         />
         <StatsCard
           title="Menunggu"
@@ -193,109 +269,275 @@ export default function DashboardPage() {
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <svg
+                  className="w-5 h-5 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
                 </svg>
               </div>
               Aksi Cepat
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* STAFF ACTIONS */}
               {userRole === "STAFF" && (
                 <>
                   <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
                       <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-blue-900">Buat SPL Baru</h3>
-                        <p className="text-blue-700 text-sm">Ajukan lembur sekarang</p>
+                        <h3 className="text-lg font-bold text-blue-900">
+                          Buat SPL Baru
+                        </h3>
+                        <p className="text-blue-700 text-sm">
+                          Ajukan lembur sekarang
+                        </p>
                       </div>
                     </div>
-                    <a
+
+                    {/* DIPERBAIKI: Menggunakan Link component */}
+                    <Link
                       href="/dashboard/staff/pengajuan"
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
                       </svg>
                       Buat Pengajuan
-                    </a>
+                    </Link>
                   </div>
 
                   <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
                       <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                          />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-green-900">Riwayat SPL</h3>
-                        <p className="text-green-700 text-sm">Lihat pengajuan Anda</p>
+                        <h3 className="text-lg font-bold text-green-900">
+                          Riwayat SPL
+                        </h3>
+                        <p className="text-green-700 text-sm">
+                          Lihat pengajuan Anda
+                        </p>
                       </div>
                     </div>
-                    <a
+
+                    {/* DIPERBAIKI: Menggunakan Link component */}
+                    <Link
                       href="/dashboard/staff"
                       className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                        />
                       </svg>
                       Lihat Riwayat
-                    </a>
+                    </Link>
                   </div>
                 </>
               )}
 
+              {/* HR ACTIONS */}
               {userRole === "HR" && (
-                <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <>
+                  <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-green-900">
+                          Data & Laporan
+                        </h3>
+                        <p className="text-green-700 text-sm">
+                          Export dan analisis SPL
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* DIPERBAIKI: Menggunakan Link component */}
+                    <Link
+                      href="/dashboard/hr"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-green-900">Data & Laporan</h3>
-                      <p className="text-green-700 text-sm">Export dan analisis SPL</p>
-                    </div>
+                      Lihat Data
+                    </Link>
                   </div>
-                  <a
-                    href="/dashboard/hr"
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Lihat Data
-                  </a>
-                </div>
+
+                  <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-blue-900">
+                          Manajemen Karyawan
+                        </h3>
+                        <p className="text-blue-700 text-sm">
+                          Lihat data karyawan
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      disabled
+                      className="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-600 font-medium rounded-lg cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      Coming Soon
+                    </button>
+                  </div>
+                </>
               )}
 
+              {/* MANAGER ACTIONS */}
               {userRole === "MANAGER" && (
                 <>
                   <div className="group bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
                       <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-purple-900">Persetujuan SPL</h3>
-                        <p className="text-purple-700 text-sm">{stats.pending} menunggu review</p>
+                        <h3 className="text-lg font-bold text-purple-900">
+                          Persetujuan SPL
+                        </h3>
+                        <p className="text-purple-700 text-sm">
+                          {stats.pending} menunggu review
+                        </p>
                       </div>
                     </div>
-                    <a
+
+                    {/* DIPERBAIKI: Menggunakan Link component */}
+                    <Link
                       href="/dashboard/hr/persetujuan"
                       className="inline-flex items-center px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                       Review SPL
                       {stats.pending > 0 && (
@@ -303,30 +545,54 @@ export default function DashboardPage() {
                           {stats.pending}
                         </span>
                       )}
-                    </a>
+                    </Link>
                   </div>
 
-                  <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                  <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
-                      <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                          />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-green-900">Semua SPL</h3>
-                        <p className="text-green-700 text-sm">Kelola seluruh data</p>
+                        <h3 className="text-lg font-bold text-blue-900">
+                          Laporan Tim
+                        </h3>
+                        <p className="text-blue-700 text-sm">
+                          Lihat statistik tim
+                        </p>
                       </div>
                     </div>
-                    <a
-                      href="/dashboard/manager"
-                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    <button
+                      disabled
+                      className="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-600 font-medium rounded-lg cursor-not-allowed"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
                       </svg>
-                      Lihat Semua
-                    </a>
+                      Coming Soon
+                    </button>
                   </div>
                 </>
               )}
@@ -342,42 +608,96 @@ export default function DashboardPage() {
           {/* Account Information */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mr-3 ${
+                  userRole === "HR"
+                    ? "bg-green-100"
+                    : userRole === "MANAGER"
+                    ? "bg-purple-100"
+                    : "bg-blue-100"
+                }`}
+              >
+                <svg
+                  className={`w-6 h-6 ${
+                    userRole === "HR"
+                      ? "text-green-600"
+                      : userRole === "MANAGER"
+                      ? "text-purple-600"
+                      : "text-blue-600"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Informasi Akun</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                Informasi Akun
+              </h2>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center text-white font-bold">
-                  {session?.user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
+                    userRole === "HR"
+                      ? "bg-gradient-to-br from-green-600 to-green-700"
+                      : userRole === "MANAGER"
+                      ? "bg-gradient-to-br from-purple-600 to-purple-700"
+                      : "bg-gradient-to-br from-blue-600 to-blue-700"
+                  }`}
+                >
+                  {session?.user?.name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)}
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-gray-900">{session?.user?.name}</p>
-                  <p className="text-sm text-gray-600">{session?.user?.email}</p>
+                  <p className="font-bold text-gray-900">
+                    {session?.user?.name}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {session?.user?.email}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 font-medium">Role:</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    userRole === 'HR' ? 'bg-green-100 text-green-800' :
-                    userRole === 'MANAGER' ? 'bg-purple-100 text-purple-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {userRole === 'HR' ? 'Human Resources' : 
-                     userRole === 'MANAGER' ? 'Manager' : 'Staff'}
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      userRole === "HR"
+                        ? "bg-green-100 text-green-800"
+                        : userRole === "MANAGER"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {userRole === "HR"
+                      ? "Human Resources"
+                      : userRole === "MANAGER"
+                      ? "Manager"
+                      : "Staff"}
                   </span>
                 </div>
-                
+
                 {session?.user?.department && (
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 font-medium">Departemen:</span>
-                    <span className="text-gray-900 font-medium">{session.user.department}</span>
+                    <span className="text-gray-600 font-medium">
+                      Departemen:
+                    </span>
+                    <span className="text-gray-900 font-medium">
+                      {session.user.department}
+                    </span>
                   </div>
                 )}
               </div>
@@ -389,21 +709,38 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900 flex items-center">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-blue-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 Aktivitas Terbaru
               </h3>
             </div>
-            
+
             {recentSpls.length > 0 ? (
               <div className="space-y-3">
                 {recentSpls.map((spl) => (
-                  <div key={spl.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div
+                    key={spl.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                  >
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900 text-sm">{spl.requester.name}</p>
-                      <p className="text-xs text-gray-500">{new Date(spl.createdAt).toLocaleDateString('id-ID')}</p>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {spl.requester.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(spl.createdAt).toLocaleDateString("id-ID")}
+                      </p>
                     </div>
                     {getStatusBadge(spl.status)}
                   </div>
@@ -412,11 +749,23 @@ export default function DashboardPage() {
             ) : (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-8 h-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                 </div>
-                <p className="text-gray-500 text-sm">Belum ada aktivitas SPL</p>
+                <p className="text-gray-500 text-sm">
+                  Belum ada aktivitas SPL
+                </p>
               </div>
             )}
           </div>
