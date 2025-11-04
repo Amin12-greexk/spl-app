@@ -2,12 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
 
 export default function SplForm() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     date: "",
@@ -46,85 +48,260 @@ export default function SplForm() {
     }
   }
 
+  const calculateDuration = () => {
+    if (formData.startTime && formData.endTime) {
+      const [startHour, startMin] = formData.startTime.split(":").map(Number)
+      const [endHour, endMin] = formData.endTime.split(":").map(Number)
+      const totalMinutes = endHour * 60 + endMin - (startHour * 60 + startMin)
+      const hours = Math.floor(totalMinutes / 60)
+      const minutes = totalMinutes % 60
+      
+      if (totalMinutes > 0) {
+        return `${hours} jam ${minutes > 0 ? `${minutes} menit` : ''}`
+      }
+    }
+    return null
+  }
+
+  const duration = calculateDuration()
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Form Pengajuan SPL
-        </h2>
-        <p className="text-sm text-gray-600 mb-6">
-          Isi formulir di bawah ini untuk mengajukan Surat Perintah Lembur
-        </p>
+    <div className="max-w-4xl mx-auto">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 sm:p-8 text-white shadow-xl mb-8">
+        <div className="flex items-center space-x-4">
+          <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+              Pengajuan SPL Baru
+            </h1>
+            <p className="text-green-100">
+              Isi formulir di bawah untuk mengajukan Surat Perintah Lembur
+            </p>
+          </div>
+        </div>
+
+        {/* User Info */}
+        <div className="mt-6 p-4 bg-white/10 rounded-xl">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white font-semibold text-sm">
+                {session?.user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+              </span>
+            </div>
+            <div>
+              <p className="font-semibold">{session?.user?.name}</p>
+              <p className="text-green-100 text-sm">{session?.user?.department}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Input
-        label="Tanggal Lembur"
-        type="date"
-        value={formData.date}
-        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-        required
-      />
+      {/* Form Section */}
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8">
+          <div className="space-y-8">
+            {/* Basic Information */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0h6a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8a2 2 0 012-2z" />
+                  </svg>
+                </div>
+                Informasi Dasar
+              </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="Waktu Mulai"
-          type="time"
-          value={formData.startTime}
-          onChange={(e) =>
-            setFormData({ ...formData, startTime: e.target.value })
-          }
-          required
-        />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Tanggal */}
+                <div>
+                  <Input
+                    label="Tanggal Lembur"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
 
-        <Input
-          label="Waktu Selesai"
-          type="time"
-          value={formData.endTime}
-          onChange={(e) =>
-            setFormData({ ...formData, endTime: e.target.value })
-          }
-          required
-        />
+                {/* Nama Proyek */}
+                <div>
+                  <Input
+                    label="Nama Proyek (Opsional)"
+                    type="text"
+                    placeholder="e.g., Project Alpha, Website Revamp"
+                    value={formData.projectName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, projectName: e.target.value })
+                    }
+                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Time Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                Waktu Lembur
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Input
+                    label="Waktu Mulai"
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startTime: e.target.value })
+                    }
+                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Input
+                    label="Waktu Selesai"
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endTime: e.target.value })
+                    }
+                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Duration Display */}
+              {duration && (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-green-800 font-medium">
+                      Durasi Lembur: {duration}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reason Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                Alasan Lembur
+              </h2>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Jelaskan alasan dan kebutuhan lembur <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  className="flex w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px] transition-all duration-200"
+                  placeholder="Contoh: Menyelesaikan laporan bulanan yang harus diserahkan besok pagi, mengatasi masalah urgent di server production, dsb..."
+                  value={formData.reason}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reason: e.target.value })
+                  }
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Berikan penjelasan yang detail dan jelas untuk memudahkan proses persetujuan
+                </p>
+              </div>
+            </div>
+
+            {/* Guidelines */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+              <h3 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Panduan Pengajuan SPL
+              </h3>
+              <ul className="text-sm text-blue-800 space-y-2">
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Pengajuan harus disubmit minimal H-1 sebelum pelaksanaan
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Jelaskan alasan lembur dengan detail dan jelas
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Proses persetujuan memakan waktu maksimal 1x24 jam
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Anda akan mendapat notifikasi status persetujuan via sistem
+                </li>
+              </ul>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
+              <Button 
+                type="submit" 
+                disabled={isLoading} 
+                className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                    Sedang Mengajukan...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Ajukan SPL
+                  </div>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={isLoading}
+                className="sm:w-auto px-6 py-4 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Batal
+              </Button>
+            </div>
+          </div>
+        </form>
       </div>
-
-      <Input
-        label="Nama Proyek (Opsional)"
-        type="text"
-        placeholder="Nama proyek yang dikerjakan"
-        value={formData.projectName}
-        onChange={(e) =>
-          setFormData({ ...formData, projectName: e.target.value })
-        }
-      />
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Alasan Lembur <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px]"
-          placeholder="Jelaskan alasan lembur secara detail..."
-          value={formData.reason}
-          onChange={(e) =>
-            setFormData({ ...formData, reason: e.target.value })
-          }
-          required
-        />
-      </div>
-
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isLoading} className="flex-1">
-          {isLoading ? "Mengirim..." : "Ajukan SPL"}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => router.back()}
-          disabled={isLoading}
-        >
-          Batal
-        </Button>
-      </div>
-    </form>
+    </div>
   )
 }

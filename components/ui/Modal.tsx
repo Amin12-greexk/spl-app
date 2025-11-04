@@ -40,7 +40,7 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black/50 transition-opacity"
@@ -48,16 +48,19 @@ export default function Modal({
         />
 
         {/* Modal */}
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 z-10">
+        <div className="relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-md sm:max-w-lg p-4 sm:p-6 z-10 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <div className="flex items-center justify-between mb-4 sticky top-0 bg-white pb-3 border-b sm:border-0">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+              {title}
+            </h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2"
+              aria-label="Close modal"
             >
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5 sm:w-6 sm:h-6"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -73,10 +76,14 @@ export default function Modal({
           </div>
 
           {/* Content */}
-          <div className="mb-6">{children}</div>
+          <div className="mb-4 sm:mb-6 text-sm sm:text-base">{children}</div>
 
           {/* Footer */}
-          {footer && <div className="flex gap-3 justify-end">{footer}</div>}
+          {footer && (
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end sticky bottom-0 bg-white pt-3 border-t sm:border-0">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </div>

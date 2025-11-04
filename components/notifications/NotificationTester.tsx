@@ -1,58 +1,30 @@
-// components/notifications/NotificationTester.tsx
 "use client"
 
 import { useState } from "react"
 import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
-import toast from "react-hot-toast"
+import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 
-/**
- * Komponen untuk testing notifikasi
- * HANYA MUNCUL DI DEVELOPMENT MODE
- */
 export default function NotificationTester() {
-  const [isLoading, setIsLoading] = useState(false)
+  const { isSubscribed, testNotification } = useNotificationContext()
   const [title, setTitle] = useState("Test Notification")
   const [message, setMessage] = useState("Ini adalah notifikasi test dari aplikasi SPL")
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Hanya tampilkan di development
   if (process.env.NODE_ENV === "production") {
     return null
   }
 
   const handleSendTest = async () => {
     if (!title.trim() || !message.trim()) {
-      toast.error("Judul dan pesan harus diisi")
       return
     }
 
     setIsLoading(true)
     try {
-      const response = await fetch("/api/notifications/test", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          message: message.trim(),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Gagal mengirim notifikasi test")
-      }
-
-      if (data.success) {
-        toast.success(data.message || "Notifikasi test berhasil dikirim!")
-      } else {
-        toast.error(data.message || "Gagal mengirim notifikasi")
-      }
-    } catch (error: any) {
-      console.error("Error sending test notification:", error)
-      toast.error(error.message || "Terjadi kesalahan")
+      await testNotification(title.trim(), message.trim())
+    } catch (error) {
+      console.error("Error in test notification:", error)
     } finally {
       setIsLoading(false)
     }
@@ -95,11 +67,16 @@ export default function NotificationTester() {
 
         <Button
           onClick={handleSendTest}
-          disabled={isLoading || !title.trim() || !message.trim()}
+          disabled={!isSubscribed || isLoading || !title.trim() || !message.trim()}
           size="sm"
           className="w-full"
         >
-          {isLoading ? "Mengirim..." : "🚀 Kirim Test Notifikasi"}
+          {isLoading 
+            ? "Mengirim..." 
+            : !isSubscribed 
+            ? "Aktifkan notifikasi dulu" 
+            : "🚀 Kirim Test Notifikasi"
+          }
         </Button>
       </div>
     </div>

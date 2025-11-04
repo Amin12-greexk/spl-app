@@ -15,10 +15,6 @@ export default function StaffPage() {
           </p>
         </div>
         <Link href="/dashboard/staff/pengajuan">
-          <Button>
-            <span className="mr-2">➕</span>
-            Buat Pengajuan Baru
-          </Button>
         </Link>
       </div>
 

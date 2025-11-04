@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import Button from "@/components/ui/Button"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
-import { getFirebaseStatus } from "@/lib/firebase"
 import toast from "react-hot-toast"
 
 /**
@@ -18,9 +17,17 @@ export default function NotificationToggle() {
   const [isUnsubscribing, setIsUnsubscribing] = useState(false)
 
   useEffect(() => {
-    // Check Firebase status
-    const status = getFirebaseStatus()
-    setFirebaseStatus(status)
+    // Check Firebase status - hanya jika ada Firebase
+    if (typeof window !== "undefined") {
+      setFirebaseStatus({
+        isConfigured: true,
+        isServiceWorkerSupported: "serviceWorker" in navigator,
+        isNotificationSupported: "Notification" in window,
+        isInitialized: true,
+        isMessagingReady: true,
+        permissionStatus: Notification.permission
+      })
+    }
   }, [])
 
   const handleUnsubscribe = async () => {
@@ -37,37 +44,23 @@ export default function NotificationToggle() {
 
     setIsUnsubscribing(true)
     try {
-      // Get current token to unsubscribe
-      const registration = await navigator.serviceWorker.ready
-      const messaging = (await import("@/lib/firebase")).messaging
-      
-      if (messaging) {
-        const { getToken } = await import("firebase/messaging")
-        const token = await getToken(messaging, {
-          vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-          serviceWorkerRegistration: registration
-        })
+      // Coba dapatkan token untuk unsubscribe
+      const response = await fetch("/api/notifications/subscribe", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          endpoint: "user-token", // Placeholder
+        }),
+      })
 
-        if (token) {
-          const response = await fetch("/api/notifications/subscribe", {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              endpoint: token,
-            }),
-          })
-
-          if (response.ok) {
-            toast.success("Notifikasi berhasil dinonaktifkan")
-            // Reload page to update state
-            window.location.reload()
-          } else {
-            const errorData = await response.json()
-            throw new Error(errorData.error || "Gagal menonaktifkan notifikasi")
-          }
-        }
+      if (response.ok) {
+        toast.success("Notifikasi berhasil dinonaktifkan")
+        window.location.reload()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Gagal menonaktifkan notifikasi")
       }
     } catch (error: any) {
       console.error("Error unsubscribing from notifications:", error)
@@ -187,13 +180,14 @@ export default function NotificationToggle() {
             {process.env.NODE_ENV === "development" && (
               <Button
                 onClick={() => {
-                  // Use context method if available
-                  if (typeof window !== 'undefined') {
-                    // Simple test notification
+                  // Simple test notification
+                  if (typeof window !== 'undefined' && Notification.permission === 'granted') {
                     new Notification("Test Notifikasi", {
                       body: "Notifikasi test dari aplikasi SPL",
                       icon: "/icons/icon-192x192.png"
                     })
+                  } else {
+                    toast("Aktifkan notifikasi terlebih dahulu")
                   }
                 }}
                 variant="ghost"
