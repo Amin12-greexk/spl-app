@@ -3,6 +3,7 @@
 import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Role } from "@/types"
 
 interface HeaderProps {
@@ -116,8 +117,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             {/* Logo & Company Name */}
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center shadow-lg mr-4">
-                <span className="text-white font-bold text-lg">TEI</span>
+              <div className="w-12 h-12 mr-4 relative">
+                <Image
+                  src="/logo.png"
+                  alt="Logo PT Tunas Esta Indonesia"
+                  fill
+                  sizes="48px"
+                  className="object-contain drop-shadow-md"
+                  priority={false}
+                />
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-xl font-bold text-gray-900">

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import Header from "@/components/dashboard/Header"
 import Sidebar from "@/components/dashboard/Sidebar"
 import NotificationProvider from "@/components/notifications/Notificationprovider"
+import Image from "next/image"
 
 export default function DashboardLayout({
   children,
@@ -41,8 +42,15 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-white">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center shadow-lg">
-            <div className="text-white text-xl font-bold">TE</div>
+          <div className="w-16 h-16 relative">
+            <Image
+              src="/logo.png"
+              alt="Logo PT Tunas Esta Indonesia"
+              fill
+              sizes="64px"
+              className="object-contain drop-shadow-md"
+              priority
+            />
           </div>
           <div className="animate-spin rounded-full h-8 w-8 border-4 border-green-200 border-t-green-600"></div>
           <p className="text-gray-600 text-sm font-medium">Memuat dashboard...</p>
@@ -88,8 +96,14 @@ export default function DashboardLayout({
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-30">
           <div className="flex justify-center">
             <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">TE</span>
+              <div className="w-6 h-6 relative">
+                <Image
+                  src="/logo.png"
+                  alt="Logo PT Tunas Esta Indonesia"
+                  fill
+                  sizes="24px"
+                  className="object-contain"
+                />
               </div>
               <span className="text-xs text-gray-600">PT Tunas Esta Indonesia</span>
             </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import StatsCard from "@/components/dashboard/StatsCard"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { Spl, Role } from "@/types"
-import toast from "react-hot-toast"
+import Swal from "sweetalert2"
 import Link from "next/link" // <-- TAMBAHAN: Import Link
 
 export default function DashboardPage() {
@@ -18,6 +18,8 @@ export default function DashboardPage() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [recentSpls, setRecentSpls] = useState<Spl[]>([])
+  const [minOvertime, setMinOvertime] = useState("16:30")
+  const [isSavingMin, setIsSavingMin] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,13 +47,33 @@ export default function DashboardPage() {
           .slice(0, 3)
         setRecentSpls(recent)
       } catch (error: any) {
-        toast.error(error.message || "Terjadi kesalahan")
+        await Swal.fire({
+          icon: "error",
+          title: "Gagal memuat data",
+          text: error.message || "Terjadi kesalahan",
+        })
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchData()
+  }, [])
+
+  // Load minimal lembur for manager view
+  useEffect(() => {
+    const loadMin = async () => {
+      try {
+        const res = await fetch("/api/settings/min-overtime")
+        const data = await res.json()
+        if (res.ok && data?.value) {
+          setMinOvertime(data.value)
+        }
+      } catch (err) {
+        console.error("Gagal mengambil setting minimal lembur", err)
+      }
+    }
+    loadMin()
   }, [])
 
   const userRole = session?.user?.role as Role
@@ -144,6 +166,43 @@ export default function DashboardPage() {
         return "Review dan setujui pengajuan lembur karyawan"
       default:
         return "Selamat datang di Sistem Pengajuan Surat Perintah Lembur"
+    }
+  }
+
+  const saveMinOvertime = async () => {
+    if (!/^\d{2}:\d{2}$/.test(minOvertime)) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Format salah",
+        text: "Format waktu harus HH:MM (contoh 13:30).",
+      })
+      return
+    }
+    try {
+      setIsSavingMin(true)
+      const res = await fetch("/api/settings/min-overtime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: minOvertime }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal menyimpan waktu minimal")
+      }
+      setMinOvertime(data.value)
+      await Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: `Waktu minimal lembur diset ke ${data.value}`,
+      })
+    } catch (err: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal menyimpan",
+        text: err.message || "Gagal menyimpan setting",
+      })
+    } finally {
+      setIsSavingMin(false)
     }
   }
 
@@ -386,13 +445,73 @@ export default function DashboardPage() {
                       </svg>
                       Lihat Riwayat
                     </Link>
-                  </div>
-                </>
-              )}
+              </div>
+            </>
+          )}
 
-              {/* HR ACTIONS */}
-              {userRole === "HR" && (
-                <>
+          {/* MANAGER ACTIONS */}
+          {userRole === "MANAGER" && (
+            <div className="group bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 0v4m0-4h4m-4 0H8m4-9a9 9 0 110 18 9 9 0 010-18z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-purple-900">
+                    Atur Jam Minimal Lembur
+                  </h3>
+                  <p className="text-purple-700 text-sm">
+                    Default 16:30, bisa fleksibel saat urgent. Format 24 jam.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-700">
+                  Waktu mulai minimal (HH:MM)
+                </label>
+                <div className="flex items-center gap-3 text-sm text-purple-800 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                  <span className="px-2 py-1 bg-purple-600 text-white text-xs font-semibold rounded-md">
+                    24 Jam
+                  </span>
+                  <span>Contoh: 07:30, 13:45. Pengajuan setelah jam ini ditolak otomatis.</span>
+                </div>
+                <input
+                  type="time"
+                  value={minOvertime}
+                  onChange={(e) => setMinOvertime(e.target.value)}
+                  className="w-full rounded-xl border-2 border-purple-200 px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={saveMinOvertime}
+                  disabled={isSavingMin}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
+                >
+                  {isSavingMin ? "Menyimpan..." : "Simpan"}
+                </button>
+                <p className="text-xs text-gray-500">
+                  Batas ini divalidasi di form dan API. Staff tidak bisa mengisi sebelum jam ini.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* HR ACTIONS */}
+          {userRole === "HR" && (
+            <>
                   <div className="group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
                       <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">

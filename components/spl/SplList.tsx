@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Spl, SplStatus } from "@/types"
 import SplCard from "./SplCard"
 import toast from "react-hot-toast"
@@ -22,7 +22,7 @@ export default function SplList({
     initialStatus || "ALL"
   )
 
-  const fetchSpls = async () => {
+  const fetchSpls = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
@@ -42,11 +42,11 @@ export default function SplList({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filterStatus])
 
   useEffect(() => {
     fetchSpls()
-  }, [filterStatus])
+  }, [fetchSpls])
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus pengajuan SPL ini?")) {

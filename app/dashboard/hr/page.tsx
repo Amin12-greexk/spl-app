@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
-import { id } from "date-fns/locale"
+import { id } from "date-fns/locale" // Import locale Indonesia
 import * as XLSX from 'xlsx'
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
@@ -138,7 +138,6 @@ export default function HRViewPage() {
       const ws = XLSX.utils.json_to_sheet(exportData)
       const wb = XLSX.utils.book_new()
       
-      // Set column widths
       const colWidths = [
         { wch: 5 },   { wch: 20 },  { wch: 25 },  { wch: 15 },  { wch: 12 },
         { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },  { wch: 40 },
@@ -150,11 +149,11 @@ export default function HRViewPage() {
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
       
       const periodText = dateFilter === "ALL" ? "Semua_Periode" :
-                        dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
-                        dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
-                        dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
-                        dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
-                        `${customStartDate}_sampai_${customEndDate}`
+                         dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
+                         dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
+                         dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
+                         dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
+                         `${customStartDate}_sampai_${customEndDate}`
       
       const fileName = `Data_SPL_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`
       XLSX.writeFile(wb, fileName)
@@ -218,6 +217,23 @@ export default function HRViewPage() {
     return bytes
   }
 
+  const wrapText = (text: string, maxChars: number) => {
+    const words = text.split(" ")
+    const lines: string[] = []
+    let current = ""
+    words.forEach((w) => {
+      if ((current + " " + w).trim().length > maxChars) {
+        if (current) lines.push(current.trim())
+        current = w
+      } else {
+        current += " " + w
+      }
+    })
+    if (current.trim()) lines.push(current.trim())
+    return lines
+  }
+
+  // --- REVISED PDF GENERATION (FIXED OVERLAP & ALIGNMENT) ---
   const generateRekapPdf = async () => {
     if (filteredSpls.length === 0) {
       toast.error("Tidak ada data untuk direkap")
@@ -232,287 +248,216 @@ export default function HRViewPage() {
       const pageWidth = 595.28 // A4 width
       const pageHeight = 841.89 // A4 height
       const margin = 30
-      const rowsPerPage = 15 // Adjust based on actual space
+      
+      const colWidths = [25, 100, 40, 60, 45, 45, 120, 100]
+      const headers = ["No", "Nama", "PIN", "Tanggal", "Mulai", "Selesai", "Keterangan", "Tanda Tangan"]
+      
+      // FIXED: Reduced rowsPerPage from 10 to 8 to prevent overlap with footer
+      const rowsPerPage = 8 
+      const rowHeight = 60
 
-      // Group SPLs by page
       const splsPerPage: Spl[][] = []
       for (let i = 0; i < filteredSpls.length; i += rowsPerPage) {
         splsPerPage.push(filteredSpls.slice(i, i + rowsPerPage))
       }
 
-      // Create pages
       for (let pageIndex = 0; pageIndex < splsPerPage.length; pageIndex++) {
         const page = pdfDoc.addPage([pageWidth, pageHeight])
         const pageSPLs = splsPerPage[pageIndex]
         let y = pageHeight - margin
 
-        // Draw logo placeholder (green leaf icon)
+        // --- HEADER ---
         const logoSize = 40
         page.drawRectangle({
-          x: margin,
-          y: y - logoSize,
-          width: logoSize,
-          height: logoSize,
-          color: rgb(0.1, 0.6, 0.3),
-          opacity: 0.2
+            x: margin, y: y - logoSize, width: logoSize, height: logoSize,
+            color: rgb(0.1, 0.6, 0.3), opacity: 0.2
         })
-        // Simple leaf shape
-        page.drawCircle({
-          x: margin + 15,
-          y: y - 20,
-          size: 10,
-          color: rgb(0.1, 0.6, 0.3)
-        })
-        page.drawCircle({
-          x: margin + 25,
-          y: y - 20,
-          size: 10,
-          color: rgb(0.1, 0.6, 0.3)
-        })
+        page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+        page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
 
-        // Title
-        const titleX = margin + logoSize + 20
         page.drawText("REKAP ABSEN MANUAL STAFF PT TUNAS ESTA INDONESIA", {
-          x: titleX,
+          x: margin + logoSize + 15,
           y: y - 25,
           size: 14,
           font: bold
         })
         y -= 60
 
-        // Table header
-        const colWidths = [30, 120, 60, 80, 80, 80, 150, 100] // Adjusted column widths
+        // --- TABEL HEADER ---
         const tableX = margin
         let currentX = tableX
 
-        // Draw table header background
         page.drawRectangle({
-          x: tableX,
-          y: y - 25,
-          width: pageWidth - (margin * 2),
-          height: 25,
-          color: rgb(0.95, 0.95, 0.95)
+          x: tableX, y: y - 25,
+          width: pageWidth - (margin * 2), height: 25,
+          color: rgb(0.9, 0.9, 0.9)
         })
 
-        // Draw header text
-        const headers = ["No", "Nama", "PIN", "Tanggal", "Jam Masuk\nLembur", "Jam Keluar\nLembur", "Keterangan", "Tanda Tangan"]
-        headers.forEach((header, i) => {
-          const lines = header.split('\n')
-          lines.forEach((line, lineIndex) => {
-            page.drawText(line, {
-              x: currentX + 5,
-              y: y - 10 - (lineIndex * 10),
-              size: 9,
-              font: bold
+        for (let i = 0; i < headers.length; i++) {
+            const textWidth = bold.widthOfTextAtSize(headers[i], 9)
+            const centerX = currentX + (colWidths[i] - textWidth) / 2
+            
+            page.drawText(headers[i], {
+                x: centerX, y: y - 17,
+                size: 9, font: bold
             })
-          })
-          currentX += colWidths[i]
-        })
 
-        // Draw header borders
-        currentX = tableX
-        for (let i = 0; i <= headers.length; i++) {
-          page.drawLine({
-            start: { x: currentX, y: y },
-            end: { x: currentX, y: y - 25 },
-            thickness: 0.5,
-            color: rgb(0, 0, 0)
-          })
-          if (i < colWidths.length) currentX += colWidths[i]
-        }
-        page.drawLine({
-          start: { x: tableX, y: y },
-          end: { x: pageWidth - margin, y: y },
-          thickness: 0.5,
-          color: rgb(0, 0, 0)
-        })
-        page.drawLine({
-          start: { x: tableX, y: y - 25 },
-          end: { x: pageWidth - margin, y: y - 25 },
-          thickness: 0.5,
-          color: rgb(0, 0, 0)
-        })
-
-        y -= 25
-
-        // Draw table rows
-        const rowHeight = 30
-        for (let index = 0; index < pageSPLs.length; index++) {
-          const spl = pageSPLs[index]
-          const rowY = y - (index + 1) * rowHeight
-          currentX = tableX
-
-          // Draw row data
-          const rowData = [
-            `${pageIndex * rowsPerPage + index + 1}`,
-            spl.requester.name,
-            spl.requester.pin || "-",
-            format(new Date(spl.date), "dd/MM/yyyy"),
-            spl.startTime,
-            spl.endTime,
-            spl.reason.length > 40 ? spl.reason.substring(0, 37) + "..." : spl.reason
-          ]
-
-          // Calculate signature column position
-          let signatureColX = tableX
-          for (let i = 0; i < colWidths.length - 1; i++) {
-            signatureColX += colWidths[i]
-          }
-
-          rowData.forEach((data, i) => {
-            page.drawText(data, {
-              x: currentX + 5,
-              y: rowY + rowHeight - 20,
-              size: 8,
-              font: font,
-              maxWidth: colWidths[i] - 10
+            page.drawLine({
+                start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 },
+                thickness: 0.5, color: rgb(0, 0, 0)
             })
             currentX += colWidths[i]
-          })
+        }
+        
+        page.drawLine({ start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
+        page.drawLine({ start: { x: tableX, y: y }, end: { x: currentX, y: y }, thickness: 0.5 })
+        page.drawLine({ start: { x: tableX, y: y - 25 }, end: { x: currentX, y: y - 25 }, thickness: 0.5 })
+        y -= 25
 
-          // Draw signature if exists
-          if (spl.signature) {
-            try {
-              const signatureBytes = dataUrlToBytes(spl.signature)
-              if (signatureBytes) {
-                let signatureImage
-                if (spl.signature.includes('image/png')) {
-                  signatureImage = await pdfDoc.embedPng(signatureBytes)
-                } else {
-                  signatureImage = await pdfDoc.embedJpg(signatureBytes)
+        // --- TABEL ROWS ---
+        for (let index = 0; index < rowsPerPage; index++) {
+            const spl = pageSPLs[index]
+            const rowY = y - (index + 1) * rowHeight
+            currentX = tableX
+
+            page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+            if (spl) {
+                const rowData = [
+                    `${pageIndex * rowsPerPage + index + 1}`,
+                    spl.requester.name,
+                    spl.requester.pin || "-",
+                    format(new Date(spl.date), "dd/MM/yyyy"),
+                    spl.startTime,
+                    spl.endTime,
+                ]
+
+                for(let i=0; i<6; i++) {
+                    const isCenter = i !== 1
+                    const text = rowData[i]
+                    const textSize = 9
+                    const textWidth = font.widthOfTextAtSize(text, textSize)
+                    let textX = currentX + 5
+                    if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
+
+                    page.drawText(text, {
+                        x: textX, y: rowY + (rowHeight / 2) - 4,
+                        size: textSize, font: font, maxWidth: colWidths[i] - 10
+                    })
+                    currentX += colWidths[i]
+                    page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
                 }
 
-                const signatureWidth = 80
-                const signatureHeight = 20
-                const signatureX = signatureColX + 10
-                const signatureY = rowY + 5
-
-                page.drawImage(signatureImage, {
-                  x: signatureX,
-                  y: signatureY,
-                  width: signatureWidth,
-                  height: signatureHeight
+                // Keterangan
+                const ketIndex = 6
+                const ketText = spl.reason || "-"
+                const ketLines = wrapText(ketText, 25)
+                let ketY = rowY + rowHeight - 15
+                ketLines.slice(0, 4).forEach((line) => {
+                    page.drawText(line, { x: currentX + 5, y: ketY, size: 8, font })
+                    ketY -= 10
                 })
-              }
-            } catch (error) {
-              console.error("Error embedding signature:", error)
+                currentX += colWidths[ketIndex]
+                page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+                // Tanda Tangan Image
+                const ttdIndex = 7
+                const ttdWidth = colWidths[ttdIndex]
+                if (spl.signature) {
+                    try {
+                        const signatureBytes = dataUrlToBytes(spl.signature)
+                        if (signatureBytes) {
+                            let signatureImage
+                            if (spl.signature.includes('image/png')) signatureImage = await pdfDoc.embedPng(signatureBytes)
+                            else signatureImage = await pdfDoc.embedJpg(signatureBytes)
+
+                            const padding = 10
+                            const maxWidth = ttdWidth - (padding * 2)
+                            const maxHeight = rowHeight - (padding * 2)
+                            const scale = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height)
+                            const dims = signatureImage.scale(scale)
+
+                            const imgX = currentX + (ttdWidth - dims.width) / 2
+                            const imgY = rowY + (rowHeight - dims.height) / 2
+                            page.drawImage(signatureImage, { x: imgX, y: imgY, width: dims.width, height: dims.height })
+                        }
+                    } catch (e) {
+                        console.error("Signature error", e)
+                    }
+                } else {
+                    page.drawText("-", { x: currentX + (ttdWidth/2) - 2, y: rowY + (rowHeight/2) - 4, size: 9, font })
+                }
+                currentX += ttdWidth
+                page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            } else {
+                for(let i=0; i < colWidths.length; i++) {
+                     currentX += colWidths[i]
+                     page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+                }
             }
-          }
-
-          // Draw row borders
-          currentX = tableX
-          for (let i = 0; i <= headers.length; i++) {
-            page.drawLine({
-              start: { x: currentX, y: rowY },
-              end: { x: currentX, y: rowY + rowHeight },
-              thickness: 0.5,
-              color: rgb(0, 0, 0)
-            })
-            if (i < colWidths.length) currentX += colWidths[i]
-          }
-          page.drawLine({
-            start: { x: tableX, y: rowY },
-            end: { x: pageWidth - margin, y: rowY },
-            thickness: 0.5,
-            color: rgb(0, 0, 0)
-          })
+            page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + 535, y: rowY }, thickness: 0.5 })
         }
 
-        // Draw empty rows to fill the table
-        const totalRows = rowsPerPage
-        const emptyRows = totalRows - pageSPLs.length
-        for (let i = 0; i < emptyRows; i++) {
-          const rowY = y - (pageSPLs.length + i + 1) * rowHeight
-          currentX = tableX
+        // --- FOOTER TANDA TANGAN (POSISI DIATUR AGAR TIDAK NABRAK) ---
+        // Dengan rowsPerPage = 8, tabel berakhir di Y ~246.
+        // Kita set footerY di 80, maka Header TTD mulai di Y ~140. Aman (Gap ~100 poin).
+        
+        const footerY = 80 
+        const boxWidth = 140
+        const totalFooterWidth = pageWidth - (margin * 2)
+        const gap = (totalFooterWidth - (boxWidth * 3)) / 2 
 
-          // Draw empty row borders
-          for (let j = 0; j <= headers.length; j++) {
-            page.drawLine({
-              start: { x: currentX, y: rowY },
-              end: { x: currentX, y: rowY + rowHeight },
-              thickness: 0.5,
-              color: rgb(0, 0, 0)
-            })
-            if (j < colWidths.length) currentX += colWidths[j]
-          }
-          page.drawLine({
-            start: { x: tableX, y: rowY },
-            end: { x: pageWidth - margin, y: rowY },
-            thickness: 0.5,
-            color: rgb(0, 0, 0)
-          })
-        }
-
-        // Footer section
-        const footerY = 120
-        const signatureWidth = 150
-        const signatureGap = (pageWidth - margin * 2 - signatureWidth * 3) / 2
-
-        // Date location
-        page.drawText("Demak,.................................", {
-          x: pageWidth - margin - 200,
-          y: footerY + 100,
-          size: 10,
-          font: font
-        })
-        page.drawText("Mengetahui :", {
-          x: pageWidth - margin - 120,
-          y: footerY + 85,
-          size: 10,
-          font: font
-        })
-
-        // Signature boxes
         const signatures = [
-          { label: "Diajukan Oleh :", name: ".....................................", title: "Karyawan / Leader" },
-          { label: "Disetujui Oleh :", name: "Zhalilla Viola Risqa Setiani", title: "HR & GA Supervisor" },
-          { label: "", name: "Tiyas Indah Setyowuri", title: "Plant Manager" }
+             { role: "Diajukan Oleh", name: "..........................", title: "Pemohon / Leader" },
+             { role: "Disetujui Oleh", name: "Zhalilla Viola R.S.", title: "HR & GA Supervisor" },
+             { role: "Mengetahui", name: "Tiyas Indah S.", title: "Plant Manager" },
         ]
 
-        signatures.forEach((sig, index) => {
-          const sigX = margin + (index * (signatureWidth + signatureGap))
-          
-          if (sig.label) {
-            page.drawText(sig.label, {
-              x: sigX,
-              y: footerY + 70,
-              size: 10,
-              font: font
-            })
-          }
-
-          // Signature line
-          page.drawLine({
-            start: { x: sigX, y: footerY + 20 },
-            end: { x: sigX + signatureWidth - 20, y: footerY + 20 },
-            thickness: 0.5,
-            color: rgb(0, 0, 0)
-          })
-
-          // Name
-          page.drawText(sig.name, {
-            x: sigX,
-            y: footerY + 5,
-            size: 9,
-            font: font
-          })
-
-          // Title
-          page.drawText(sig.title, {
-            x: sigX,
-            y: footerY - 10,
-            size: 9,
-            font: font
-          })
+        // 1. Gambar Tanggal & Lokasi
+        const dateText = `Demak, ${format(new Date(), "dd MMMM yyyy", { locale: id })}`
+        const dateXPos = margin + (2 * (boxWidth + gap))
+        const dateWidth = font.widthOfTextAtSize(dateText, 10)
+        const centeredDateX = dateXPos + (boxWidth - dateWidth) / 2
+        
+        page.drawText(dateText, {
+            x: centeredDateX,
+            y: footerY + 85,
+            size: 10, font
         })
-      }
+
+        // 2. Loop Gambar Box Tanda Tangan
+        signatures.forEach((sig, idx) => {
+             const xPos = margin + (idx * (boxWidth + gap))
+             
+             const drawCentered = (text: string, y: number, f: any, s: number) => {
+                const w = f.widthOfTextAtSize(text, s)
+                page.drawText(text, { x: xPos + (boxWidth - w) / 2, y, size: s, font: f })
+             }
+
+             // Role
+             drawCentered(sig.role + " :", footerY + 60, bold, 9)
+             
+             // Garis
+             page.drawLine({
+                 start: { x: xPos, y: footerY + 25 },
+                 end: { x: xPos + boxWidth, y: footerY + 25 },
+                 thickness: 0.5
+             })
+             
+             // Nama
+             drawCentered(sig.name, footerY + 12, bold, 9)
+             // Title
+             drawCentered(sig.title, footerY, font, 9)
+        })
+
+      } // End Page Loop
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = `Rekap_Lembur_Manual_${format(new Date(), "yyyyMMdd")}.pdf`
+      link.download = `Rekap_Lembur_Manual_${format(new Date(), "yyyyMMdd_HHmmss")}.pdf`
       link.click()
       URL.revokeObjectURL(url)
       toast.success("Rekap PDF berhasil dibuat")
@@ -572,7 +517,7 @@ export default function HRViewPage() {
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="text-center">

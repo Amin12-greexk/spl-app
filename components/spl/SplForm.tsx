@@ -1,17 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
 import SignaturePad from "@/components/spl/SignaturePad"
-import toast from "react-hot-toast"
+import Swal from "sweetalert2"
 
 export default function SplForm() {
   const router = useRouter()
   const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
+  const [minStart, setMinStart] = useState("16:30")
   const [formData, setFormData] = useState({
     signature: "",
     date: "",
@@ -21,12 +22,56 @@ export default function SplForm() {
     projectName: "",
   })
 
+  useEffect(() => {
+    const loadMin = async () => {
+      try {
+        const res = await fetch("/api/settings/min-overtime")
+        const data = await res.json()
+        if (res.ok && data?.value) {
+          setMinStart(data.value)
+        }
+      } catch (err) {
+        console.error("Gagal mengambil setting jam minimal lembur", err)
+      }
+    }
+    loadMin()
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.signature || formData.signature.length < 30) {
-      toast.error("Tanda tangan belum diisi dengan benar")
+      await Swal.fire({
+        icon: "error",
+        title: "Tanda tangan belum diisi",
+        text: "Silakan isi tanda tangan sebelum mengajukan.",
+      })
       return
+    }
+
+    const [minH, minM] = minStart.split(":").map(Number)
+    const [startH, startM] = formData.startTime.split(":").map(Number)
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    if (!Number.isNaN(minH) && !Number.isNaN(startH)) {
+      const minMinutes = minH * 60 + minM
+      const startMinutes = startH * 60 + startM
+      if (nowMinutes > minMinutes) {
+        await Swal.fire({
+          icon: "error",
+          title: "Lewat Batas Waktu",
+          text: `Pengajuan hanya bisa sebelum pukul ${minStart} (atur oleh Manager).`,
+        })
+        return
+      }
+      if (startMinutes < minMinutes) {
+        await Swal.fire({
+          icon: "error",
+          title: "Jam Mulai Terlalu Awal",
+          text: `Waktu mulai minimal ${minStart} (atur oleh Manager).`,
+        })
+        return
+      }
     }
 
     setIsLoading(true)
@@ -46,11 +91,19 @@ export default function SplForm() {
         throw new Error(data.error || "Gagal mengajukan SPL")
       }
 
-      toast.success("SPL berhasil diajukan!")
+      await Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: "SPL berhasil diajukan!",
+      })
       router.push("/dashboard/staff")
       router.refresh()
     } catch (error: any) {
-      toast.error(error.message || "Terjadi kesalahan")
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: error.message || "Terjadi kesalahan",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -156,41 +209,50 @@ export default function SplForm() {
             {/* Time Section */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                Waktu Lembur
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Input
-                    label="Waktu Mulai"
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startTime: e.target.value })
-                    }
-                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Input
-                    label="Waktu Selesai"
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endTime: e.target.value })
-                    }
-                    className="border-gray-200 focus:border-green-500 focus:ring-green-500"
-                    required
-                  />
-                </div>
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
+              Waktu Lembur
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Input
+                  label="Waktu Mulai"
+                  type="time"
+                  placeholder="13:30"
+                  value={formData.startTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, startTime: e.target.value })
+                  }
+                  className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                  required
+                />
+              <div className="mt-2 text-xs text-gray-600 space-y-1">
+                <p>Format 24 jam (contoh: 13:30). Minimal: {minStart} (atur oleh Manager).</p>
+                <p>Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
+              </div>
+            </div>
+
+              <div>
+                <Input
+                  label="Waktu Selesai"
+                  type="time"
+                  placeholder="17:00"
+                  value={formData.endTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endTime: e.target.value })
+                  }
+                  className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Pastikan lebih besar dari waktu mulai. Gunakan format HH:MM.
+                </p>
+              </div>
+            </div>
 
               {/* Duration Display */}
               {duration && (

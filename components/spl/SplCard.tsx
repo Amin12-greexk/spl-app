@@ -1,6 +1,7 @@
 import { Spl } from "@/types"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
+import Image from "next/image"
 
 interface SplCardProps {
   spl: Spl
@@ -103,11 +104,17 @@ export default function SplCard({
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-sm text-gray-500 mb-2">Tanda Tangan Pemohon:</p>
             <div className="bg-gray-50 border rounded-lg p-2">
-              <img
-                src={spl.signature}
-                alt={`Tanda tangan ${spl.requester.name}`}
-                className="w-full h-24 object-contain"
-              />
+              <div className="relative w-full h-24">
+                <Image
+                  src={spl.signature}
+                  alt={`Tanda tangan ${spl.requester.name}`}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-contain"
+                  unoptimized
+                  priority={false}
+                />
+              </div>
             </div>
           </div>
         )}

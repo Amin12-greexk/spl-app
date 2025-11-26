@@ -50,6 +50,13 @@ async function main() {
     },
   });
 
+  // Default setting minimal jam lembur (16:30)
+  const minOvertimeSetting = await prisma.setting.upsert({
+    where: { key: "MIN_OVERTIME_START" },
+    update: { value: "16:30" },
+    create: { key: "MIN_OVERTIME_START", value: "16:30" },
+  });
+
   console.log({ hrUser, managerUser, staffUser });
 }
 

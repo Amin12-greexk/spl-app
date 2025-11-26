@@ -97,9 +97,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
-    // Kalkulasi total jam
+    // Ambil minimal waktu lembur yang diset manager (default 16:30)
+    const minSetting = await prisma.setting.findUnique({
+      where: { key: "MIN_OVERTIME_START" },
+    })
+    const minTime = minSetting?.value || "16:30"
+    const [minHour, minMin] = minTime.split(":").map(Number)
     const [startHour, startMin] = body.startTime.split(":").map(Number);
     const [endHour, endMin] = body.endTime.split(":").map(Number);
+
+    // Hard stop: past cutoff time (menggunakan waktu server lokal)
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const minTotalMinutes = minHour * 60 + minMin
+    if (nowMinutes > minTotalMinutes) {
+      return NextResponse.json(
+        { error: `Pengajuan hanya bisa sebelum pukul ${minTime} (atur oleh Manager)` },
+        { status: 400 }
+      );
+    }
+
+    // Validasi jam mulai minimal
+    const startTotalMinutes = startHour * 60 + startMin
+    if (Number.isNaN(startTotalMinutes) || startTotalMinutes < minTotalMinutes) {
+      return NextResponse.json(
+        { error: `Waktu mulai minimal ${minTime} (atur oleh Manager)` },
+        { status: 400 }
+      );
+    }
+
+    // Kalkulasi total jam
     const totalMinutes = endHour * 60 + endMin - (startHour * 60 + startMin);
     const totalHours = parseFloat((totalMinutes / 60).toFixed(2)); // Ubah ke 2 angka desimal
 

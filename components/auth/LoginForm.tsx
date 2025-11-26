@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
+import Image from "next/image"
 
 export default function LoginForm() {
   const router = useRouter()
@@ -45,9 +46,15 @@ export default function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo dan Branding */}
         <div className="text-center mb-8">
-          {/* Logo Container */}
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center shadow-lg mb-4">
-            <div className="text-white text-2xl font-bold">TE</div>
+          <div className="mx-auto w-20 h-20 mb-4 relative">
+            <Image
+              src="/logo.png"
+              alt="Logo PT Tunas Esta Indonesia"
+              fill
+              sizes="80px"
+              className="object-contain drop-shadow-md"
+              priority
+            />
           </div>
           
           {/* Company Branding */}
@@ -91,7 +98,7 @@ export default function LoginForm() {
               <Input
                 label="Kata Sandi"
                 type="password"
-                placeholder="••••••••••••"
+                placeholder="*****************"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
@@ -149,10 +156,21 @@ export default function LoginForm() {
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-gray-500 text-xs">
-            © 2024 PT Tunas Esta Indonesia. All rights reserved.
-          </p>
-          <p className="text-gray-400 text-xs mt-1">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <div className="relative w-6 h-6">
+              <Image
+                src="/logo.png"
+                alt="Logo PT Tunas Esta Indonesia"
+                fill
+                sizes="24px"
+                className="object-contain"
+              />
+            </div>
+            <p className="text-gray-500 text-xs">
+              (c) 2024 PT Tunas Esta Indonesia. All rights reserved.
+            </p>
+          </div>
+          <p className="text-gray-400 text-xs">
             Sistem SPL v1.0
           </p>
         </div>
@@ -160,3 +178,5 @@ export default function LoginForm() {
     </div>
   )
 }
+
+
