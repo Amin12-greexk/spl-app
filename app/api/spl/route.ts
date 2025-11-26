@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         requester: {
-          select: { id: true, name: true, email: true }, // Hanya pilih data yang perlu
+          select: { id: true, name: true, email: true, pin: true, department: true }, // Hanya pilih data yang perlu
         },
         approver: {
           select: { id: true, name: true, email: true }, // Hanya pilih data yang perlu
@@ -89,8 +89,12 @@ export async function POST(req: NextRequest) {
     const body: CreateSplInput = await req.json();
 
     // Validasi input dasar
-    if (!body.date || !body.startTime || !body.endTime || !body.reason) {
-        return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
+    if (!body.date || !body.startTime || !body.endTime || !body.reason || !body.signature) {
+        return NextResponse.json({ error: "Semua field wajib diisi termasuk tanda tangan" }, { status: 400 });
+    }
+
+    if (typeof body.signature !== "string" || body.signature.trim().length < 30) {
+      return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
     // Kalkulasi total jam
@@ -114,6 +118,7 @@ export async function POST(req: NextRequest) {
         endTime: body.endTime,
         totalHours,
         reason: body.reason,
+        signature: body.signature.trim(),
         projectName: body.projectName,
         status: "PENDING", // Status default diatur di sini
       },

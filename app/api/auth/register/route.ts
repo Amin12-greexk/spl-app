@@ -5,12 +5,20 @@ import { prisma } from "@/lib/prisma"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, name, department } = body
+    const { email, password, name, department, pin } = body
 
     // Validasi input
-    if (!email || !password || !name) {
+    if (!email || !password || !name || !pin) {
       return NextResponse.json(
-        { error: "Email, password, dan nama harus diisi" },
+        { error: "Email, password, nama, dan pin harus diisi" },
+        { status: 400 }
+      )
+    }
+
+    // Validasi pin sederhana: minimal 4 karakter agar tidak kosong
+    if (typeof pin !== "string" || pin.trim().length < 4) {
+      return NextResponse.json(
+        { error: "Pin harus berisi minimal 4 karakter" },
         { status: 400 }
       )
     }
@@ -36,6 +44,7 @@ export async function POST(req: NextRequest) {
         email,
         password: hashedPassword,
         name,
+        pin: pin.trim(),
         department,
         role: "STAFF", // Default role untuk user baru
       },

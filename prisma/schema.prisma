@@ -16,6 +16,7 @@ model User {
   id             String             @id @default(cuid())
   email          String             @unique
   password       String
+  pin            String
   name           String
   role           String             @default("STAFF") // Diubah ke String
   department     String?
@@ -37,6 +38,7 @@ model Spl {
   endTime         String
   totalHours      Float
   reason          String
+  signature       String?
   projectName     String?
   status          String    @default("PENDING") // Diubah ke String
   approverId      String?

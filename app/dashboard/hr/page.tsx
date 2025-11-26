@@ -9,6 +9,7 @@ import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale"
 import * as XLSX from 'xlsx'
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
 export default function HRViewPage() {
   const [spls, setSpls] = useState<Spl[]>([])
@@ -130,7 +131,8 @@ export default function HRViewPage() {
         'Disetujui Oleh': spl.approver?.name || '-',
         'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         'Alasan Penolakan': spl.rejectionReason || '-',
-        'Tanggal Pengajuan': format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm")
+        'Tanggal Pengajuan': format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+        'Tanda Tangan': spl.signature ? 'Ada' : 'Tidak'
       }))
 
       const ws = XLSX.utils.json_to_sheet(exportData)
@@ -140,7 +142,8 @@ export default function HRViewPage() {
       const colWidths = [
         { wch: 5 },   { wch: 20 },  { wch: 25 },  { wch: 15 },  { wch: 12 },
         { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },  { wch: 40 },
-        { wch: 12 },  { wch: 20 },  { wch: 18 },  { wch: 30 },  { wch: 18 }
+        { wch: 12 },  { wch: 20 },  { wch: 18 },  { wch: 30 },  { wch: 18 },
+        { wch: 12 }
       ]
       ws['!cols'] = colWidths
 
@@ -181,13 +184,14 @@ export default function HRViewPage() {
         spl.approver?.name || '-',
         spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         spl.rejectionReason || '-',
-        format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm")
+        format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+        spl.signature ? 'Ada' : 'Tidak'
       ])
 
       const headers = [
         'No', 'Nama Karyawan', 'Email', 'Departemen', 'Tanggal Lembur',
         'Waktu Mulai', 'Waktu Selesai', 'Total Jam', 'Nama Proyek', 'Alasan Lembur',
-        'Status', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan'
+        'Status', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan', 'Tanda Tangan'
       ]
 
       const csvContent = [headers, ...tableData]
@@ -199,6 +203,322 @@ export default function HRViewPage() {
     } catch (error) {
       console.error("Error copying data:", error)
       toast.error("Gagal menyalin data")
+    }
+  }
+
+  const dataUrlToBytes = (dataUrl: string) => {
+    const base64 = dataUrl.split(",")[1]
+    if (!base64) return null
+    const binary = atob(base64)
+    const len = binary.length
+    const bytes = new Uint8Array(len)
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return bytes
+  }
+
+  const generateRekapPdf = async () => {
+    if (filteredSpls.length === 0) {
+      toast.error("Tidak ada data untuk direkap")
+      return
+    }
+
+    try {
+      const pdfDoc = await PDFDocument.create()
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+      const pageWidth = 595.28 // A4 width
+      const pageHeight = 841.89 // A4 height
+      const margin = 30
+      const rowsPerPage = 15 // Adjust based on actual space
+
+      // Group SPLs by page
+      const splsPerPage: Spl[][] = []
+      for (let i = 0; i < filteredSpls.length; i += rowsPerPage) {
+        splsPerPage.push(filteredSpls.slice(i, i + rowsPerPage))
+      }
+
+      // Create pages
+      for (let pageIndex = 0; pageIndex < splsPerPage.length; pageIndex++) {
+        const page = pdfDoc.addPage([pageWidth, pageHeight])
+        const pageSPLs = splsPerPage[pageIndex]
+        let y = pageHeight - margin
+
+        // Draw logo placeholder (green leaf icon)
+        const logoSize = 40
+        page.drawRectangle({
+          x: margin,
+          y: y - logoSize,
+          width: logoSize,
+          height: logoSize,
+          color: rgb(0.1, 0.6, 0.3),
+          opacity: 0.2
+        })
+        // Simple leaf shape
+        page.drawCircle({
+          x: margin + 15,
+          y: y - 20,
+          size: 10,
+          color: rgb(0.1, 0.6, 0.3)
+        })
+        page.drawCircle({
+          x: margin + 25,
+          y: y - 20,
+          size: 10,
+          color: rgb(0.1, 0.6, 0.3)
+        })
+
+        // Title
+        const titleX = margin + logoSize + 20
+        page.drawText("REKAP ABSEN MANUAL STAFF PT TUNAS ESTA INDONESIA", {
+          x: titleX,
+          y: y - 25,
+          size: 14,
+          font: bold
+        })
+        y -= 60
+
+        // Table header
+        const colWidths = [30, 120, 60, 80, 80, 80, 150, 100] // Adjusted column widths
+        const tableX = margin
+        let currentX = tableX
+
+        // Draw table header background
+        page.drawRectangle({
+          x: tableX,
+          y: y - 25,
+          width: pageWidth - (margin * 2),
+          height: 25,
+          color: rgb(0.95, 0.95, 0.95)
+        })
+
+        // Draw header text
+        const headers = ["No", "Nama", "PIN", "Tanggal", "Jam Masuk\nLembur", "Jam Keluar\nLembur", "Keterangan", "Tanda Tangan"]
+        headers.forEach((header, i) => {
+          const lines = header.split('\n')
+          lines.forEach((line, lineIndex) => {
+            page.drawText(line, {
+              x: currentX + 5,
+              y: y - 10 - (lineIndex * 10),
+              size: 9,
+              font: bold
+            })
+          })
+          currentX += colWidths[i]
+        })
+
+        // Draw header borders
+        currentX = tableX
+        for (let i = 0; i <= headers.length; i++) {
+          page.drawLine({
+            start: { x: currentX, y: y },
+            end: { x: currentX, y: y - 25 },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          })
+          if (i < colWidths.length) currentX += colWidths[i]
+        }
+        page.drawLine({
+          start: { x: tableX, y: y },
+          end: { x: pageWidth - margin, y: y },
+          thickness: 0.5,
+          color: rgb(0, 0, 0)
+        })
+        page.drawLine({
+          start: { x: tableX, y: y - 25 },
+          end: { x: pageWidth - margin, y: y - 25 },
+          thickness: 0.5,
+          color: rgb(0, 0, 0)
+        })
+
+        y -= 25
+
+        // Draw table rows
+        const rowHeight = 30
+        for (let index = 0; index < pageSPLs.length; index++) {
+          const spl = pageSPLs[index]
+          const rowY = y - (index + 1) * rowHeight
+          currentX = tableX
+
+          // Draw row data
+          const rowData = [
+            `${pageIndex * rowsPerPage + index + 1}`,
+            spl.requester.name,
+            spl.requester.pin || "-",
+            format(new Date(spl.date), "dd/MM/yyyy"),
+            spl.startTime,
+            spl.endTime,
+            spl.reason.length > 40 ? spl.reason.substring(0, 37) + "..." : spl.reason
+          ]
+
+          // Calculate signature column position
+          let signatureColX = tableX
+          for (let i = 0; i < colWidths.length - 1; i++) {
+            signatureColX += colWidths[i]
+          }
+
+          rowData.forEach((data, i) => {
+            page.drawText(data, {
+              x: currentX + 5,
+              y: rowY + rowHeight - 20,
+              size: 8,
+              font: font,
+              maxWidth: colWidths[i] - 10
+            })
+            currentX += colWidths[i]
+          })
+
+          // Draw signature if exists
+          if (spl.signature) {
+            try {
+              const signatureBytes = dataUrlToBytes(spl.signature)
+              if (signatureBytes) {
+                let signatureImage
+                if (spl.signature.includes('image/png')) {
+                  signatureImage = await pdfDoc.embedPng(signatureBytes)
+                } else {
+                  signatureImage = await pdfDoc.embedJpg(signatureBytes)
+                }
+
+                const signatureWidth = 80
+                const signatureHeight = 20
+                const signatureX = signatureColX + 10
+                const signatureY = rowY + 5
+
+                page.drawImage(signatureImage, {
+                  x: signatureX,
+                  y: signatureY,
+                  width: signatureWidth,
+                  height: signatureHeight
+                })
+              }
+            } catch (error) {
+              console.error("Error embedding signature:", error)
+            }
+          }
+
+          // Draw row borders
+          currentX = tableX
+          for (let i = 0; i <= headers.length; i++) {
+            page.drawLine({
+              start: { x: currentX, y: rowY },
+              end: { x: currentX, y: rowY + rowHeight },
+              thickness: 0.5,
+              color: rgb(0, 0, 0)
+            })
+            if (i < colWidths.length) currentX += colWidths[i]
+          }
+          page.drawLine({
+            start: { x: tableX, y: rowY },
+            end: { x: pageWidth - margin, y: rowY },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          })
+        }
+
+        // Draw empty rows to fill the table
+        const totalRows = rowsPerPage
+        const emptyRows = totalRows - pageSPLs.length
+        for (let i = 0; i < emptyRows; i++) {
+          const rowY = y - (pageSPLs.length + i + 1) * rowHeight
+          currentX = tableX
+
+          // Draw empty row borders
+          for (let j = 0; j <= headers.length; j++) {
+            page.drawLine({
+              start: { x: currentX, y: rowY },
+              end: { x: currentX, y: rowY + rowHeight },
+              thickness: 0.5,
+              color: rgb(0, 0, 0)
+            })
+            if (j < colWidths.length) currentX += colWidths[j]
+          }
+          page.drawLine({
+            start: { x: tableX, y: rowY },
+            end: { x: pageWidth - margin, y: rowY },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          })
+        }
+
+        // Footer section
+        const footerY = 120
+        const signatureWidth = 150
+        const signatureGap = (pageWidth - margin * 2 - signatureWidth * 3) / 2
+
+        // Date location
+        page.drawText("Demak,.................................", {
+          x: pageWidth - margin - 200,
+          y: footerY + 100,
+          size: 10,
+          font: font
+        })
+        page.drawText("Mengetahui :", {
+          x: pageWidth - margin - 120,
+          y: footerY + 85,
+          size: 10,
+          font: font
+        })
+
+        // Signature boxes
+        const signatures = [
+          { label: "Diajukan Oleh :", name: ".....................................", title: "Karyawan / Leader" },
+          { label: "Disetujui Oleh :", name: "Zhalilla Viola Risqa Setiani", title: "HR & GA Supervisor" },
+          { label: "", name: "Tiyas Indah Setyowuri", title: "Plant Manager" }
+        ]
+
+        signatures.forEach((sig, index) => {
+          const sigX = margin + (index * (signatureWidth + signatureGap))
+          
+          if (sig.label) {
+            page.drawText(sig.label, {
+              x: sigX,
+              y: footerY + 70,
+              size: 10,
+              font: font
+            })
+          }
+
+          // Signature line
+          page.drawLine({
+            start: { x: sigX, y: footerY + 20 },
+            end: { x: sigX + signatureWidth - 20, y: footerY + 20 },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          })
+
+          // Name
+          page.drawText(sig.name, {
+            x: sigX,
+            y: footerY + 5,
+            size: 9,
+            font: font
+          })
+
+          // Title
+          page.drawText(sig.title, {
+            x: sigX,
+            y: footerY - 10,
+            size: 9,
+            font: font
+          })
+        })
+      }
+
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `Rekap_Lembur_Manual_${format(new Date(), "yyyyMMdd")}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success("Rekap PDF berhasil dibuat")
+    } catch (error) {
+      console.error("Gagal membuat rekap PDF:", error)
+      toast.error("Gagal membuat rekap PDF")
     }
   }
 
@@ -387,6 +707,16 @@ export default function HRViewPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Export Excel
+            </Button>
+            <Button
+              onClick={generateRekapPdf}
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700"
+              disabled={filteredSpls.length === 0}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Generate Rekap PDF
             </Button>
           </div>
         </div>

@@ -16,6 +16,7 @@ async function main() {
       email: "hr@example.com",
       name: "Akun HR",
       password: hashedPassword,
+      pin: "1111",
       role: "HR", // Sesuai dengan tipe Role Anda
       department: "Human Resources",
     },
@@ -29,6 +30,7 @@ async function main() {
       email: "manager@example.com",
       name: "Akun Manager",
       password: hashedPassword,
+      pin: "2222",
       role: "MANAGER", // Sesuai dengan tipe Role Anda
       department: "Management",
     },
@@ -42,6 +44,7 @@ async function main() {
       email: "staff@example.com",
       name: "Akun Staff",
       password: hashedPassword,
+      pin: "3333",
       role: "STAFF", // Sesuai dengan tipe Role Anda
       department: "IT",
     },

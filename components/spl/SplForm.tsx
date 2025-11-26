@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
+import SignaturePad from "@/components/spl/SignaturePad"
 import toast from "react-hot-toast"
 
 export default function SplForm() {
@@ -12,6 +13,7 @@ export default function SplForm() {
   const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
+    signature: "",
     date: "",
     startTime: "",
     endTime: "",
@@ -21,6 +23,12 @@ export default function SplForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.signature || formData.signature.length < 30) {
+      toast.error("Tanda tangan belum diisi dengan benar")
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -227,6 +235,23 @@ export default function SplForm() {
                   Berikan penjelasan yang detail dan jelas untuk memudahkan proses persetujuan
                 </p>
               </div>
+            </div>
+
+            {/* Signature Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12c2.28-2.04 4.68-3.06 7.2-3.06.86 0 1.58.7 1.58 1.56 0 6.6-4.98 9.5-8.78 9.5-2.5 0-4.06-1.24-4.06-3.02 0-1.58 1.04-2.78 2.88-2.78 1.02 0 1.96.34 3.08 1.06l.8-.66C11.1 13.22 8.8 12.5 6.6 12.5c-1.76 0-3.12 1.08-3.12 2.6 0 1.78 1.86 3.16 4.52 3.16 2.56 0 5.74-1.44 7.64-3.74-.44 2.72-2.72 4.6-5.96 4.6-3.7 0-6.68-2.42-6.68-6.06C2 9.16 5.26 6 9.98 6c2.3 0 4.28.9 5.66 2.34l.98-.92C14.84 5.62 12.7 4.8 10.1 4.8 4.96 4.8 1 8.64 1 13.06 1 17.02 3.86 20 8.1 20c4.92 0 8.9-3.52 8.9-8.94 0-1.88-1.3-3.12-3.8-3.12-2.1 0-3.96 1.02-5.2 2.06z" />
+                  </svg>
+                </div>
+                Tanda Tangan Pengajuan
+              </h2>
+
+              <SignaturePad
+                value={formData.signature}
+                onChange={(signature) => setFormData({ ...formData, signature })}
+              />
             </div>
 
             {/* Guidelines */}

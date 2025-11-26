@@ -19,6 +19,7 @@ export interface User {
   email: string
   name: string
   role: Role // <-- Menggunakan tipe Role yang kita definisikan di atas
+  pin?: string
   department?: string | null
 }
 
@@ -31,6 +32,7 @@ export interface Spl {
   endTime: string
   totalHours: number
   reason: string
+  signature?: string | null
   projectName?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
   approverId?: string | null
@@ -48,6 +50,7 @@ export interface CreateSplInput {
   startTime: string
   endTime: string
   reason: string
+  signature: string
   projectName?: string
 }
 

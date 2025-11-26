@@ -10,6 +10,7 @@ export default function RegisterForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
+    pin: "",
     name: "",
     email: "",
     password: "",
@@ -22,6 +23,11 @@ export default function RegisterForm() {
 
     if (formData.password !== formData.confirmPassword) {
       toast.error("Password tidak cocok!")
+      return
+    }
+
+    if (!formData.pin || formData.pin.trim().length < 4) {
+      toast.error("PIN minimal 4 karakter!")
       return
     }
 
@@ -43,6 +49,7 @@ export default function RegisterForm() {
           email: formData.email,
           password: formData.password,
           department: formData.department,
+          pin: formData.pin,
         }),
       })
 
@@ -88,6 +95,17 @@ export default function RegisterForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* PIN */}
+            <Input
+              label="PIN"
+              type="password"
+              placeholder="Masukkan PIN (min. 4 digit)"
+              value={formData.pin}
+              onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+              className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+              required
+            />
+
             {/* Nama Lengkap */}
             <Input
               label="Nama Lengkap"

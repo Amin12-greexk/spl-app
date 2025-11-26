@@ -99,6 +99,19 @@ export default function SplCard({
           <p className="text-sm text-gray-900">{spl.reason}</p>
         </div>
 
+        {spl.signature && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500 mb-2">Tanda Tangan Pemohon:</p>
+            <div className="bg-gray-50 border rounded-lg p-2">
+              <img
+                src={spl.signature}
+                alt={`Tanda tangan ${spl.requester.name}`}
+                className="w-full h-24 object-contain"
+              />
+            </div>
+          </div>
+        )}
+
         {spl.rejectionReason && (
           <div className="mt-3 pt-3 border-t border-gray-100 bg-red-50 p-3 rounded">
             <p className="text-sm text-red-700 font-medium mb-1">
