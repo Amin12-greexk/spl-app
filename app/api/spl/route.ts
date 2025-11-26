@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
-    // Ambil minimal waktu lembur yang diset manager (default 16:30)
+    // Ambil batas maksimal waktu pengajuan yang diset manager (default 16:30)
     const minSetting = await prisma.setting.findUnique({
       where: { key: "MIN_OVERTIME_START" },
     })
@@ -106,22 +106,13 @@ export async function POST(req: NextRequest) {
     const [startHour, startMin] = body.startTime.split(":").map(Number);
     const [endHour, endMin] = body.endTime.split(":").map(Number);
 
-    // Hard stop: past cutoff time (menggunakan waktu server lokal)
+    // Hard stop: jika waktu pengajuan (saat ini) melewati batas maksimal
     const now = new Date()
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
     const minTotalMinutes = minHour * 60 + minMin
     if (nowMinutes > minTotalMinutes) {
       return NextResponse.json(
         { error: `Pengajuan hanya bisa sebelum pukul ${minTime} (atur oleh Manager)` },
-        { status: 400 }
-      );
-    }
-
-    // Validasi jam mulai minimal
-    const startTotalMinutes = startHour * 60 + startMin
-    if (Number.isNaN(startTotalMinutes) || startTotalMinutes < minTotalMinutes) {
-      return NextResponse.json(
-        { error: `Waktu mulai minimal ${minTime} (atur oleh Manager)` },
         { status: 400 }
       );
     }

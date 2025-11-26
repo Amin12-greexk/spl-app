@@ -55,20 +55,11 @@ export default function SplForm() {
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
     if (!Number.isNaN(minH) && !Number.isNaN(startH)) {
       const minMinutes = minH * 60 + minM
-      const startMinutes = startH * 60 + startM
       if (nowMinutes > minMinutes) {
         await Swal.fire({
           icon: "error",
           title: "Lewat Batas Waktu",
           text: `Pengajuan hanya bisa sebelum pukul ${minStart} (atur oleh Manager).`,
-        })
-        return
-      }
-      if (startMinutes < minMinutes) {
-        await Swal.fire({
-          icon: "error",
-          title: "Jam Mulai Terlalu Awal",
-          text: `Waktu mulai minimal ${minStart} (atur oleh Manager).`,
         })
         return
       }
@@ -231,8 +222,8 @@ export default function SplForm() {
                   required
                 />
               <div className="mt-2 text-xs text-gray-600 space-y-1">
-                <p>Format 24 jam (contoh: 13:30). Minimal: {minStart} (atur oleh Manager).</p>
-                <p>Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
+                <p>Format 24 jam (contoh: 13:30).</p>
+                <p>Batas maksimal pengajuan: {minStart} (atur oleh Manager). Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
               </div>
             </div>
 

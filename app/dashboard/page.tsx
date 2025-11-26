@@ -470,17 +470,17 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-purple-900">
-                    Atur Jam Minimal Lembur
+                    Atur Batas Maksimal Pengajuan
                   </h3>
                   <p className="text-purple-700 text-sm">
-                    Default 16:30, bisa fleksibel saat urgent. Format 24 jam.
+                    Default 16:30, bisa fleksibel saat urgent. Format 24 jam. Pengajuan setelah jam ini ditolak.
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <label className="text-sm font-medium text-gray-700">
-                  Waktu mulai minimal (HH:MM)
+                  Batas maksimal pengajuan (HH:MM)
                 </label>
                 <div className="flex items-center gap-3 text-sm text-purple-800 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
                   <span className="px-2 py-1 bg-purple-600 text-white text-xs font-semibold rounded-md">
