@@ -38,12 +38,34 @@ export async function POST(req: NextRequest) {
 
     // Kirim notifikasi ke semua token
     const notificationPromises = userNotifications.map((token) =>
-      sendNotification(token.endpoint, title, notificationBody, data)
+      sendNotification(token.endpoint, title, notificationBody, data).catch((error) => {
+        console.error(`Failed to send to token ${token.id}:`, error.message)
+        return { error: error.message, tokenId: token.id }
+      })
     )
 
-    await Promise.allSettled(notificationPromises)
+    const results = await Promise.allSettled(notificationPromises)
 
-    return NextResponse.json({ message: "Notifications sent successfully" })
+    // Count success and failures
+    const successful = results.filter(
+      (result) => result.status === "fulfilled" && !(result.value as any)?.error
+    ).length
+    const failed = results.length - successful
+
+    console.log(`📊 Notification results: ${successful} sent, ${failed} failed`)
+
+    if (successful > 0) {
+      return NextResponse.json({
+        message: `Notifications sent to ${successful} device(s)${failed > 0 ? `, ${failed} failed` : ""}`,
+        successful,
+        failed,
+      })
+    } else {
+      return NextResponse.json(
+        { error: "Failed to send notifications to all devices" },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error("Error sending notifications:", error)
     return NextResponse.json(

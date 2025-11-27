@@ -56,6 +56,27 @@ export type SendResult =
   | { error: string; token: string }
 
 // ======================================================
+// 🗑️ CLEANUP INVALID TOKEN FROM DATABASE
+// ======================================================
+export const cleanupInvalidToken = async (token: string): Promise<void> => {
+  try {
+    const { prisma } = await import("@/lib/prisma")
+
+    const deleted = await prisma.userNotification.deleteMany({
+      where: {
+        endpoint: token,
+      },
+    })
+
+    if (deleted.count > 0) {
+      console.log(`🗑️ Cleaned up ${deleted.count} invalid token(s)`)
+    }
+  } catch (error) {
+    console.error("❌ Error cleaning up invalid token:", error)
+  }
+}
+
+// ======================================================
 // 📩 SEND A SINGLE NOTIFICATION
 // ======================================================
 export const sendNotification = async (
@@ -143,15 +164,15 @@ export const sendNotification = async (
   } catch (error: any) {
     console.error("❌ Error sending notification:", error)
 
-    // Handle specific Firebase errors
-    if (error.code === "messaging/registration-token-not-registered") {
-      console.warn("⚠️ Token is no longer valid, should be removed from database")
+    // Handle specific Firebase errors and cleanup invalid tokens
+    if (
+      error.code === "messaging/registration-token-not-registered" ||
+      error.code === "messaging/invalid-registration-token" ||
+      error.code === "messaging/invalid-argument"
+    ) {
+      console.warn("⚠️ Token is invalid, removing from database...")
+      await cleanupInvalidToken(token)
       throw new Error("Token tidak valid atau sudah expired")
-    }
-
-    if (error.code === "messaging/invalid-registration-token") {
-      console.warn("⚠️ Invalid token format")
-      throw new Error("Format token tidak valid")
     }
 
     if (error.code === "messaging/mismatched-credential") {
