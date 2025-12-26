@@ -4,17 +4,56 @@ import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { Role } from "@/types"
+import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 
 interface HeaderProps {
   onMenuClick?: () => void
+}
+
+interface Notification {
+  id: string
+  title: string
+  message: string
+  status: string
+  createdAt: string
+  approvalDate?: string
+  employeeName?: string
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession()
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [notificationCount, setNotificationCount] = useState(0)
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(false)
+
+  // Get notification count from context (real-time updates via Firebase)
+  const { notificationCount, refreshNotificationCount } = useNotificationContext()
+
+  // Efek Glassmorphism saat scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 0)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  // Refresh notification count on mount and when session changes
+  useEffect(() => {
+    if (session) {
+      refreshNotificationCount()
+    }
+  }, [session])
+
+  // Auto-refresh notifications list when dropdown is open and count changes
+  useEffect(() => {
+    if (showNotificationMenu && session) {
+      fetchNotifications()
+    }
+  }, [notificationCount])
 
   const handleLogout = async () => {
     setShowUserMenu(false)
@@ -22,64 +61,147 @@ export default function Header({ onMenuClick }: HeaderProps) {
     router.push("/login")
   }
 
-  // Fetch notification count
-  useEffect(() => {
-    const fetchNotificationCount = async () => {
-      try {
-        if (session?.user?.role === "STAFF") {
-          // Check for SPL status updates
-          const response = await fetch("/api/spl")
-          if (response.ok) {
-            const data = await response.json()
-            const recentUpdates = data.filter((spl: any) => 
-              spl.status !== "PENDING" && 
-              new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+  // Fetch notifications when dropdown is opened
+  const fetchNotifications = async () => {
+    if (loadingNotifications || !session) return
+
+    setLoadingNotifications(true)
+    try {
+      if (session.user.role === "STAFF") {
+        const response = await fetch("/api/spl")
+        if (response.ok) {
+          const data = await response.json()
+          const recentUpdates = data
+            .filter((spl: any) =>
+              spl.status !== "PENDING" &&
+              new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             )
-            setNotificationCount(recentUpdates.length)
-          }
-        } else if (session?.user?.role === "HR" || session?.user?.role === "MANAGER") {
-          // Check for pending SPLs
-          const response = await fetch("/api/spl?status=PENDING")
-          if (response.ok) {
-            const data = await response.json()
-            setNotificationCount(data.length)
-          }
+            .map((spl: any) => {
+              // Format tanggal dengan validasi
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              // Format approval date dengan waktu
+              const formatApprovalDate = (dateString: string) => {
+                if (!dateString) return ''
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return ''
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                } catch {
+                  return ''
+                }
+              }
+
+              const statusText = spl.status === "APPROVED" ? "disetujui" : spl.status === "REJECTED" ? "ditolak" : "diupdate"
+              const approvalDateText = formatApprovalDate(spl.approvalDate)
+
+              return {
+                id: spl.id,
+                title: `SPL ${spl.status === "APPROVED" ? "Disetujui" : spl.status === "REJECTED" ? "Ditolak" : "Diupdate"}`,
+                message: `SPL untuk tanggal ${formatDate(spl.startDate)} telah ${statusText}${approvalDateText ? ` pada ${approvalDateText}` : ''}`,
+                status: spl.status,
+                createdAt: spl.approvalDate || spl.updatedAt,
+              }
+            })
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 10) // Limit to 10 recent notifications
+
+          setNotifications(recentUpdates)
         }
-      } catch (error) {
-        console.error("Error fetching notifications:", error)
+      } else if (session.user.role === "HR" || session.user.role === "MANAGER") {
+        const response = await fetch("/api/spl?status=PENDING")
+        if (response.ok) {
+          const data = await response.json()
+          const pendingNotifications = data
+            .map((spl: any) => {
+              // Format tanggal dengan validasi
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              return {
+                id: spl.id,
+                title: "SPL Perlu Persetujuan",
+                message: `${spl.employee?.name || "Karyawan"} mengajukan SPL untuk tanggal ${formatDate(spl.startDate)}`,
+                status: spl.status,
+                createdAt: spl.createdAt,
+                employeeName: spl.employee?.name,
+              }
+            })
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 10)
+
+          setNotifications(pendingNotifications)
+        }
       }
+    } catch (error) {
+      console.error("Error fetching notifications:", error)
+    } finally {
+      setLoadingNotifications(false)
     }
+  }
 
-    if (session) {
-      fetchNotificationCount()
-      // Refresh every 5 minutes
-      const interval = setInterval(fetchNotificationCount, 5 * 60 * 1000)
-      return () => clearInterval(interval)
+  // Handle notification menu toggle
+  const handleNotificationClick = () => {
+    setShowUserMenu(false) // Close user menu if open
+    const willOpen = !showNotificationMenu
+    setShowNotificationMenu(willOpen)
+
+    if (willOpen) {
+      // Saat membuka dropdown, fetch notifications
+      fetchNotifications()
+    } else {
+      // Saat menutup dropdown, refresh count
+      refreshNotificationCount()
     }
-  }, [session])
+  }
 
-  const getRoleBadge = (role: string) => {
-    const colors: Record<string, string> = {
-      STAFF: "bg-blue-100 text-blue-800 border-blue-200",
-      HR: "bg-green-100 text-green-800 border-green-200",
-      MANAGER: "bg-purple-100 text-purple-800 border-purple-200",
+  // Handle notification item click
+  const handleNotificationItemClick = (notificationId: string) => {
+    setShowNotificationMenu(false)
+
+    // Refresh notification count setelah notifikasi dibuka
+    setTimeout(() => {
+      refreshNotificationCount()
+    }, 500)
+
+    if (session?.user?.role === "STAFF") {
+      router.push(`/dashboard/staff/pengajuan/${notificationId}`)
+    } else if (session?.user?.role === "HR") {
+      router.push(`/dashboard/hr/persetujuan`)
+    } else if (session?.user?.role === "MANAGER") {
+      router.push(`/dashboard/manager/persetujuan`)
     }
-
-    const labels: Record<string, string> = {
-      STAFF: "Staff",
-      HR: "HR",
-      MANAGER: "Manager",
-    }
-
-    return (
-      <span
-        className={`px-2 py-1 text-xs font-semibold rounded-full border ${
-          colors[role] || "bg-gray-100 text-gray-800 border-gray-200"
-        }`}
-      >
-        {labels[role] || role}
-      </span>
-    )
   }
 
   const getInitials = (name: string) => {
@@ -91,155 +213,309 @@ export default function Header({ onMenuClick }: HeaderProps) {
       .slice(0, 2)
   }
 
-  const getNotificationText = () => {
-    if (session?.user?.role === "STAFF") {
-      return notificationCount > 0 ? `${notificationCount} update SPL` : "Tidak ada update"
-    } else {
-      return notificationCount > 0 ? `${notificationCount} SPL menunggu` : "Tidak ada SPL pending"
-    }
+  // Format relative time
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return "Baru saja"
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit lalu`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} hari lalu`
+    return date.toLocaleDateString("id-ID")
   }
 
   return (
-    <header className="bg-white shadow-lg border-b border-green-100 sticky top-0 z-50">
-      <div className="px-4 sm:px-6 lg:px-8 py-3">
-        <div className="flex items-center justify-between">
-          {/* Left side - Logo & Menu */}
-          <div className="flex items-center">
-            {/* Mobile Menu Button */}
-            <button
-              onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-xl text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors mr-3"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-
-            {/* Logo & Company Name */}
-            <div className="flex items-center">
-              <div className="w-12 h-12 mr-4 relative">
-                <Image
-                  src="/logo.png"
-                  alt="Logo PT Tunas Esta Indonesia"
-                  fill
-                  sizes="48px"
-                  className="object-contain drop-shadow-md"
-                  priority={false}
-                />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-gray-900">
-                  PT Tunas Esta Indonesia
-                </h1>
-                <p className="text-sm text-green-600 font-medium">
-                  Sistem Pengajuan SPL
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right side - Actions & User Menu */}
-          <div className="flex items-center space-x-3">
+    <>
+      <header 
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 w-full ${
+          isScrolled 
+            ? "bg-white/85 backdrop-blur-md shadow-sm border-b border-gray-200/50 py-2" 
+            : "bg-white border-b border-gray-100 py-3"
+        }`}
+      >
+        <div className="px-4 sm:px-6 lg:px-8 w-full">
+          <div className="flex items-center justify-between">
             
-
-            {/* User Profile Dropdown */}
-            <div className="relative">
+            {/* --- LEFT: BRANDING --- */}
+            <div className="flex items-center gap-4">
+              {/* Mobile Toggle */}
               <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center space-x-3 p-2 rounded-xl hover:bg-green-50 transition-colors"
+                onClick={onMenuClick}
+                className="lg:hidden p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-green-600 transition-colors"
               >
-                {/* User Avatar */}
-                <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md">
-                  {session?.user?.name ? getInitials(session.user.name) : "U"}
-                </div>
-                
-                {/* User Info - Hidden on small screens */}
-                <div className="hidden md:block text-left">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {session?.user?.name}
-                  </p>
-                  <div className="flex items-center space-x-2 mt-1">
-                    {session?.user?.role && getRoleBadge(session.user.role)}
-                  </div>
-                </div>
-
-                {/* Dropdown Arrow */}
-                <svg
-                  className={`w-4 h-4 text-gray-600 transition-transform ${
-                    showUserMenu ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
 
-              {/* Dropdown Menu */}
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-                  {/* User Info Header */}
-                  <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-14 h-14 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                        {session?.user?.name ? getInitials(session.user.name) : "U"}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-gray-900 text-base">{session?.user?.name}</p>
-                        <p className="text-sm text-gray-600 break-all">{session?.user?.email}</p>
-                        <div className="flex items-center space-x-2 mt-2">
-                          {session?.user?.role && getRoleBadge(session.user.role)}
-                          {session?.user?.department && (
-                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
-                              {session.user.department}
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 transition-transform hover:scale-105">
+                  <Image
+                    src="/logo.png"
+                    alt="Logo"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                {/* Vertical Divider */}
+                <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
+                
+                <div className="hidden sm:block">
+                  <h1 className="text-sm font-bold text-gray-900 leading-none mb-1">
+                    PT Tunas Esta Indonesia
+                  </h1>
+                  <p className="text-xs text-green-600 font-medium tracking-wide bg-green-50 px-2 py-0.5 rounded-full w-fit">
+                    Sistem Pengajuan SPL
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* --- RIGHT: ACTIONS --- */}
+            <div className="flex items-center gap-3">
+
+              {/* Notification Icon */}
+              <div className="relative mr-2">
+                <button
+                  onClick={handleNotificationClick}
+                  className={`p-2.5 rounded-full transition-all duration-200 ${
+                    showNotificationMenu
+                      ? "bg-green-50 text-green-600 ring-2 ring-green-100"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-green-600"
+                  }`}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+
+                  {notificationCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-5 w-5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] font-bold text-white items-center justify-center border-2 border-white shadow-sm">
+                        {notificationCount > 9 ? '9+' : notificationCount}
+                      </span>
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification Dropdown */}
+                {showNotificationMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => {
+                      setShowNotificationMenu(false)
+                      refreshNotificationCount()
+                    }} />
+
+                    <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col">
+                      {/* Header */}
+                      <div className="p-4 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-gray-900">Notifikasi</h3>
+                          {notificationCount > 0 && (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                              {notificationCount} Baru
                             </span>
                           )}
                         </div>
                       </div>
+
+                      {/* Notification List */}
+                      <div className="overflow-y-auto flex-1">
+                        {loadingNotifications ? (
+                          <div className="p-8 text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                            <p className="text-sm text-gray-500 mt-3">Memuat notifikasi...</p>
+                          </div>
+                        ) : notifications.length === 0 ? (
+                          <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                              </svg>
+                            </div>
+                            <p className="text-sm font-medium text-gray-900">Tidak ada notifikasi</p>
+                            <p className="text-xs text-gray-500 mt-1">Notifikasi akan muncul di sini</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {notifications.map((notification) => (
+                              <button
+                                key={notification.id}
+                                onClick={() => handleNotificationItemClick(notification.id)}
+                                className="w-full p-4 hover:bg-gray-50 transition-colors text-left group"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                                    notification.status === "APPROVED"
+                                      ? "bg-green-100 text-green-600"
+                                      : notification.status === "REJECTED"
+                                      ? "bg-red-100 text-red-600"
+                                      : "bg-blue-100 text-blue-600"
+                                  }`}>
+                                    {notification.status === "APPROVED" ? (
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    ) : notification.status === "REJECTED" ? (
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    ) : (
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 group-hover:text-green-600 transition-colors">
+                                      {notification.title}
+                                    </p>
+                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                      {notification.message}
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-1.5">
+                                      {getRelativeTime(notification.createdAt)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      {notifications.length > 0 && (
+                        <div className="p-3 border-t border-gray-100 bg-gray-50">
+                          <button
+                            onClick={() => {
+                              setShowNotificationMenu(false)
+
+                              // Refresh notification count setelah lihat semua
+                              setTimeout(() => {
+                                refreshNotificationCount()
+                              }, 500)
+
+                              if (session?.user?.role === "STAFF") {
+                                router.push("/dashboard/staff/pengajuan")
+                              } else if (session?.user?.role === "HR") {
+                                router.push("/dashboard/hr/persetujuan")
+                              } else if (session?.user?.role === "MANAGER") {
+                                router.push("/dashboard/manager/persetujuan")
+                              }
+                            }}
+                            className="w-full text-center text-xs font-semibold text-green-600 hover:text-green-700 py-2 rounded-lg hover:bg-white transition-colors"
+                          >
+                            Lihat Semua Notifikasi
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </>
+                )}
+              </div>
 
-                  {/* Menu Items */}
-                  <div className="py-2">
-                    <a
-                      href="/dashboard"
-                      className="w-full text-left px-6 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors flex items-center"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <svg className="w-5 h-5 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                      </svg>
-                      Dashboard
-                    </a>
+              {/* User Menu Trigger */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationMenu(false) // Close notification menu if open
+                    setShowUserMenu(!showUserMenu)
+                  }}
+                  className={`flex items-center gap-3 pl-1 pr-1 sm:pr-4 py-1 rounded-full border transition-all duration-200 group ${
+                    showUserMenu
+                      ? "bg-green-50/50 border-green-200 ring-2 ring-green-100"
+                      : "bg-white border-gray-200 hover:border-green-200 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white">
+                    {session?.user?.name ? getInitials(session.user.name) : "U"}
                   </div>
-
-                  {/* Logout */}
-                  <div className="border-t border-gray-100">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-6 py-3 text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center"
-                    >
-                      <svg className="w-5 h-5 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      Keluar dari Sistem
-                    </button>
+                  
+                  <div className="hidden sm:flex flex-col items-start mr-1">
+                    <span className="text-xs font-bold text-gray-700 group-hover:text-green-700 transition-colors">
+                      {session?.user?.name?.split(" ")[0]}
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-medium">
+                      {session?.user?.role}
+                    </span>
                   </div>
-                </div>
-              )}
+                  <svg 
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 hidden sm:block ${showUserMenu ? 'rotate-180 text-green-600' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowUserMenu(false)} />
+                    <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* User Info Header */}
+                      <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
+                        <div className="flex items-center gap-3 mb-3">
+                           <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg">
+                             {session?.user?.name ? getInitials(session.user.name) : "U"}
+                           </div>
+                           <div>
+                              <p className="text-sm font-bold text-gray-900 line-clamp-1">{session?.user?.name}</p>
+                              <p className="text-xs text-gray-500 line-clamp-1">{session?.user?.email}</p>
+                           </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                            {session?.user?.role}
+                          </span>
+                          {session?.user?.pin && (
+                            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                              PIN: {session.user.pin}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Menu List */}
+                      <div className="p-2">
+                        <a
+                          href="/dashboard"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-green-50 hover:text-green-700 transition-all"
+                        >
+                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                          </svg>
+                          Dashboard
+                        </a>
+                      </div>
+                      {/* Logout */}
+                      <div className="p-2 border-t border-gray-100">
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-all group"
+                        >
+                          <svg className="w-5 h-5 mr-3 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Keluar Aplikasi
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Click outside to close dropdown */}
-      {showUserMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowUserMenu(false)}
-        />
-      )}
-    </header>
+      {/* Spacer agar konten di bawahnya tidak tertutup Header yg Fixed */}
+      <div className="h-[76px]" />
+    </>
   )
 }

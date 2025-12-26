@@ -26,8 +26,13 @@ export default function RegisterForm() {
       return
     }
 
-    if (!formData.pin || formData.pin.trim().length < 4) {
-      toast.error("PIN minimal 4 karakter!")
+    if (!formData.pin || formData.pin.trim().length !== 3) {
+      toast.error("PIN harus 3 digit!")
+      return
+    }
+
+    if (!/^\d{3}$/.test(formData.pin.trim())) {
+      toast.error("PIN harus berupa 3 digit angka!")
       return
     }
 
@@ -97,11 +102,16 @@ export default function RegisterForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* PIN */}
             <Input
-              label="PIN"
-              type="password"
-              placeholder="Masukkan PIN (min. 4 digit)"
+              label="PIN (3 Digit)"
+              type="text"
+              placeholder="Masukkan 3 digit PIN (contoh: 123)"
               value={formData.pin}
-              onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+              onChange={(e) => {
+                // Hanya izinkan angka dan maksimal 3 digit
+                const value = e.target.value.replace(/\D/g, '').slice(0, 3)
+                setFormData({ ...formData, pin: value })
+              }}
+              maxLength={3}
               className="border-gray-200 focus:border-green-500 focus:ring-green-500"
               required
             />

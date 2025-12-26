@@ -8,8 +8,11 @@ interface NotificationContextType {
   isSupported: boolean
   isSubscribed: boolean
   isLoading: boolean
+  notificationCount: number
   requestPermission: () => Promise<boolean>
   testNotification: (title: string, message: string) => Promise<void>
+  refreshNotificationCount: () => Promise<void>
+  incrementNotificationCount: () => void
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -32,6 +35,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [firebaseAvailable, setFirebaseAvailable] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
 
   // Check if notifications are supported
   useEffect(() => {
@@ -107,15 +111,18 @@ export default function NotificationProvider({ children }: NotificationProviderP
       if (firebaseAvailable) {
         try {
           const { onMessageListener } = await import("@/lib/firebase")
-          
+
           const messagePromise = onMessageListener()
-          
+
           messagePromise.then((payload: any) => {
             console.log("📬 Received foreground message:", payload)
-            
+
             const title = payload.notification?.title || "Notifikasi Baru"
             const body = payload.notification?.body || ""
-            
+
+            // Increment notification count when new message arrives
+            incrementNotificationCount()
+
             // Show custom toast notification
             toast.custom(
               (t) => (
@@ -169,6 +176,13 @@ export default function NotificationProvider({ children }: NotificationProviderP
 
     setupListener()
   }, [session, isSupported, firebaseAvailable])
+
+  // Fetch initial notification count
+  useEffect(() => {
+    if (session) {
+      refreshNotificationCount()
+    }
+  }, [session])
 
   // Request permission for notifications
   const requestPermission = async (): Promise<boolean> => {
@@ -291,7 +305,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
 
       if (data.success) {
         toast.success(data.message || "Notifikasi test berhasil dikirim!")
-        
+
         // Show browser notification for immediate feedback
         if (Notification.permission === "granted") {
           new Notification(title, {
@@ -309,14 +323,49 @@ export default function NotificationProvider({ children }: NotificationProviderP
     }
   }
 
+  // Fetch notification count
+  const refreshNotificationCount = async () => {
+    if (!session) return
+
+    try {
+      if (session.user.role === "STAFF") {
+        const response = await fetch("/api/spl")
+        if (response.ok) {
+          const data = await response.json()
+          const recentUpdates = data.filter((spl: any) =>
+            spl.status !== "PENDING" &&
+            new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+          )
+          setNotificationCount(recentUpdates.length)
+        }
+      } else if (session.user.role === "HR" || session.user.role === "MANAGER") {
+        const response = await fetch("/api/spl?status=PENDING")
+        if (response.ok) {
+          const data = await response.json()
+          setNotificationCount(data.length)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching notification count:", error)
+    }
+  }
+
+  // Increment notification count (called when new notification arrives)
+  const incrementNotificationCount = () => {
+    setNotificationCount(prev => prev + 1)
+  }
+
   return (
     <NotificationContext.Provider
       value={{
         isSupported,
         isSubscribed,
         isLoading,
+        notificationCount,
         requestPermission,
         testNotification,
+        refreshNotificationCount,
+        incrementNotificationCount,
       }}
     >
       {children}

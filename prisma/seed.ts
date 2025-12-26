@@ -78,6 +78,19 @@ async function main() {
     },
   });
 
+  const hrViola = await prisma.user.upsert({
+    where: { email: "zhallila@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "zhallila@tunasestaindonesia.com",
+      name: "Zhallila",
+      password: hashedPasswordCommon,
+      pin: "7777",
+      role: "HR",
+      department: "Human Resources",
+    },
+  });
+
   const staffAmin = await prisma.user.upsert({
     where: { email: "amin@tunasestaindonesia.com" },
     update: {},
@@ -98,7 +111,7 @@ async function main() {
     create: { key: "MIN_OVERTIME_START", value: "16:30" },
   });
 
-  console.log({ hrUser, managerUser, staffUser, managerTiyas, hrSabrina, staffAmin });
+  console.log({ hrUser, managerUser, staffUser, managerTiyas, hrSabrina, hrViola, staffAmin });
 }
 
 // Jalankan fungsi main dan tangani error

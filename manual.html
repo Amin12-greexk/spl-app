@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual Book Sistem SPL - PT Tunas Esta Indonesia</title>
+    <style>
+        /* --- GENERAL STYLES --- */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4; /* Background for web view */
+        }
+
+        .page-container {
+            max-width: 210mm; /* A4 Width */
+            margin: 20px auto;
+            background: white;
+            padding: 20mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* --- PRINT STYLES (PDF GENERATION) --- */
+        @media print {
+            body {
+                background: white;
+            }
+            .page-container {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+            a {
+                text-decoration: none;
+                color: #000;
+            }
+            /* Hide URL on print */
+            a[href]:after {
+                content: none !important;
+            }
+        }
+
+        /* --- TYPOGRAPHY --- */
+        h1, h2, h3, h4 {
+            color: #003366; /* Corporate Blue */
+        }
+        
+        h1 { font-size: 28pt; margin-bottom: 10px; }
+        h2 { 
+            font-size: 18pt; 
+            border-bottom: 2px solid #003366; 
+            padding-bottom: 10px; 
+            margin-top: 30px; 
+            margin-bottom: 20px;
+        }
+        h3 { font-size: 14pt; margin-top: 25px; color: #00509E; }
+        h4 { font-size: 12pt; font-weight: bold; margin-top: 15px; }
+
+        p { margin-bottom: 15px; text-align: justify; }
+        ul, ol { margin-bottom: 15px; padding-left: 25px; }
+        li { margin-bottom: 5px; }
+
+        /* --- COVER PAGE --- */
+        .cover-page {
+            height: 270mm; /* Full A4 height approx */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            border: 10px solid #003366;
+            padding: 20px;
+            position: relative;
+        }
+        .cover-logo {
+            font-size: 40px;
+            font-weight: bold;
+            color: #003366;
+            margin-bottom: 50px;
+            letter-spacing: 2px;
+        }
+        .cover-title {
+            font-size: 36pt;
+            font-weight: 800;
+            color: #003366;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .cover-subtitle {
+            font-size: 20pt;
+            color: #555;
+            margin-bottom: 50px;
+        }
+        .cover-footer {
+            margin-top: auto;
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+            font-size: 12pt;
+        }
+
+        /* --- COMPONENTS --- */
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #003366;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 10pt;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+            color: #856404;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            color: #0c5460;
+        }
+        .alert-error {
+            background-color: #f8d7da;
+            border-left: 5px solid #dc3545;
+            color: #721c24;
+        }
+
+        /* Code Blocks */
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 9pt;
+        }
+
+        /* Badge/Status */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        .bg-success { background-color: #28a745; }
+        .bg-warning { background-color: #ffc107; color: #333; }
+        .bg-danger { background-color: #dc3545; }
+
+        /* Footer on Content Pages */
+        .content-footer {
+            font-size: 9pt;
+            color: #999;
+            text-align: right;
+            border-top: 1px solid #eee;
+            margin-top: 50px;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page-container">
+        <div class="cover-page">
+            <div class="cover-logo">PT TUNAS ESTA INDONESIA</div>
+            <br><br>
+            <div class="cover-title">MANUAL BOOK</div>
+            <div class="cover-subtitle">SISTEM PENGAJUAN SURAT PERINTAH LEMBUR (SPL)</div>
+            <br><br>
+            <div style="font-size: 14pt;">
+                <strong>Versi:</strong> 1.2<br>
+                <strong>Tanggal:</strong> November 2025<br>
+                <strong>Platform:</strong> Web-Based Application
+            </div>
+            <div class="cover-footer">
+                <p>&copy; 2025 IT Department - PT Tunas Esta Indonesia. All Rights Reserved.</p>
+            </div>
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2>DAFTAR ISI</h2>
+        <ul style="list-style-type: none; padding: 0;">
+            <li><strong>1. PENDAHULUAN</strong></li>
+            <li><strong>2. AKSES SISTEM</strong></li>
+            <li><strong>3. PANDUAN UNTUK STAFF</strong></li>
+            <li><strong>4. PANDUAN UNTUK MANAGER</strong></li>
+            <li><strong>5. PANDUAN UNTUK HR</strong></li>
+            <li><strong>6. FITUR NOTIFIKASI</strong></li>
+            <li><strong>7. TROUBLESHOOTING</strong></li>
+            <li><strong>8. GLOSSARY</strong></li>
+        </ul>
+        <hr>
+
+        <h2>1. PENDAHULUAN</h2>
+        <h3>1.1 Tentang Sistem SPL</h3>
+        <p>Sistem SPL (Surat Perintah Lembur) adalah aplikasi berbasis web yang dirancang untuk memfasilitasi proses pengajuan, persetujuan, dan pengelolaan data lembur karyawan PT Tunas Esta Indonesia. Sistem ini mengintegrasikan proses manual menjadi digital untuk meningkatkan efisiensi dan transparansi.</p>
+        
+        <h3>1.2 Tujuan Manual Book</h3>
+        <p>Manual book ini disusun untuk memberikan panduan lengkap dan mendetail kepada seluruh pengguna sistem dalam mengoperasikan aplikasi SPL dengan benar dan efektif.</p>
+
+        <h3>1.3 Pengguna Sistem</h3>
+        <ul>
+            <li><strong>Staff:</strong> Karyawan yang mengajukan Surat Perintah Lembur</li>
+            <li><strong>Manager:</strong> Pihak yang berwenang menyetujui atau menolak pengajuan SPL</li>
+            <li><strong>HR (Human Resources):</strong> Administrator yang mengelola data dan laporan SPL secara keseluruhan</li>
+        </ul>
+
+        <h3>1.4 Spesifikasi Teknis</h3>
+        <ul>
+            <li><strong>Platform:</strong> Web-Based (dapat diakses melalui browser)</li>
+            <li><strong>Browser yang Didukung:</strong> Chrome, Firefox, Edge, Safari (Versi Terbaru)</li>
+            <li><strong>Resolusi Layar:</strong> Optimal pada 1366x768 atau lebih tinggi</li>
+            <li><strong>Keamanan:</strong> Protokol HTTPS (diperlukan untuk notifikasi push)</li>
+        </ul>
+
+        <div class="page-break"></div>
+
+        <h2>2. AKSES SISTEM</h2>
+
+        <h3>2.1 Registrasi Akun Baru</h3>
+        <ol>
+            <li><strong>Akses Halaman Registrasi:</strong> Buka URL sistem SPL dan klik "Daftar".</li>
+            <li><strong>Isi Formulir:</strong>
+                <ul>
+                    <li>Nama Lengkap (sesuai identitas)</li>
+                    <li>Email (nama@domain.com)</li>
+                    <li>Password (min 8 karakter, kombinasi huruf/angka)</li>
+                    <li>PIN (6 digit untuk verifikasi)</li>
+                    <li>Departemen (IT, Production, QC, dll)</li>
+                </ul>
+            </li>
+            <li><strong>Verifikasi:</strong> Role default adalah "STAFF". Hubungi admin untuk akses Manager/HR.</li>
+        </ol>
+
+        <h3>2.2 Login & Logout</h3>
+        <p>Masukkan email dan password terdaftar pada halaman login. Jika lupa password, gunakan fitur "Lupa Password" untuk reset via email. Untuk keluar, klik profil di pojok kanan atas dan pilih "Logout".</p>
+
+        <div class="page-break"></div>
+
+        <h2>3. PANDUAN UNTUK STAFF</h2>
+        
+        <h3>3.1 Dashboard Staff</h3>
+        <p>Dashboard menampilkan ringkasan aktivitas Anda:</p>
+        <ul>
+            <li><strong>Kartu Statistik:</strong> Total SPL, Menunggu, Disetujui, Ditolak.</li>
+            <li><strong>Aksi Cepat:</strong> Tombol "Buat SPL Baru" dan "Riwayat SPL".</li>
+            <li><strong>Aktivitas Terbaru:</strong> 3 pengajuan terakhir.</li>
+        </ul>
+
+        <h3>3.2 Membuat Pengajuan SPL</h3>
+        
+        <div class="alert alert-warning">
+            <strong>PERHATIAN:</strong><br>
+            Pengajuan SPL hanya dapat dilakukan sebelum batas waktu (Default: 16:30). Jika melewati batas waktu, sistem akan menolak otomatis.
+        </div>
+
+        <h4>Langkah-langkah Pengajuan:</h4>
+        <ol>
+            <li>Klik tombol <strong>"Buat SPL Baru"</strong>.</li>
+            <li>Isi <strong>Informasi Dasar</strong> (Tanggal Lembur, Nama Proyek).</li>
+            <li>Tentukan <strong>Waktu Lembur</strong> (Jam Mulai & Selesai). Sistem akan menghitung durasi otomatis.</li>
+            <li>Isi <strong>Alasan Lembur</strong> dengan detail.
+                <div class="alert alert-info">
+                    Contoh yang baik: <em>"Menyelesaikan laporan bulanan 15 sheet Excel untuk meeting direktur besok pagi."</em>
+                </div>
+            </li>
+            <li>Tanda tangan pada <strong>Signature Pad</strong> digital.</li>
+            <li>Klik <strong>"Ajukan SPL"</strong>.</li>
+        </ol>
+
+        <h3>3.3 Status Pengajuan</h3>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Warna</th>
+                    <th>Keterangan</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PENDING</td>
+                    <td><span class="badge bg-warning">Kuning</span></td>
+                    <td>Menunggu review dari Manager. Dapat dihapus/dibatalkan.</td>
+                </tr>
+                <tr>
+                    <td>APPROVED</td>
+                    <td><span class="badge bg-success">Hijau</span></td>
+                    <td>Disetujui Manager. Sudah final.</td>
+                </tr>
+                <tr>
+                    <td>REJECTED</td>
+                    <td><span class="badge bg-danger">Merah</span></td>
+                    <td>Ditolak oleh Manager. Lihat detail untuk alasan penolakan.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-break"></div>
+
+        <h2>4. PANDUAN UNTUK MANAGER</h2>
+
+        <h3>4.1 Dashboard & Fitur Utama</h3>
+        <p>Manager memiliki wewenang untuk mengatur operasional lembur tim:</p>
+        <ul>
+            <li><strong>Review SPL:</strong> Menyetujui atau menolak pengajuan.</li>
+            <li><strong>Pengaturan Batas Waktu:</strong> Mengatur jam cut-off pengajuan (Default 16:30).</li>
+        </ul>
+
+        <h3>4.2 Proses Persetujuan (Approval)</h3>
+        <ol>
+            <li>Akses menu <strong>"Persetujuan"</strong> atau klik panel notifikasi.</li>
+            <li>Review detail pengajuan (Tanggal, Durasi, Alasan, Urgensi).</li>
+            <li><strong>Setujui:</strong> Klik tombol Hijau (Approve). Notifikasi terkirim ke staff.</li>
+            <li><strong>Tolak:</strong> Klik tombol Merah (Reject).
+                <ul>
+                    <li>Wajib mengisi alasan penolakan pada kotak dialog yang muncul.</li>
+                    <li>Berikan alasan yang konstruktif (misal: "Bisa diselesaikan jam kerja normal").</li>
+                </ul>
+            </li>
+        </ol>
+
+        <div class="alert alert-info">
+            <strong>Tips:</strong> Rutin cek dashboard menjelang jam pulang kerja untuk memastikan tidak ada pengajuan yang tertahan.
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2>5. PANDUAN UNTUK HR</h2>
+
+        <h3>5.1 Manajemen Data Laporan</h3>
+        <p>HR memiliki akses penuh ke seluruh data SPL perusahaan ("Data & Laporan").</p>
+        
+        <h4>Filter Data:</h4>
+        <ul>
+            <li><strong>Status:</strong> All, Pending, Approved, Rejected.</li>
+            <li><strong>Periode:</strong> Bulan Ini, Bulan Lalu, Custom Date Range.</li>
+        </ul>
+
+        <h3>5.2 Export & Laporan</h3>
+        <p>Terdapat 3 metode pengambilan data:</p>
+        
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Metode</th>
+                    <th>Fungsi Utama</th>
+                    <th>Format</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Export Excel</strong></td>
+                    <td>Analisis data mendalam, pivot table, perhitungan payroll.</td>
+                    <td>.xlsx (Data lengkap 16 kolom)</td>
+                </tr>
+                <tr>
+                    <td><strong>Generate PDF</strong></td>
+                    <td>Dokumen resmi/arsip fisik. Dilengkapi kop surat dan TTD digital.</td>
+                    <td>.pdf (Siap cetak A4)</td>
+                </tr>
+                <tr>
+                    <td><strong>Copy Table</strong></td>
+                    <td>Sharing cepat via email/chat.</td>
+                    <td>Clipboard (Paste ke Excel/Word)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-break"></div>
+
+        <h2>6. FITUR NOTIFIKASI</h2>
+        <p>Sistem menggunakan <strong>Web Push Notification</strong> untuk update real-time.</p>
+        
+        <h3>Cara Mengaktifkan:</h3>
+        <ol>
+            <li>Klik tombol <strong>"🔔 Aktifkan Notifikasi"</strong> di dashboard bawah.</li>
+            <li>Browser akan memunculkan popup izin. Klik <strong>"Allow"</strong> atau <strong>"Izinkan"</strong>.</li>
+            <li>Jika sukses, status berubah menjadi "✅ Aktif".</li>
+        </ol>
+
+        <div class="alert alert-error">
+            <strong>Masalah Umum:</strong> Jika notifikasi tidak muncul, pastikan Anda tidak mengakses sistem dalam mode "Incognito" dan browser tidak memblokir notifikasi (Cek icon gembok di address bar).
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2>7. TROUBLESHOOTING</h2>
+
+        <h3>Masalah Umum & Solusi</h3>
+        
+        <h4>1. Error "Lewat Batas Waktu"</h4>
+        <p><strong>Sebab:</strong> Anda mengajukan setelah jam cut-off (misal 16:30).<br>
+        <strong>Solusi:</strong> Temui Manager langsung untuk persetujuan manual.</p>
+
+        <h4>2. Tanda Tangan Gagal Disimpan</h4>
+        <p><strong>Solusi:</strong> Pastikan goresan tanda tangan cukup jelas. Refresh halaman dan coba lagi.</p>
+
+        <h4>3. Lupa Password</h4>
+        <p><strong>Solusi:</strong> Gunakan link "Lupa Password" di halaman login. Link reset akan dikirim ke email.</p>
+
+        <h3>Kontak Support</h3>
+        <p>Jika masalah berlanjut, hubungi tim IT:</p>
+        <ul>
+            <li><strong>Email:</strong> it@tunasesta.com</li>
+            <li><strong>Ext:</strong> 123</li>
+            <li>Sertakan screenshot error saat melapor.</li>
+        </ul>
+
+        <div class="page-break"></div>
+
+        <h2>8. GLOSSARY & LAMPIRAN</h2>
+        
+        <dl>
+            <dt><strong>SPL (Surat Perintah Lembur)</strong></dt>
+            <dd>Dokumen digital otorisasi kerja lembur.</dd>
+            
+            <dt><strong>Approver</strong></dt>
+            <dd>Manager atau HR yang berwenang menyetujui pengajuan.</dd>
+            
+            <dt><strong>Service Worker</strong></dt>
+            <dd>Teknologi browser yang memungkinkan notifikasi berjalan di background.</dd>
+        </dl>
+
+        <hr>
+        
+        <h3>Shortcut Keyboard</h3>
+        <ul>
+            <li><strong>Refresh Halaman:</strong> F5 / Ctrl + R</li>
+            <li><strong>Hard Refresh (Clear Cache):</strong> Ctrl + Shift + R</li>
+            <li><strong>Print/Save PDF:</strong> Ctrl + P</li>
+        </ul>
+
+        <div class="content-footer">
+            PT Tunas Esta Indonesia | Manual Book Sistem SPL v1.2 | Halaman Akhir
+        </div>
+
+    </div>
+</body>
+</html>
