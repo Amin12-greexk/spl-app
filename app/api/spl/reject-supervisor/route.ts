@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { sendNotification } from "@/lib/firebase-admin"
 
 export async function POST(req: NextRequest) {
   try {
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
             sendNotification(
               token.endpoint,
               "SPL Ditolak Supervisor",
-              `Pengajuan lembur Anda telah ditolak oleh ${session.user.name}. Alasan: ${supervisorRejectionReason}`,
+              `Pengajuan lembur Anda telah ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
               { splId: updatedSpl.id, click_action: '/dashboard/staff' }
             )
           )
