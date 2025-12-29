@@ -15,7 +15,8 @@
       "Bash(node test-db.js:*)",
       "Bash(npx prisma migrate:*)",
       "Bash(npx prisma db seed:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
