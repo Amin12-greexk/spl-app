@@ -73,11 +73,21 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
+    const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
       PENDING: {
         bg: "bg-yellow-100",
         text: "text-yellow-800",
         label: "Menunggu Persetujuan",
+      },
+      PENDING_SUPERVISOR: {
+        bg: "bg-orange-100",
+        text: "text-orange-800",
+        label: "Menunggu Supervisor",
+      },
+      PENDING_MANAGER: {
+        bg: "bg-blue-100",
+        text: "text-blue-800",
+        label: "Menunggu Manager",
       },
       APPROVED: {
         bg: "bg-green-100",
@@ -89,9 +99,23 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
         text: "text-red-800",
         label: "Ditolak",
       },
+      REJECTED_BY_SUPERVISOR: {
+        bg: "bg-red-100",
+        text: "text-red-800",
+        label: "Ditolak oleh Supervisor",
+      },
+      REJECTED_BY_MANAGER: {
+        bg: "bg-red-100",
+        text: "text-red-800",
+        label: "Ditolak oleh Manager",
+      },
     }
 
-    const config = statusConfig[status as keyof typeof statusConfig]
+    const config = statusConfig[status] || {
+      bg: "bg-gray-100",
+      text: "text-gray-800",
+      label: status,
+    }
 
     return (
       <span
@@ -200,7 +224,7 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {spl.status === "PENDING" && (
+        {(spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") && (
           <div className="pt-4 border-t">
             <Button variant="danger" onClick={handleDelete} className="w-full">
               Hapus Pengajuan

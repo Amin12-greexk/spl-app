@@ -44,6 +44,8 @@ export const authOptions: NextAuthOptions = {
             role: user.role as Role,
             department: user.department,
             pin: user.pin,
+            position: user.position,
+            supervisorId: user.supervisorId,
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -65,6 +67,8 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role
         token.department = user.department
         token.pin = user.pin
+        token.position = user.position
+        token.supervisorId = user.supervisorId
       }
       return token
     },
@@ -74,6 +78,8 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as Role
         session.user.department = token.department as string | null
         session.user.pin = token.pin as string
+        session.user.position = token.position as string | null
+        session.user.supervisorId = token.supervisorId as string | null
       }
       return session
     },

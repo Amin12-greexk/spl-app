@@ -19,6 +19,9 @@ export default function HRViewPage() {
   const [dateFilter, setDateFilter] = useState<string>("ALL")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
 
   const fetchSpls = async () => {
     setIsLoading(true)
@@ -41,7 +44,7 @@ export default function HRViewPage() {
     fetchSpls()
   }, [])
 
-  // Filter data berdasarkan status dan tanggal
+  // Filter data berdasarkan status, tanggal, dan search
   useEffect(() => {
     let filtered = spls
 
@@ -50,65 +53,114 @@ export default function HRViewPage() {
       filtered = filtered.filter(spl => spl.status === filterStatus)
     }
 
+    // Filter by search query (nama atau PIN)
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter(spl =>
+        spl.requester.name.toLowerCase().includes(query) ||
+        (spl.requester.pin && spl.requester.pin.toLowerCase().includes(query))
+      )
+    }
+
     // Filter by date
     const now = new Date()
-    
+
     switch (dateFilter) {
       case "THIS_WEEK":
         const weekStart = startOfWeek(now, { weekStartsOn: 1 })
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
-        filtered = filtered.filter(spl => 
+        filtered = filtered.filter(spl =>
           isWithinInterval(new Date(spl.date), { start: weekStart, end: weekEnd })
         )
         break
-        
+
       case "THIS_MONTH":
         const monthStart = startOfMonth(now)
         const monthEnd = endOfMonth(now)
-        filtered = filtered.filter(spl => 
+        filtered = filtered.filter(spl =>
           isWithinInterval(new Date(spl.date), { start: monthStart, end: monthEnd })
         )
         break
-        
+
       case "LAST_MONTH":
         const lastMonth = subMonths(now, 1)
         const lastMonthStart = startOfMonth(lastMonth)
         const lastMonthEnd = endOfMonth(lastMonth)
-        filtered = filtered.filter(spl => 
+        filtered = filtered.filter(spl =>
           isWithinInterval(new Date(spl.date), { start: lastMonthStart, end: lastMonthEnd })
         )
         break
-        
+
       case "LAST_3_MONTHS":
         const threeMonthsAgo = subMonths(now, 3)
-        filtered = filtered.filter(spl => 
+        filtered = filtered.filter(spl =>
           new Date(spl.date) >= threeMonthsAgo
         )
         break
-        
+
       case "CUSTOM":
         if (customStartDate && customEndDate) {
           const start = new Date(customStartDate)
           const end = new Date(customEndDate)
-          filtered = filtered.filter(spl => 
+          filtered = filtered.filter(spl =>
             isWithinInterval(new Date(spl.date), { start, end })
           )
         }
         break
-        
+
       default: // "ALL"
         break
     }
 
     setFilteredSpls(filtered)
-  }, [filterStatus, dateFilter, customStartDate, customEndDate, spls])
+    // Reset ke halaman 1 ketika filter berubah
+    setCurrentPage(1)
+  }, [filterStatus, dateFilter, customStartDate, customEndDate, spls, searchQuery])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredSpls.length / itemsPerPage)
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = filteredSpls.slice(indexOfFirstItem, indexOfLastItem)
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber)
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    setCurrentPage(1)
+  }
+
+  const getStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'PENDING': 'Menunggu',
+      'PENDING_SUPERVISOR': 'Menunggu Supervisor',
+      'PENDING_MANAGER': 'Menunggu Manager',
+      'APPROVED': 'Disetujui',
+      'REJECTED': 'Ditolak',
+      'REJECTED_BY_SUPERVISOR': 'Ditolak Supervisor',
+      'REJECTED_BY_MANAGER': 'Ditolak Manager',
+    }
+    return statusMap[status] || status
+  }
 
   const getStats = () => {
     return {
       total: filteredSpls.length,
-      pending: filteredSpls.filter(spl => spl.status === "PENDING").length,
+      pending: filteredSpls.filter(spl =>
+        spl.status === "PENDING" ||
+        spl.status === "PENDING_SUPERVISOR" ||
+        spl.status === "PENDING_MANAGER"
+      ).length,
       approved: filteredSpls.filter(spl => spl.status === "APPROVED").length,
-      rejected: filteredSpls.filter(spl => spl.status === "REJECTED").length,
+      rejected: filteredSpls.filter(spl =>
+        spl.status === "REJECTED" ||
+        spl.status === "REJECTED_BY_SUPERVISOR" ||
+        spl.status === "REJECTED_BY_MANAGER"
+      ).length,
       totalHours: filteredSpls.reduce((sum, spl) => sum + Number(spl.totalHours), 0).toFixed(1)
     }
   }
@@ -118,6 +170,7 @@ export default function HRViewPage() {
       const exportData = filteredSpls.map((spl, index) => ({
         No: index + 1,
         'Nama Karyawan': spl.requester.name,
+        'PIN': spl.requester.pin || '-',
         'Email': spl.requester.email,
         'Departemen': spl.requester.department || '-',
         'Tanggal Lembur': format(new Date(spl.date), "dd/MM/yyyy"),
@@ -126,8 +179,7 @@ export default function HRViewPage() {
         'Total Jam': spl.totalHours,
         'Nama Proyek': spl.projectName || '-',
         'Alasan Lembur': spl.reason,
-        'Status': spl.status === 'PENDING' ? 'Menunggu' : 
-               spl.status === 'APPROVED' ? 'Disetujui' : 'Ditolak',
+        'Status': getStatusText(spl.status),
         'Disetujui Oleh': spl.approver?.name || '-',
         'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         'Alasan Penolakan': spl.rejectionReason || '-',
@@ -137,12 +189,12 @@ export default function HRViewPage() {
 
       const ws = XLSX.utils.json_to_sheet(exportData)
       const wb = XLSX.utils.book_new()
-      
+
       const colWidths = [
-        { wch: 5 },   { wch: 20 },  { wch: 25 },  { wch: 15 },  { wch: 12 },
-        { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },  { wch: 40 },
-        { wch: 12 },  { wch: 20 },  { wch: 18 },  { wch: 30 },  { wch: 18 },
-        { wch: 12 }
+        { wch: 5 },   { wch: 20 },  { wch: 10 },  { wch: 25 },  { wch: 15 },
+        { wch: 12 },  { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },
+        { wch: 40 },  { wch: 12 },  { wch: 20 },  { wch: 18 },  { wch: 30 },
+        { wch: 18 },  { wch: 12 }
       ]
       ws['!cols'] = colWidths
 
@@ -170,6 +222,7 @@ export default function HRViewPage() {
       const tableData = filteredSpls.map((spl, index) => [
         index + 1,
         spl.requester.name,
+        spl.requester.pin || '-',
         spl.requester.email,
         spl.requester.department || '-',
         format(new Date(spl.date), "dd/MM/yyyy"),
@@ -178,8 +231,7 @@ export default function HRViewPage() {
         spl.totalHours,
         spl.projectName || '-',
         spl.reason,
-        spl.status === 'PENDING' ? 'Menunggu' : 
-        spl.status === 'APPROVED' ? 'Disetujui' : 'Ditolak',
+        getStatusText(spl.status),
         spl.approver?.name || '-',
         spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         spl.rejectionReason || '-',
@@ -188,7 +240,7 @@ export default function HRViewPage() {
       ])
 
       const headers = [
-        'No', 'Nama Karyawan', 'Email', 'Departemen', 'Tanggal Lembur',
+        'No', 'Nama Karyawan', 'PIN', 'Email', 'Departemen', 'Tanggal Lembur',
         'Waktu Mulai', 'Waktu Selesai', 'Total Jam', 'Nama Proyek', 'Alasan Lembur',
         'Status', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan', 'Tanda Tangan'
       ]
@@ -554,7 +606,36 @@ export default function HRViewPage() {
       {/* Advanced Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Data</h3>
-        
+
+        {/* Search Filter */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">Cari Nama atau PIN:</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Ketik nama karyawan atau PIN..."
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Status Filter */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">Filter Status:</label>
@@ -667,6 +748,84 @@ export default function HRViewPage() {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {filteredSpls.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Items per page selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Tampilkan:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span className="text-sm text-gray-700">per halaman</span>
+            </div>
+
+            {/* Page info */}
+            <div className="text-sm text-gray-700">
+              Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredSpls.length)} dari {filteredSpls.length} data
+            </div>
+
+            {/* Page numbers */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                ← Prev
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNumber
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i
+                  } else {
+                    pageNumber = currentPage - 2 + i
+                  }
+
+                  return (
+                    <button
+                      key={pageNumber}
+                      onClick={() => handlePageChange(pageNumber)}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                        currentPage === pageNumber
+                          ? "bg-green-600 text-white"
+                          : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SPL Cards */}
       {filteredSpls.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -687,13 +846,14 @@ export default function HRViewPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredSpls.map((spl) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          {currentItems.map((spl) => (
             <SplCard
               key={spl.id}
               spl={spl}
               userRole="HR"
               showActions={false}
+              compact={true}
             />
           ))}
         </div>

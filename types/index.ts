@@ -5,12 +5,26 @@
  * Mendefinisikan peran (Role) pengguna yang valid dalam aplikasi.
  * Ini adalah "sumber kebenaran" untuk tipe data Role.
  */
-export type Role = "STAFF" | "HR" | "MANAGER"
+export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
+ * - PENDING_SUPERVISOR: Menunggu persetujuan supervisor/GA/Kepala Dept
+ * - PENDING_MANAGER: Sudah disetujui supervisor, menunggu persetujuan manager
+ * - APPROVED: Disetujui oleh manager (final)
+ * - REJECTED_BY_SUPERVISOR: Ditolak oleh supervisor
+ * - REJECTED_BY_MANAGER: Ditolak oleh manager
+ * - PENDING: Legacy status untuk backward compatibility
+ * - REJECTED: Legacy status untuk backward compatibility
  */
-export type SplStatus = "PENDING" | "APPROVED" | "REJECTED"
+export type SplStatus =
+  | "PENDING_SUPERVISOR"
+  | "PENDING_MANAGER"
+  | "APPROVED"
+  | "REJECTED_BY_SUPERVISOR"
+  | "REJECTED_BY_MANAGER"
+  | "PENDING"  // Legacy
+  | "REJECTED" // Legacy
 
 // --- Interface untuk Model Database ---
 
@@ -21,6 +35,10 @@ export interface User {
   role: Role // <-- Menggunakan tipe Role yang kita definisikan di atas
   pin?: string
   department?: string | null
+  position?: string | null
+  supervisorId?: string | null
+  supervisor?: User | null
+  subordinates?: User[]
 }
 
 export interface Spl {
@@ -34,11 +52,22 @@ export interface Spl {
   reason: string
   signature?: string | null
   projectName?: string | null
+  proofImage?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
+
+  // Supervisor approval (Level 1)
+  supervisorId?: string | null
+  supervisor?: User | null
+  supervisorApprovalDate?: Date | null
+  supervisorSignature?: string | null
+  supervisorRejectionReason?: string | null
+
+  // Manager approval (Level 2)
   approverId?: string | null
   approver?: User | null
   approvalDate?: Date | null
   rejectionReason?: string | null
+
   createdAt: Date
   updatedAt: Date
 }
@@ -52,6 +81,7 @@ export interface CreateSplInput {
   reason: string
   signature: string
   projectName?: string
+  proofImage?: string
 }
 
 export interface UpdateSplStatusInput {
@@ -72,6 +102,8 @@ declare module "next-auth" {
     role: Role
     department?: string | null
     pin?: string
+    position?: string | null
+    supervisorId?: string | null
   }
 
   interface Session {
@@ -80,6 +112,8 @@ declare module "next-auth" {
       role: Role
       department?: string | null
       pin?: string
+      position?: string | null
+      supervisorId?: string | null
     }
   }
 }
@@ -90,6 +124,8 @@ declare module "next-auth/jwt" {
     role: Role // <-- Menggunakan tipe Role
     department?: string | null
     pin?: string
+    position?: string | null
+    supervisorId?: string | null
   }
 }
 

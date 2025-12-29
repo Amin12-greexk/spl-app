@@ -20,7 +20,9 @@ export default function SplForm() {
     endTime: "",
     reason: "",
     projectName: "",
+    proofImage: "",
   })
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   useEffect(() => {
     const loadMin = async () => {
@@ -36,6 +38,45 @@ export default function SplForm() {
     }
     loadMin()
   }, [])
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validasi tipe file
+    if (!file.type.startsWith("image/")) {
+      await Swal.fire({
+        icon: "error",
+        title: "File Tidak Valid",
+        text: "Harap upload file gambar (JPG, PNG, atau JPEG)",
+      })
+      return
+    }
+
+    // Validasi ukuran file (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      await Swal.fire({
+        icon: "error",
+        title: "Ukuran File Terlalu Besar",
+        text: "Ukuran file maksimal 5MB",
+      })
+      return
+    }
+
+    // Convert ke base64
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setFormData({ ...formData, proofImage: base64String })
+      setImagePreview(base64String)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveImage = () => {
+    setFormData({ ...formData, proofImage: "" })
+    setImagePreview(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +128,12 @@ export default function SplForm() {
         title: "Berhasil",
         text: "SPL berhasil diajukan!",
       })
-      router.push("/dashboard/staff")
+      // Dynamic redirect based on role
+      if (session?.user.role === "GA" || session?.user.role === "DEPARTMENT_HEAD") {
+        router.push("/dashboard/ga/riwayat")
+      } else {
+        router.push("/dashboard/staff")
+      }
       router.refresh()
     } catch (error: any) {
       await Swal.fire({
@@ -286,6 +332,81 @@ export default function SplForm() {
                 />
                 <p className="text-xs text-gray-500 mt-2">
                   Berikan penjelasan yang detail dan jelas untuk memudahkan proses persetujuan
+                </p>
+              </div>
+            </div>
+
+            {/* Proof Image Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                Foto Bukti Pengerjaan Lembur
+              </h2>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Upload foto bukti pengerjaan lembur 
+                </label>
+
+                {!imagePreview ? (
+                  <div className="mt-2">
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all duration-200">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4">
+                        <svg className="w-12 h-12 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="mb-2 text-sm text-gray-600 font-semibold text-center">
+                          <span className="text-indigo-600">Klik untuk upload</span> atau drag & drop
+                        </p>
+                        <p className="text-xs text-gray-500 text-center">
+                          PNG, JPG, atau JPEG (Max. 5MB)
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="mt-2 relative">
+                    <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                      <img
+                        src={imagePreview}
+                        alt="Preview foto bukti"
+                        className="w-full h-auto max-h-96 object-contain"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-all duration-200 transform hover:scale-110"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Foto berhasil diupload</span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="text-red-600 hover:text-red-700 font-medium"
+                      >
+                        Ganti Foto
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500 mt-3">
+                  Upload foto sebagai bukti bahwa pekerjaan lembur telah selesai dikerjakan. Foto ini akan dilihat oleh atasan Anda.
                 </p>
               </div>
             </div>

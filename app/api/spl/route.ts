@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
 
     const userRole = session.user.role as Role;
 
-    if (userRole === "STAFF") {
-      // Staff hanya bisa melihat data miliknya
+    if (["STAFF", "GA", "DEPARTMENT_HEAD"].includes(userRole)) {
+      // Staff, GA, dan Department Head hanya bisa melihat data miliknya
       where.requesterId = session.user.id;
     } else if (userId) {
       // HR/Manager bisa memfilter berdasarkan ID staff
@@ -48,10 +48,13 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         requester: {
-          select: { id: true, name: true, email: true, pin: true, department: true }, // Hanya pilih data yang perlu
+          select: { id: true, name: true, email: true, pin: true, department: true, position: true },
+        },
+        supervisor: {
+          select: { id: true, name: true, email: true, role: true },
         },
         approver: {
-          select: { id: true, name: true, email: true }, // Hanya pilih data yang perlu
+          select: { id: true, name: true, email: true, role: true },
         },
       },
       orderBy: {
@@ -79,9 +82,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || (session.user.role as Role) !== "STAFF") {
+    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD"].includes(session.user.role as Role)) {
       return NextResponse.json(
-        { error: "Hanya staff yang bisa mengajukan SPL" },
+        { error: "Hanya STAFF, GA, atau DEPARTMENT_HEAD yang bisa mengajukan SPL" },
         { status: 403 }
       );
     }
@@ -128,6 +131,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check user's role and supervisor
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        supervisorId: true,
+        role: true,
+      },
+    })
+
+    // Determine initial status based on role and supervisor presence
+    let initialStatus = "PENDING_MANAGER"
+
+    // GA dan DEPARTMENT_HEAD langsung ke Manager (skip supervisor approval)
+    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD") {
+      initialStatus = "PENDING_MANAGER"
+    }
+    // STAFF: cek apakah ada supervisor
+    else if (user?.role === "STAFF") {
+      // If user has supervisor -> PENDING_SUPERVISOR
+      // If no supervisor -> PENDING_MANAGER (direct to manager)
+      initialStatus = user.supervisorId ? "PENDING_SUPERVISOR" : "PENDING_MANAGER"
+    }
+    // Role lain (HR, MANAGER): langsung ke Manager
+    else {
+      initialStatus = "PENDING_MANAGER"
+    }
+
     const spl = await prisma.spl.create({
       data: {
         requesterId: session.user.id,
@@ -138,54 +168,73 @@ export async function POST(req: NextRequest) {
         reason: body.reason,
         signature: body.signature.trim(),
         projectName: body.projectName,
-        status: "PENDING", // Status default diatur di sini
+        proofImage: body.proofImage || null,
+        status: initialStatus,
       },
       include: {
         requester: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, supervisorId: true },
         },
       },
     });
 
-    // --- Logika Mengirim Notifikasi (Lanjutan dari kode Anda) ---
+    // --- Logika Mengirim Notifikasi (Multi-level approval) ---
     try {
-      const managers = await prisma.user.findMany({
-        where: {
-          role: {
-            in: ["HR", "MANAGER"],
-          },
-        },
-        include: {
-          notifications: true, // Ambil semua token FCM yang tersimpan
-        },
-      });
-
       const notificationTitle = "Pengajuan SPL Baru";
       const notificationBody = `${session.user.name} telah mengajukan lembur baru.`;
-      
       const notificationPromises: Promise<any>[] = [];
 
-      managers.forEach((manager) => {
-        manager.notifications.forEach((token) => {
-          // Tambahkan setiap pengiriman notifikasi ke dalam array promise
-          notificationPromises.push(
-            sendNotification(
-              token.endpoint, // 'endpoint' adalah token FCM
-              notificationTitle,
-              notificationBody,
-              { splId: spl.id, click_action: '/dashboard/approvals' } // Data tambahan
-            )
-          );
+      if (spl.requester.supervisorId) {
+        // If user has supervisor, notify supervisor
+        const supervisor = await prisma.user.findUnique({
+          where: { id: spl.requester.supervisorId },
+          include: { notifications: true },
         });
-      });
 
-      // Kirim semua notifikasi secara paralel
+        if (supervisor) {
+          supervisor.notifications.forEach((token) => {
+            notificationPromises.push(
+              sendNotification(
+                token.endpoint,
+                notificationTitle,
+                notificationBody,
+                { splId: spl.id, click_action: '/dashboard/ga/persetujuan' } // Supervisor notification
+              )
+            );
+          });
+        }
+      } else {
+        // If no supervisor, notify managers directly
+        const managers = await prisma.user.findMany({
+          where: {
+            role: {
+              in: ["HR", "MANAGER"],
+            },
+          },
+          include: {
+            notifications: true,
+          },
+        });
+
+        managers.forEach((manager) => {
+          manager.notifications.forEach((token) => {
+            notificationPromises.push(
+              sendNotification(
+                token.endpoint,
+                notificationTitle,
+                notificationBody,
+                { splId: spl.id, click_action: '/dashboard/hr/persetujuan' } // Manager notification - FIXED ROUTE
+              )
+            );
+          });
+        });
+      }
+
+      // Send all notifications in parallel
       await Promise.allSettled(notificationPromises);
-      console.log("Notifikasi telah dikirim ke HR/Manager");
+      console.log("Notifikasi telah dikirim");
 
     } catch (notificationError) {
-        // Gagal mengirim notifikasi BUKAN berarti transaksi gagal
-        // Cukup catat errornya
         console.error("Gagal mengirim notifikasi:", notificationError);
     }
     // ---------------------------------------------------------

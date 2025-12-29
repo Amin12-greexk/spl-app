@@ -42,7 +42,10 @@ export async function GET(
 
     // Periksa hak akses
     const userRole = session.user.role as Role;
-    if (userRole === "STAFF" && spl.requesterId !== session.user.id) {
+    if (
+      ["STAFF", "GA", "DEPARTMENT_HEAD"].includes(userRole) &&
+      spl.requesterId !== session.user.id
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -80,7 +83,7 @@ export async function PATCH(
     const body: UpdateSplStatusInput = await req.json();
 
     // Validasi input
-    if (!body.status || (body.status === "REJECTED" && !body.rejectionReason)) {
+    if (!body.status || ((body.status === "REJECTED" || body.status === "REJECTED_BY_MANAGER") && !body.rejectionReason)) {
         return NextResponse.json({ error: "Status dan alasan penolakan (jika ditolak) wajib diisi." }, { status: 400 });
     }
 
@@ -92,7 +95,7 @@ export async function PATCH(
         status: body.status,
         approverId: session.user.id, // Catat siapa yang memproses
         approvalDate: new Date(),
-        rejectionReason: body.status === "REJECTED" ? body.rejectionReason : null,
+        rejectionReason: (body.status === "REJECTED" || body.status === "REJECTED_BY_MANAGER") ? body.rejectionReason : null,
       },
       include: {
         requester: {
@@ -115,7 +118,7 @@ export async function PATCH(
       if (requester && requester.notifications.length > 0) {
         const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";
         const notificationTitle = `Pengajuan SPL Anda ${statusText}`;
-        const notificationBody = `Pengajuan lembur Anda telah ${statusText} oleh ${session.user.name}.`;
+        const notificationBody = `Pengajuan lembur Anda telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
 
         const notificationPromises: Promise<any>[] = [];
         requester.notifications.forEach((token) => {
@@ -150,8 +153,8 @@ export async function PATCH(
 /**
  * DELETE /api/spl/[id]
  * Menghapus pengajuan SPL.
- * - Hanya bisa dilakukan oleh staff yang mengajukan.
- * - Hanya bisa jika status masih PENDING.
+ * - Hanya bisa dilakukan oleh user yang mengajukan (STAFF/GA/DEPARTMENT_HEAD).
+ * - Hanya bisa jika status masih pending (belum diapprove/reject).
  */
 export async function DELETE(
   req: NextRequest,
@@ -174,13 +177,14 @@ export async function DELETE(
       return NextResponse.json({ error: "SPL not found" }, { status: 404 });
     }
 
-    // Hanya izinkan penghapusan oleh requester dan HANYA jika status PENDING
+    // Hanya izinkan penghapusan oleh requester dan HANYA jika status masih pending
+    const pendingStatuses = ["PENDING", "PENDING_SUPERVISOR", "PENDING_MANAGER"];
     if (
       spl.requesterId !== session.user.id ||
-      spl.status !== "PENDING"
+      !pendingStatuses.includes(spl.status)
     ) {
       return NextResponse.json(
-        { error: "Hanya bisa dihapus oleh pembuat saat status masih PENDING" },
+        { error: "Hanya bisa dihapus oleh pembuat saat status masih pending" },
         { status: 403 }
       );
     }

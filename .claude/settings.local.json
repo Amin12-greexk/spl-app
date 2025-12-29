@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm install:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(node test-db.js:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx prisma db seed:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

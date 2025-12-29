@@ -7,9 +7,15 @@ interface SignaturePadProps {
   onChange: (dataUrl: string) => void
 }
 
+interface Point {
+  x: number
+  y: number
+}
+
 export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const isDrawing = useRef(false)
+  const lastPoint = useRef<Point | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -26,8 +32,10 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
     canvas.height = height * ratio
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
 
-    ctx.lineWidth = 2
+    // Increased line width for better visibility on mobile
+    ctx.lineWidth = 3
     ctx.lineCap = "round"
+    ctx.lineJoin = "round"
     ctx.strokeStyle = "#0f766e"
 
     ctx.clearRect(0, 0, width, height)
@@ -58,9 +66,11 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
     const ctx = canvas?.getContext("2d")
     if (!canvas || !ctx) return
 
-    const { x, y } = getPoint(event)
+    const point = getPoint(event)
+    lastPoint.current = point
+
     ctx.beginPath()
-    ctx.moveTo(x, y)
+    ctx.moveTo(point.x, point.y)
     isDrawing.current = true
     canvas.setPointerCapture(event.pointerId)
   }
@@ -69,11 +79,25 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
     if (!isDrawing.current) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
-    if (!canvas || !ctx) return
+    if (!canvas || !ctx || !lastPoint.current) return
 
-    const { x, y } = getPoint(event)
-    ctx.lineTo(x, y)
+    const currentPoint = getPoint(event)
+
+    // Use quadratic curves for smoother lines
+    const midPoint = {
+      x: (lastPoint.current.x + currentPoint.x) / 2,
+      y: (lastPoint.current.y + currentPoint.y) / 2
+    }
+
+    ctx.quadraticCurveTo(
+      lastPoint.current.x,
+      lastPoint.current.y,
+      midPoint.x,
+      midPoint.y
+    )
     ctx.stroke()
+
+    lastPoint.current = currentPoint
   }
 
   const endDrawing = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -83,6 +107,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
     if (!canvas || !ctx) return
 
     isDrawing.current = false
+    lastPoint.current = null
     ctx.closePath()
     if (canvas.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId)
@@ -113,7 +138,8 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
       <div className="border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
         <canvas
           ref={canvasRef}
-          className="w-full h-48 rounded-xl bg-white"
+          className="w-full h-48 rounded-xl bg-white touch-none"
+          style={{ touchAction: 'none' }}
           onPointerDown={startDrawing}
           onPointerMove={draw}
           onPointerUp={endDrawing}

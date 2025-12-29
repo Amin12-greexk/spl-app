@@ -73,9 +73,17 @@ export default function SplList({
   const getFilterStats = () => {
     return {
       all: spls.length,
-      pending: spls.filter(spl => spl.status === "PENDING").length,
+      pending: spls.filter(spl =>
+        spl.status === "PENDING" ||
+        spl.status === "PENDING_SUPERVISOR" ||
+        spl.status === "PENDING_MANAGER"
+      ).length,
       approved: spls.filter(spl => spl.status === "APPROVED").length,
-      rejected: spls.filter(spl => spl.status === "REJECTED").length,
+      rejected: spls.filter(spl =>
+        spl.status === "REJECTED" ||
+        spl.status === "REJECTED_BY_SUPERVISOR" ||
+        spl.status === "REJECTED_BY_MANAGER"
+      ).length,
     }
   }
 
