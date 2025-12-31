@@ -12,8 +12,8 @@ export default function GAPengajuanPage() {
 
   // Authorization check
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD"].includes(session.user.role)) {
-      toast.error("Akses ditolak! Hanya GA/Kepala Dept yang dapat mengakses halaman ini.")
+    if (session && !["GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role)) {
+      toast.error("Akses ditolak! Hanya GA/Kepala Dept/HR yang dapat mengakses halaman ini.")
       router.push("/dashboard")
     }
   }, [session, router])
@@ -43,7 +43,9 @@ export default function GAPengajuanPage() {
             Informasi:
           </div>
           <p>
-            Pengajuan Anda akan langsung diteruskan ke Manager untuk persetujuan (melewati approval supervisor).
+            {session?.user.role === "HR"
+              ? "Sebagai HR, pengajuan Anda akan langsung diteruskan ke Manager untuk persetujuan (melewati approval supervisor)."
+              : "Pengajuan Anda akan langsung diteruskan ke Manager untuk persetujuan (melewati approval supervisor)."}
           </p>
         </div>
       </div>

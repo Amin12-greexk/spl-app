@@ -13,7 +13,7 @@ export default function GARiwayatPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD"].includes(session.user.role)) {
+    if (session && !["GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role)) {
       toast.error("Akses ditolak!")
       router.push("/dashboard")
     }
@@ -60,7 +60,11 @@ export default function GARiwayatPage() {
         </div>
       </div>
 
-      <SplList userRole={session.user.role} showFilters={true} />
+      <SplList
+        userRole={session.user.role}
+        showFilters={true}
+        userId={session.user.role === "HR" ? session.user.id : undefined}
+      />
     </div>
   )
 }

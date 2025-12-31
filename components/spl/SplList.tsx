@@ -9,12 +9,14 @@ interface SplListProps {
   userRole?: string
   showFilters?: boolean
   initialStatus?: SplStatus
+  userId?: string // Optional userId untuk HR yang ingin lihat SPL mereka sendiri
 }
 
 export default function SplList({
   userRole,
   showFilters = true,
   initialStatus,
+  userId,
 }: SplListProps) {
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -33,6 +35,9 @@ export default function SplList({
       if (filterStatus !== "ALL") {
         params.append("status", filterStatus)
       }
+      if (userId) {
+        params.append("userId", userId)
+      }
 
       const response = await fetch(`/api/spl?${params.toString()}`)
       if (!response.ok) {
@@ -46,7 +51,7 @@ export default function SplList({
     } finally {
       setIsLoading(false)
     }
-  }, [filterStatus])
+  }, [filterStatus, userId])
 
   useEffect(() => {
     fetchSpls()

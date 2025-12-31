@@ -38,11 +38,21 @@ export async function GET(req: NextRequest) {
     if (["STAFF", "GA", "DEPARTMENT_HEAD"].includes(userRole)) {
       // Staff, GA, dan Department Head hanya bisa melihat data miliknya
       where.requesterId = session.user.id;
-    } else if (userId) {
-      // HR/Manager bisa memfilter berdasarkan ID staff
-      where.requesterId = userId;
+    } else if (userRole === "HR") {
+      // HR bisa lihat SPL mereka sendiri ATAU semua SPL
+      // Jika ada userId parameter (termasuk userId mereka sendiri), filter by userId
+      // Jika tidak ada userId, lihat SEMUA SPL (untuk halaman Data & Laporan)
+      if (userId) {
+        where.requesterId = userId;
+      }
+      // Jika tidak ada userId, tidak ada filter (lihat semua)
+    } else if (userRole === "MANAGER") {
+      // Manager bisa memfilter berdasarkan ID staff atau lihat semua
+      if (userId) {
+        where.requesterId = userId;
+      }
+      // Jika tidak ada userId, tidak ada filter (lihat semua)
     }
-    // Jika HR/Manager dan tidak ada userId, mereka akan melihat semua
 
     const spls = await prisma.spl.findMany({
       where,
@@ -82,9 +92,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD"].includes(session.user.role as Role)) {
+    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role as Role)) {
       return NextResponse.json(
-        { error: "Hanya STAFF, GA, atau DEPARTMENT_HEAD yang bisa mengajukan SPL" },
+        { error: "Hanya STAFF, GA, DEPARTMENT_HEAD, atau HR yang bisa mengajukan SPL" },
         { status: 403 }
       );
     }
@@ -156,8 +166,8 @@ export async function POST(req: NextRequest) {
     // Determine initial status based on role and supervisor presence
     let initialStatus = "PENDING_MANAGER"
 
-    // GA dan DEPARTMENT_HEAD langsung ke Manager (skip supervisor approval)
-    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD") {
+    // GA, DEPARTMENT_HEAD, dan HR langsung ke Manager (skip supervisor approval)
+    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD" || user?.role === "HR") {
       initialStatus = "PENDING_MANAGER"
     }
     // STAFF: cek apakah ada supervisor

@@ -15,6 +15,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const userRole = session?.user?.role as Role
+  const userPosition = session?.user?.position || ""
+  const isHeadHR = userRole === "HR" && userPosition.toLowerCase().includes("head")
   const [pendingCount, setPendingCount] = useState(0)
 
   // Ambil jumlah SPL pending hanya untuk Manager
@@ -35,7 +37,14 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
   }, [userRole])
 
-  const navItems = [
+  const navItems: Array<{
+    name: string
+    href: string
+    icon: React.ReactNode
+    roles: Role[]
+    badge: number | null
+    customCondition?: (role: string, position: string) => boolean
+  }> = [
     {
       name: "Dashboard",
       href: "/dashboard",
@@ -78,7 +87,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       ),
-      roles: ["GA", "DEPARTMENT_HEAD"],
+      roles: ["GA", "DEPARTMENT_HEAD", "HR"],
       badge: null,
     },
     {
@@ -89,7 +98,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      roles: ["GA", "DEPARTMENT_HEAD"],
+      roles: ["GA", "DEPARTMENT_HEAD", "HR"],
       badge: null,
     },
     {
@@ -144,20 +153,37 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
-      roles: ["MANAGER", "HR"],
+      roles: ["MANAGER"],
+      badge: null,
+      customCondition: (role: string, position: string) => {
+        // Hanya tampil untuk MANAGER atau Head HR
+        return role === "MANAGER" || (role === "HR" && position.toLowerCase().includes("head"))
+      },
+    },
+    {
+      name: "Profil Saya",
+      href: "/dashboard/profile",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD"],
       badge: null,
     },
-    // ❌ HAPUS MENU "Semua SPL" karena tidak ada halaman /dashboard/manager
-    // {
-    //   name: "Semua SPL",
-    //   href: "/dashboard/manager",
-    //   icon: (...),
-    //   roles: ["MANAGER"],
-    //   badge: null,
-    // },
   ]
 
-  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole))
+  const filteredNavItems = navItems.filter((item) => {
+    // Check basic role permission
+    if (!item.roles.includes(userRole)) return false
+
+    // Check custom condition if exists
+    if (item.customCondition) {
+      return item.customCondition(userRole, userPosition)
+    }
+
+    return true
+  })
 
   return (
     <>

@@ -406,8 +406,37 @@ export default function NotificationProvider({ children }: NotificationProviderP
         }
 
         setNotificationCount(count)
-      } else if (session.user.role === "HR" || session.user.role === "MANAGER") {
-        // HR/MANAGER: count pending manager approvals
+      } else if (session.user.role === "HR") {
+        // HR: count both their own SPL updates AND pending manager approvals (informational)
+        let count = 0
+
+        // Count 1: Their own SPL updates
+        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
+        if (ownResponse.ok) {
+          const ownData = await ownResponse.json()
+          const ownUpdates = ownData.filter((spl: any) => {
+            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const updateDate = new Date(spl.approvalDate || spl.updatedAt)
+            const isNewUpdate = updateDate > lastViewedTime
+            return isNotPending && isNewUpdate
+          })
+          count += ownUpdates.length
+        }
+
+        // Count 2: Pending manager approvals (informational view for HR)
+        const pendingResponse = await fetch("/api/spl?status=PENDING_MANAGER")
+        if (pendingResponse.ok) {
+          const pendingData = await pendingResponse.json()
+          const newPendingSPLs = pendingData.filter((spl: any) => {
+            const createdDate = new Date(spl.createdAt)
+            return createdDate > lastViewedTime
+          })
+          count += newPendingSPLs.length
+        }
+
+        setNotificationCount(count)
+      } else if (session.user.role === "MANAGER") {
+        // MANAGER: count only pending manager approvals
         const response = await fetch("/api/spl?status=PENDING_MANAGER")
         if (response.ok) {
           const data = await response.json()

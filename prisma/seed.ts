@@ -11,7 +11,7 @@ async function main() {
   // ========== HR USERS ==========
   const hrSabrina = await prisma.user.upsert({
     where: { email: "sabrina@tunasestaindonesia.com" },
-    update: {},
+    update: { position: "Head HR" },
     create: {
       email: "sabrina@tunasestaindonesia.com",
       name: "Hayyu Sabrina",
@@ -19,7 +19,7 @@ async function main() {
       pin: "1001",
       role: "HR",
       department: "HR",
-      position: "HR Manager",
+      position: "Head HR",
     },
   });
 

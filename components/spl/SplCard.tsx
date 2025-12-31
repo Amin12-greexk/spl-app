@@ -12,6 +12,7 @@ interface SplCardProps {
   showActions?: boolean
   userRole?: string
   compact?: boolean
+  currentUserId?: string
 }
 
 export default function SplCard({
@@ -23,69 +24,162 @@ export default function SplCard({
   showActions = true,
   userRole,
   compact = false,
+  currentUserId,
 }: SplCardProps) {
+  // Determine detailed status label based on supervisor and role
+  const getDetailedStatus = () => {
+    // Determine supervisor type
+    const supervisorRole = spl.supervisor?.role || spl.requester?.department
+    let supervisorLabel = "Supervisor"
+
+    if (supervisorRole === "GA") {
+      supervisorLabel = "GA"
+    } else if (supervisorRole === "DEPARTMENT_HEAD") {
+      supervisorLabel = "Kepala Dept"
+    }
+
+    switch (spl.status) {
+      case "PENDING_SUPERVISOR":
+        return {
+          icon: "⏳",
+          label: `Menunggu ${supervisorLabel}`,
+          shortLabel: supervisorLabel,
+          description: `Menunggu persetujuan ${supervisorLabel}`,
+        }
+      case "PENDING_MANAGER":
+        return {
+          icon: "⏳",
+          label: "Menunggu Manager",
+          shortLabel: "Manager",
+          description: "Menunggu persetujuan Manager",
+        }
+      case "APPROVED":
+        const approver = spl.approver?.name || "Manager"
+        return {
+          icon: "✅",
+          label: "Disetujui",
+          shortLabel: "Disetujui",
+          description: `Disetujui oleh ${approver}`,
+        }
+      case "REJECTED_BY_SUPERVISOR":
+        return {
+          icon: "❌",
+          label: `Ditolak ${supervisorLabel}`,
+          shortLabel: "Ditolak",
+          description: `Ditolak oleh ${supervisorLabel}`,
+        }
+      case "REJECTED_BY_MANAGER":
+        return {
+          icon: "❌",
+          label: "Ditolak Manager",
+          shortLabel: "Ditolak",
+          description: "Ditolak oleh Manager",
+        }
+      default:
+        return {
+          icon: "📝",
+          label: "Pending",
+          shortLabel: "Pending",
+          description: "Menunggu proses",
+        }
+    }
+  }
+
   const getStatusBadge = (status: string, isCompact = false) => {
+    const statusInfo = getDetailedStatus()
+
     const statusConfig = {
       PENDING: {
-        bg: "bg-yellow-100",
-        text: "text-yellow-800",
-        label: "Menunggu",
-        shortLabel: "Menunggu",
+        bg: "bg-yellow-50",
+        text: "text-yellow-700",
+        border: "border-yellow-200",
+        ring: "ring-yellow-100",
       },
       PENDING_SUPERVISOR: {
-        bg: "bg-orange-100",
-        text: "text-orange-800",
-        label: "Menunggu Supervisor",
-        shortLabel: "Supervisor",
+        bg: "bg-orange-50",
+        text: "text-orange-700",
+        border: "border-orange-200",
+        ring: "ring-orange-100",
       },
       PENDING_MANAGER: {
-        bg: "bg-blue-100",
-        text: "text-blue-800",
-        label: "Menunggu Manager",
-        shortLabel: "Manager",
+        bg: "bg-blue-50",
+        text: "text-blue-700",
+        border: "border-blue-200",
+        ring: "ring-blue-100",
       },
       APPROVED: {
-        bg: "bg-green-100",
-        text: "text-green-800",
-        label: "Disetujui",
-        shortLabel: "Disetujui",
+        bg: "bg-green-50",
+        text: "text-green-700",
+        border: "border-green-200",
+        ring: "ring-green-100",
       },
       REJECTED: {
-        bg: "bg-red-100",
-        text: "text-red-800",
-        label: "Ditolak",
-        shortLabel: "Ditolak",
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        ring: "ring-red-100",
       },
       REJECTED_BY_SUPERVISOR: {
-        bg: "bg-red-100",
-        text: "text-red-800",
-        label: "Ditolak Supervisor",
-        shortLabel: "Ditolak",
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        ring: "ring-red-100",
       },
       REJECTED_BY_MANAGER: {
-        bg: "bg-red-100",
-        text: "text-red-800",
-        label: "Ditolak Manager",
-        shortLabel: "Ditolak",
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        ring: "ring-red-100",
       },
     }
 
     const config = statusConfig[status as keyof typeof statusConfig] || {
-      bg: "bg-gray-100",
-      text: "text-gray-800",
-      label: status,
-      shortLabel: status,
+      bg: "bg-gray-50",
+      text: "text-gray-700",
+      border: "border-gray-200",
+      ring: "ring-gray-100",
     }
 
-    const displayLabel = isCompact && config.shortLabel ? config.shortLabel : config.label
+    const displayLabel = isCompact ? statusInfo.shortLabel : statusInfo.label
 
     return (
-      <span
-        className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${config.bg} ${config.text}`}
-      >
-        {displayLabel}
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <span
+          className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${config.bg} ${config.text} ${config.border} shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
+          title={statusInfo.description}
+        >
+          <span className="text-sm">{statusInfo.icon}</span>
+          {displayLabel}
+        </span>
+        {!isCompact && status.includes("PENDING") && (
+          <span className="text-[10px] text-gray-500 italic">
+            {statusInfo.description}
+          </span>
+        )}
+      </div>
     )
+  }
+
+  // Get approval flow for this SPL
+  const getApprovalFlow = () => {
+    const hasSubordinate = spl.requester?.department !== undefined
+    const supervisorRole = spl.supervisor?.role || "DEPARTMENT_HEAD"
+    const supervisorLabel = supervisorRole === "GA" ? "GA" : "Kepala Dept"
+
+    // For staff with supervisor
+    if (spl.status === "PENDING_SUPERVISOR" || spl.supervisorApprovalDate) {
+      return [
+        { label: "Staff", done: true, current: false },
+        { label: supervisorLabel, done: !!spl.supervisorApprovalDate, current: spl.status === "PENDING_SUPERVISOR" },
+        { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+      ]
+    }
+
+    // For GA/Dept Head (direct to manager)
+    return [
+      { label: "Pemohon", done: true, current: false },
+      { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+    ]
   }
 
   // Compact version for HR view with many records
@@ -97,7 +191,9 @@ export default function SplCard({
             <h3 className="text-sm font-semibold text-gray-900 truncate">
               {spl.requester.name}
             </h3>
-            <p className="text-xs text-gray-500 truncate">PIN: {spl.requester.pin || "-"}</p>
+            <p className="text-xs text-gray-500 truncate">
+              {spl.requester.department} · PIN: {spl.requester.pin || "-"}
+            </p>
           </div>
           {getStatusBadge(spl.status, true)}
         </div>
@@ -150,10 +246,37 @@ export default function SplCard({
             </div>
           )}
 
+          {/* Supervisor Approval (compact) */}
+          {spl.supervisorApprovalDate && (
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100">
+              <p className="text-green-600 text-xs font-medium flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                ✓ Disetujui {spl.supervisor?.role === "GA" ? "GA" : "Kepala Dept"}
+              </p>
+            </div>
+          )}
+
+          {/* Rejection Reason (compact) */}
+          {(spl.rejectionReason || spl.supervisorRejectionReason) && (
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100 bg-red-50 p-2 rounded">
+              <p className="text-red-700 text-xs font-semibold mb-0.5 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Alasan Ditolak:
+              </p>
+              <p className="text-red-600 text-xs line-clamp-2">
+                {spl.supervisorRejectionReason || spl.rejectionReason}
+              </p>
+            </div>
+          )}
+
           {spl.approver && (
             <div className="pt-1.5 mt-1.5 border-t border-gray-100">
               <p className="text-gray-500 text-xs">
-                Diproses: {spl.approver.name}
+                Disetujui: {spl.approver.name}
               </p>
             </div>
           )}
@@ -230,10 +353,72 @@ export default function SplCard({
           <h3 className="text-base font-semibold text-gray-900 truncate">
             {spl.requester.name}
           </h3>
-          <p className="text-sm text-gray-600 truncate">{spl.requester.email}</p>
+          <p className="text-sm text-gray-600 truncate">
+            {spl.requester.department} · {spl.requester.email}
+          </p>
         </div>
         {getStatusBadge(spl.status, false)}
       </div>
+
+      {/* Approval Flow Progress */}
+      {!["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
+        <div className="mb-4 p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
+          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Alur Persetujuan:
+          </p>
+          <div className="flex items-center gap-2">
+            {getApprovalFlow().map((step, index) => (
+              <div key={index} className="flex items-center gap-2 flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                      step.done
+                        ? "bg-green-500 border-green-600 text-white shadow-md"
+                        : step.current
+                        ? "bg-blue-500 border-blue-600 text-white shadow-md animate-pulse"
+                        : "bg-gray-100 border-gray-300 text-gray-400"
+                    }`}
+                  >
+                    {step.done ? "✓" : index + 1}
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold mt-1 ${
+                      step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+                {index < getApprovalFlow().length - 1 && (
+                  <div
+                    className={`h-0.5 flex-1 ${
+                      step.done ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Notice */}
+      {["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
+        <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <p className="text-xs font-semibold text-red-700 mb-1 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {getDetailedStatus().label}
+          </p>
+          <p className="text-xs text-red-600">
+            {getDetailedStatus().description}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm">
@@ -305,19 +490,54 @@ export default function SplCard({
           </div>
         )}
 
+        {/* Supervisor Approval Info */}
+        {spl.supervisorApprovalDate && (
+          <div className="mt-3 pt-3 border-t border-gray-100 bg-green-50 p-3 rounded-lg">
+            <p className="text-xs text-green-700 font-semibold mb-1 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Disetujui Supervisor:
+            </p>
+            <p className="text-xs text-green-600">
+              {spl.supervisor?.name || "Supervisor"} · {format(new Date(spl.supervisorApprovalDate), "dd MMM yyyy HH:mm", { locale: id })}
+            </p>
+          </div>
+        )}
+
+        {/* Rejection Reason */}
         {spl.rejectionReason && (
-          <div className="mt-3 pt-3 border-t border-gray-100 bg-red-50 p-3 rounded">
-            <p className="text-sm text-red-700 font-medium mb-1">
+          <div className="mt-3 pt-3 border-t border-gray-100 bg-red-50 p-3 rounded-lg border border-red-200">
+            <p className="text-sm text-red-700 font-semibold mb-2 flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
               Alasan Penolakan:
             </p>
-            <p className="text-sm text-red-600">{spl.rejectionReason}</p>
+            <p className="text-sm text-red-600 leading-relaxed">{spl.rejectionReason}</p>
+          </div>
+        )}
+
+        {spl.supervisorRejectionReason && (
+          <div className="mt-3 pt-3 border-t border-gray-100 bg-red-50 p-3 rounded-lg border border-red-200">
+            <p className="text-sm text-red-700 font-semibold mb-2 flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Alasan Penolakan (Supervisor):
+            </p>
+            <p className="text-sm text-red-600 leading-relaxed">{spl.supervisorRejectionReason}</p>
           </div>
         )}
 
         {spl.approver && (
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
               Diproses oleh: {spl.approver.name}
+              {spl.approvalDate && ` · ${format(new Date(spl.approvalDate), "dd MMM yyyy HH:mm", { locale: id })}`}
             </p>
           </div>
         )}

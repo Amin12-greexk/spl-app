@@ -72,10 +72,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
         if (response.ok) {
           const data = await response.json()
           const recentUpdates = data
-            .filter((spl: any) =>
-              spl.status !== "PENDING" &&
-              new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            )
+            .filter((spl: any) => {
+              // Filter harus sama dengan logic di NotificationProvider
+              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+              return isNotPending && isRecent
+            })
             .map((spl: any) => {
               // Format tanggal dengan validasi
               const formatDate = (dateString: string) => {
@@ -127,13 +129,58 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
           setNotifications(recentUpdates)
         }
-      } else if (session.user.role === "HR" || session.user.role === "MANAGER") {
-        const response = await fetch("/api/spl?status=PENDING")
-        if (response.ok) {
-          const data = await response.json()
-          const pendingNotifications = data
+      } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
+        // GA/DEPT_HEAD punya 2 jenis notifikasi:
+        // 1. Update SPL mereka sendiri
+        // 2. Pending approval dari team mereka
+
+        const allNotifications: any[] = []
+
+        // 1. Fetch own SPL updates
+        const ownResponse = await fetch("/api/spl")
+        if (ownResponse.ok) {
+          const ownData = await ownResponse.json()
+          const ownUpdates = ownData
+            .filter((spl: any) => {
+              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+              return isNotPending && isRecent
+            })
             .map((spl: any) => {
-              // Format tanggal dengan validasi
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              const statusText = spl.status === "APPROVED" ? "disetujui" : "ditolak"
+              return {
+                id: spl.id,
+                title: `SPL Anda ${spl.status === "APPROVED" ? "Disetujui" : "Ditolak"}`,
+                message: `SPL ${formatDate(spl.date)} telah ${statusText}`,
+                status: spl.status,
+                createdAt: spl.approvalDate || spl.updatedAt,
+              }
+            })
+          allNotifications.push(...ownUpdates)
+        }
+
+        // 2. Fetch team SPL pending approval
+        const teamResponse = await fetch("/api/spl/my-team")
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json()
+          const pendingApprovals = teamData
+            .filter((spl: any) => spl.status === "PENDING_SUPERVISOR")
+            .map((spl: any) => {
               const formatDate = (dateString: string) => {
                 if (!dateString) return 'tanggal tidak tersedia'
                 try {
@@ -152,7 +199,127 @@ export default function Header({ onMenuClick }: HeaderProps) {
               return {
                 id: spl.id,
                 title: "SPL Perlu Persetujuan",
-                message: `${spl.requester?.name || "Karyawan"} mengajukan SPL untuk tanggal ${formatDate(spl.date)}`,
+                message: `${spl.requester?.name || "Staff"} mengajukan SPL ${formatDate(spl.date)}`,
+                status: spl.status,
+                createdAt: spl.createdAt,
+                employeeName: spl.requester?.name,
+              }
+            })
+          allNotifications.push(...pendingApprovals)
+        }
+
+        // Sort and limit
+        allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        setNotifications(allNotifications.slice(0, 10))
+
+      } else if (session.user.role === "HR") {
+        // HR punya 2 jenis notifikasi:
+        // 1. Update SPL mereka sendiri (jika mereka submit)
+        // 2. Pending approval MANAGER dari semua staff
+
+        const allNotifications: any[] = []
+
+        // 1. Fetch own SPL updates
+        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
+        if (ownResponse.ok) {
+          const ownData = await ownResponse.json()
+          const ownUpdates = ownData
+            .filter((spl: any) => {
+              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+              return isNotPending && isRecent
+            })
+            .map((spl: any) => {
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              const statusText = spl.status === "APPROVED" ? "disetujui" : "ditolak"
+              return {
+                id: spl.id,
+                title: `SPL Anda ${spl.status === "APPROVED" ? "Disetujui" : "Ditolak"}`,
+                message: `SPL ${formatDate(spl.date)} telah ${statusText}`,
+                status: spl.status,
+                createdAt: spl.approvalDate || spl.updatedAt,
+              }
+            })
+          allNotifications.push(...ownUpdates)
+        }
+
+        // 2. Fetch pending manager approvals (view only, tidak bisa approve)
+        const pendingResponse = await fetch("/api/spl?status=PENDING_MANAGER")
+        if (pendingResponse.ok) {
+          const data = await pendingResponse.json()
+          const pendingNotifications = data.slice(0, 5).map((spl: any) => {
+              // Format tanggal dengan validasi
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              return {
+                id: spl.id,
+                title: "SPL Menunggu Manager",
+                message: `${spl.requester?.name || "Karyawan"} - SPL ${formatDate(spl.date)} menunggu Manager`,
+                status: spl.status,
+                createdAt: spl.createdAt,
+                employeeName: spl.requester?.name,
+              }
+            })
+          allNotifications.push(...pendingNotifications)
+        }
+
+        // Sort and limit
+        allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        setNotifications(allNotifications.slice(0, 10))
+
+      } else if (session.user.role === "MANAGER") {
+        // MANAGER hanya lihat pending approvals
+        const response = await fetch("/api/spl?status=PENDING_MANAGER")
+        if (response.ok) {
+          const data = await response.json()
+          const pendingNotifications = data
+            .map((spl: any) => {
+              const formatDate = (dateString: string) => {
+                if (!dateString) return 'tanggal tidak tersedia'
+                try {
+                  const date = new Date(dateString)
+                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                  return date.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })
+                } catch {
+                  return 'tanggal tidak valid'
+                }
+              }
+
+              return {
+                id: spl.id,
+                title: "SPL Perlu Persetujuan",
+                message: `${spl.requester?.name || "Karyawan"} mengajukan SPL ${formatDate(spl.date)}`,
                 status: spl.status,
                 createdAt: spl.createdAt,
                 employeeName: spl.requester?.name,
@@ -185,16 +352,32 @@ export default function Header({ onMenuClick }: HeaderProps) {
   }
 
   // Handle notification item click
-  const handleNotificationItemClick = (notificationId: string) => {
+  const handleNotificationItemClick = (notification: any) => {
     setShowNotificationMenu(false)
     clearNotificationCount() // Clear badge immediately for smooth UX
 
     if (session?.user?.role === "STAFF") {
-      router.push(`/dashboard/staff/pengajuan/${notificationId}`)
+      router.push(`/dashboard/staff/pengajuan/${notification.id}`)
+    } else if (session?.user?.role === "GA" || session?.user?.role === "DEPARTMENT_HEAD") {
+      // Route based on notification type
+      if (notification.notificationType === "own_spl") {
+        // Own SPL update - go to history page
+        router.push(`/dashboard/ga/riwayat`)
+      } else {
+        // Team approval needed - go to approval page
+        router.push(`/dashboard/ga/persetujuan`)
+      }
     } else if (session?.user?.role === "HR") {
-      router.push(`/dashboard/hr/persetujuan`)
+      // Route based on notification type
+      if (notification.notificationType === "own_spl") {
+        // Own SPL update - go to history page
+        router.push(`/dashboard/ga/riwayat`)
+      } else {
+        // Pending manager approval - go to HR data page
+        router.push(`/dashboard/hr`)
+      }
     } else if (session?.user?.role === "MANAGER") {
-      router.push(`/dashboard/manager/persetujuan`)
+      router.push(`/dashboard/hr/persetujuan`)
     }
   }
 
@@ -337,7 +520,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                             {notifications.map((notification) => (
                               <button
                                 key={notification.id}
-                                onClick={() => handleNotificationItemClick(notification.id)}
+                                onClick={() => handleNotificationItemClick(notification)}
                                 className="w-full p-4 hover:bg-gray-50 transition-colors text-left group"
                               >
                                 <div className="flex items-start gap-3">
