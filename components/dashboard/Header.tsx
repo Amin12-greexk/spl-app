@@ -2,7 +2,7 @@
 
 import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, memo } from "react"
 import Image from "next/image"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 
@@ -48,21 +48,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
     }
   }, [session])
 
-  // Auto-refresh notifications list when dropdown is open and count changes
-  useEffect(() => {
-    if (showNotificationMenu && session) {
-      fetchNotifications()
-    }
-  }, [notificationCount])
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     setShowUserMenu(false)
     await signOut({ redirect: false })
     router.push("/login")
-  }
+  }, [router])
 
   // Fetch notifications when dropdown is opened
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (loadingNotifications || !session) return
 
     setLoadingNotifications(true)
@@ -332,66 +325,66 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
       }
     } catch (error) {
-      console.error("Error fetching notifications:", error)
+      // Error fetching notifications - silent fail
     } finally {
       setLoadingNotifications(false)
     }
-  }
+  }, [session, loadingNotifications])
+
+  // Auto-refresh notifications list when dropdown is open and count changes
+  useEffect(() => {
+    if (showNotificationMenu && session) {
+      fetchNotifications()
+    }
+  }, [showNotificationMenu, session, fetchNotifications])
 
   // Handle notification menu toggle
-  const handleNotificationClick = () => {
-    setShowUserMenu(false) // Close user menu if open
+  const handleNotificationClick = useCallback(() => {
+    setShowUserMenu(false)
     const willOpen = !showNotificationMenu
     setShowNotificationMenu(willOpen)
 
     if (willOpen) {
-      // Saat membuka dropdown, clear notification badge dan fetch notifications
       clearNotificationCount()
       fetchNotifications()
     }
-  }
+  }, [showNotificationMenu, clearNotificationCount, fetchNotifications])
 
   // Handle notification item click
-  const handleNotificationItemClick = (notification: any) => {
+  const handleNotificationItemClick = useCallback((notification: any) => {
     setShowNotificationMenu(false)
-    clearNotificationCount() // Clear badge immediately for smooth UX
+    clearNotificationCount()
 
     if (session?.user?.role === "STAFF") {
       router.push(`/dashboard/staff/pengajuan/${notification.id}`)
     } else if (session?.user?.role === "GA" || session?.user?.role === "DEPARTMENT_HEAD") {
-      // Route based on notification type
       if (notification.notificationType === "own_spl") {
-        // Own SPL update - go to history page
         router.push(`/dashboard/ga/riwayat`)
       } else {
-        // Team approval needed - go to approval page
         router.push(`/dashboard/ga/persetujuan`)
       }
     } else if (session?.user?.role === "HR") {
-      // Route based on notification type
       if (notification.notificationType === "own_spl") {
-        // Own SPL update - go to history page
         router.push(`/dashboard/ga/riwayat`)
       } else {
-        // Pending manager approval - go to HR data page
         router.push(`/dashboard/hr`)
       }
     } else if (session?.user?.role === "MANAGER") {
       router.push(`/dashboard/hr/persetujuan`)
     }
-  }
+  }, [session?.user?.role, router, clearNotificationCount])
 
-  const getInitials = (name: string) => {
+  const getInitials = useCallback((name: string) => {
     return name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
-  }
+  }, [])
 
   // Format relative time
-  const getRelativeTime = (dateString: string) => {
+  const getRelativeTime = useCallback((dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
@@ -401,7 +394,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} hari lalu`
     return date.toLocaleDateString("id-ID")
-  }
+  }, [])
 
   return (
     <>

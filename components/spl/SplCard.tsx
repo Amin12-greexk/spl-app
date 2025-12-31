@@ -2,6 +2,7 @@ import { Spl } from "@/types"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import Image from "next/image"
+import { memo, useMemo } from "react"
 
 interface SplCardProps {
   spl: Spl
@@ -15,7 +16,7 @@ interface SplCardProps {
   currentUserId?: string
 }
 
-export default function SplCard({
+function SplCard({
   spl,
   onView,
   onApprove,
@@ -26,8 +27,8 @@ export default function SplCard({
   compact = false,
   currentUserId,
 }: SplCardProps) {
-  // Determine detailed status label based on supervisor and role
-  const getDetailedStatus = () => {
+  // Determine detailed status label based on supervisor and role - memoized
+  const detailedStatus = useMemo(() => {
     // Determine supervisor type
     const supervisorRole = spl.supervisor?.role || spl.requester?.department
     let supervisorLabel = "Supervisor"
@@ -83,10 +84,10 @@ export default function SplCard({
           description: "Menunggu proses",
         }
     }
-  }
+  }, [spl.status, spl.supervisor?.role, spl.requester?.department, spl.approver?.name])
 
   const getStatusBadge = (status: string, isCompact = false) => {
-    const statusInfo = getDetailedStatus()
+    const statusInfo = detailedStatus
 
     const statusConfig = {
       PENDING: {
@@ -240,7 +241,7 @@ export default function SplCard({
                   fill
                   sizes="(max-width: 768px) 100vw, 300px"
                   className="object-cover"
-                  unoptimized
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -412,10 +413,10 @@ export default function SplCard({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {getDetailedStatus().label}
+            {detailedStatus.label}
           </p>
           <p className="text-xs text-red-600">
-            {getDetailedStatus().description}
+            {detailedStatus.description}
           </p>
         </div>
       )}
@@ -463,8 +464,7 @@ export default function SplCard({
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-contain"
-                  unoptimized
-                  priority={false}
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -482,8 +482,7 @@ export default function SplCard({
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-contain"
-                  unoptimized
-                  priority={false}
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -591,3 +590,5 @@ export default function SplCard({
     </div>
   )
 }
+
+export default memo(SplCard)

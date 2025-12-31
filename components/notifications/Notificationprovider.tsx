@@ -63,14 +63,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
           appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
         }
 
-        // Log untuk debugging
-        console.log('🔍 Firebase Config Check:', {
-          apiKey: firebaseConfig.apiKey ? '✅' : '❌',
-          authDomain: firebaseConfig.authDomain ? '✅' : '❌',
-          projectId: firebaseConfig.projectId ? '✅' : '❌',
-          messagingSenderId: firebaseConfig.messagingSenderId ? '✅' : '❌',
-          appId: firebaseConfig.appId ? '✅' : '❌'
-        })
+        // Firebase config check (silent in production)
 
         const requiredVars = [
           firebaseConfig.apiKey,
@@ -81,16 +74,13 @@ export default function NotificationProvider({ children }: NotificationProviderP
         ]
 
         const hasAllVars = requiredVars.every(Boolean)
-        
+
         if (hasAllVars) {
-          console.log('✅ Firebase configuration complete')
           setFirebaseAvailable(true)
         } else {
-          console.warn('⚠️ Firebase configuration incomplete, using fallback mode')
           setFirebaseAvailable(false)
         }
       } catch (error) {
-        console.warn('⚠️ Firebase check error:', error)
         setFirebaseAvailable(false)
       }
     }
@@ -116,8 +106,6 @@ export default function NotificationProvider({ children }: NotificationProviderP
           const messagePromise = onMessageListener()
 
           messagePromise.then((payload: any) => {
-            console.log("📬 Received foreground message:", payload)
-
             const title = payload.notification?.title || "Notifikasi Baru"
             const body = payload.notification?.body || ""
             const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
@@ -194,11 +182,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
               }
             )
           }).catch((err: any) => {
-            console.log("❌ Failed to receive foreground message:", err)
+            // Failed to receive foreground message - silent fail
           })
 
         } catch (err) {
-          console.log("Firebase message listener setup failed:", err)
+          // Firebase message listener setup failed - silent fail
         }
       }
     }
@@ -261,13 +249,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
               throw new Error("Gagal mendapatkan FCM token")
             }
           } catch (firebaseError) {
-            console.log("Firebase error, falling back to mock mode:", firebaseError)
-            // Fallback ke mock mode
+            // Firebase error, falling back to mock mode
           }
         }
-        
+
         // Fallback mode (baik karena Firebase tidak tersedia atau error)
-        console.log("Using fallback notification mode")
         const mockToken = `fallback-${session.user.id}-${Date.now()}`
         
         const response = await fetch("/api/notifications/subscribe", {
@@ -299,7 +285,6 @@ export default function NotificationProvider({ children }: NotificationProviderP
         return false
       }
     } catch (error: any) {
-      console.error("Error requesting notification permission:", error)
       toast.error(error.message || "Gagal mengaktifkan notifikasi")
       return false
     } finally {
@@ -347,7 +332,6 @@ export default function NotificationProvider({ children }: NotificationProviderP
         toast.error(data.message || "Gagal mengirim notifikasi")
       }
     } catch (error: any) {
-      console.error("Error sending test notification:", error)
       toast.error(error.message || "Terjadi kesalahan")
     }
   }
@@ -448,7 +432,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
         }
       }
     } catch (error) {
-      console.error("Error fetching notification count:", error)
+      // Error fetching notification count - silent fail
     }
   }
 
