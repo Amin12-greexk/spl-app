@@ -30,7 +30,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [loadingNotifications, setLoadingNotifications] = useState(false)
 
   // Get notification count from context (real-time updates via Firebase)
-  const { notificationCount, refreshNotificationCount } = useNotificationContext()
+  const { notificationCount, refreshNotificationCount, clearNotificationCount } = useNotificationContext()
 
   // Efek Glassmorphism saat scroll
   useEffect(() => {
@@ -178,22 +178,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setShowNotificationMenu(willOpen)
 
     if (willOpen) {
-      // Saat membuka dropdown, fetch notifications
+      // Saat membuka dropdown, clear notification badge dan fetch notifications
+      clearNotificationCount()
       fetchNotifications()
-    } else {
-      // Saat menutup dropdown, refresh count
-      refreshNotificationCount()
     }
   }
 
   // Handle notification item click
   const handleNotificationItemClick = (notificationId: string) => {
     setShowNotificationMenu(false)
-
-    // Refresh notification count setelah notifikasi dibuka
-    setTimeout(() => {
-      refreshNotificationCount()
-    }, 500)
+    clearNotificationCount() // Clear badge immediately for smooth UX
 
     if (session?.user?.role === "STAFF") {
       router.push(`/dashboard/staff/pengajuan/${notificationId}`)
@@ -306,7 +300,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => {
                       setShowNotificationMenu(false)
-                      refreshNotificationCount()
                     }} />
 
                     <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col">
@@ -393,11 +386,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           <button
                             onClick={() => {
                               setShowNotificationMenu(false)
-
-                              // Refresh notification count setelah lihat semua
-                              setTimeout(() => {
-                                refreshNotificationCount()
-                              }, 500)
+                              clearNotificationCount() // Clear badge for smooth UX
 
                               if (session?.user?.role === "STAFF") {
                                 router.push("/dashboard/staff/pengajuan")

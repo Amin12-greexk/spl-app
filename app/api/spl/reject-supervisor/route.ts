@@ -100,6 +100,14 @@ export async function POST(req: NextRequest) {
       })
 
       if (requester && requester.notifications.length > 0) {
+        // Format tanggal SPL
+        const splDate = new Date(updatedSpl.date);
+        const formattedDate = splDate.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+
         const notificationPromises: Promise<any>[] = []
 
         requester.notifications.forEach((token) => {
@@ -107,7 +115,7 @@ export async function POST(req: NextRequest) {
             sendNotification(
               token.endpoint,
               "SPL Ditolak Supervisor",
-              `Pengajuan lembur Anda telah ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
+              `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
               { splId: updatedSpl.id, click_action: '/dashboard/staff' }
             )
           )

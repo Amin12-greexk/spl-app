@@ -13,6 +13,7 @@ interface NotificationContextType {
   testNotification: (title: string, message: string) => Promise<void>
   refreshNotificationCount: () => Promise<void>
   incrementNotificationCount: () => void
+  clearNotificationCount: () => void
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -119,6 +120,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
 
             const title = payload.notification?.title || "Notifikasi Baru"
             const body = payload.notification?.body || ""
+            const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 
             // Increment notification count when new message arrives
             incrementNotificationCount()
@@ -129,38 +131,65 @@ export default function NotificationProvider({ children }: NotificationProviderP
                 <div
                   className={`${
                     t.visible ? "animate-enter" : "animate-leave"
-                  } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                  } max-w-md w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-gray-200 overflow-hidden transition-all duration-300 hover:shadow-2xl`}
                 >
-                  <div className="flex-1 w-0 p-4">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0 pt-0.5">
-                        <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-green-100 text-green-600">
-                          🔔
-                        </span>
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      {/* Icon */}
+                      <div className="flex-shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-md">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                          </svg>
+                        </div>
                       </div>
-                      <div className="ml-3 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{title}</p>
-                        <p className="mt-1 text-sm text-gray-500">{body}</p>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1">
+                          <p className="text-sm font-bold text-gray-900">{title}</p>
+                          {/* Close button */}
+                          <button
+                            onClick={() => toast.dismiss(t.id)}
+                            className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">{body}</p>
+                        <p className="text-xs text-gray-400 mt-2 flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {timestamp}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex border-l border-gray-200">
-                    <button
-                      onClick={() => {
-                        toast.dismiss(t.id)
-                        if (payload.data?.click_action) {
+
+                    {/* Action button */}
+                    {payload.data?.click_action && (
+                      <button
+                        onClick={() => {
+                          toast.dismiss(t.id)
+                          clearNotificationCount()
                           window.location.href = payload.data.click_action
-                        }
-                      }}
-                      className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-green-600 hover:text-green-500 focus:outline-none"
-                    >
-                      Lihat
-                    </button>
+                        }}
+                        className="mt-3 w-full py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-semibold text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Lihat Detail
+                      </button>
+                    )}
                   </div>
                 </div>
               ),
               {
-                duration: 5000,
+                duration: 6000,
                 position: 'top-right',
               }
             )
@@ -355,6 +384,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
     setNotificationCount(prev => prev + 1)
   }
 
+  // Clear notification count (called when user views notifications)
+  const clearNotificationCount = () => {
+    setNotificationCount(0)
+  }
+
   return (
     <NotificationContext.Provider
       value={{
@@ -366,6 +400,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
         testNotification,
         refreshNotificationCount,
         incrementNotificationCount,
+        clearNotificationCount,
       }}
     >
       {children}

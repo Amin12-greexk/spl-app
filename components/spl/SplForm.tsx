@@ -90,19 +90,25 @@ export default function SplForm() {
       return
     }
 
-    const [minH, minM] = minStart.split(":").map(Number)
-    const [startH, startM] = formData.startTime.split(":").map(Number)
-    const now = new Date()
-    const nowMinutes = now.getHours() * 60 + now.getMinutes()
-    if (!Number.isNaN(minH) && !Number.isNaN(startH)) {
-      const minMinutes = minH * 60 + minM
-      if (nowMinutes > minMinutes) {
-        await Swal.fire({
-          icon: "error",
-          title: "Lewat Batas Waktu",
-          text: `Pengajuan hanya bisa sebelum pukul ${minStart} (atur oleh Manager).`,
-        })
-        return
+    // Security tidak memiliki batasan waktu karena berbeda-beda shift
+    const userDepartment = session?.user?.department
+    const isSecurityDepartment = userDepartment === "Security"
+
+    if (!isSecurityDepartment) {
+      const [minH, minM] = minStart.split(":").map(Number)
+      const [startH, startM] = formData.startTime.split(":").map(Number)
+      const now = new Date()
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      if (!Number.isNaN(minH) && !Number.isNaN(startH)) {
+        const minMinutes = minH * 60 + minM
+        if (nowMinutes > minMinutes) {
+          await Swal.fire({
+            icon: "error",
+            title: "Lewat Batas Waktu",
+            text: `Pengajuan hanya bisa sebelum pukul ${minStart} (atur oleh Manager).`,
+          })
+          return
+        }
       }
     }
 
@@ -269,7 +275,13 @@ export default function SplForm() {
                 />
               <div className="mt-2 text-xs text-gray-600 space-y-1">
                 <p>Format 24 jam (contoh: 13:30).</p>
-                <p>Batas maksimal pengajuan: {minStart} (atur oleh Manager). Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
+                {session?.user?.department === "Security" ? (
+                  <p className="text-blue-600 font-medium">
+                    ℹ️ Security: Tidak ada batasan waktu pengajuan (karena berbeda-beda shift).
+                  </p>
+                ) : (
+                  <p>Batas maksimal pengajuan: {minStart} (atur oleh Manager). Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
+                )}
               </div>
             </div>
 
@@ -344,13 +356,19 @@ export default function SplForm() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                Foto Bukti Pengerjaan Lembur
+                Foto Bukti Pengerjaan Lembur <span className="text-sm font-normal text-gray-500">(Opsional)</span>
               </h2>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Upload foto bukti pengerjaan lembur 
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload foto bukti pengerjaan lembur <span className="text-gray-500 font-normal">(Opsional)</span>
                 </label>
+                <p className="text-xs text-gray-600 mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <span className="font-semibold text-blue-800">ℹ️ Informasi:</span>
+                  <span className="text-blue-900 ml-1">
+                    Foto bukti opsional.
+                  </span>
+                </p>
 
                 {!imagePreview ? (
                   <div className="mt-2">

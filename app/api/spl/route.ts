@@ -100,25 +100,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
-    // Ambil batas maksimal waktu pengajuan yang diset manager (default 16:30)
-    const minSetting = await prisma.setting.findUnique({
-      where: { key: "MIN_OVERTIME_START" },
+    // Check user's department first
+    const userDepartment = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { department: true },
     })
-    const minTime = minSetting?.value || "16:30"
-    const [minHour, minMin] = minTime.split(":").map(Number)
+
+    // Security tidak memiliki batasan waktu karena berbeda-beda shift
+    const isSecurityDepartment = userDepartment?.department === "Security"
+
+    // Validasi waktu pengajuan (tidak berlaku untuk Security)
+    if (!isSecurityDepartment) {
+      // Ambil batas maksimal waktu pengajuan yang diset manager (default 16:30)
+      const minSetting = await prisma.setting.findUnique({
+        where: { key: "MIN_OVERTIME_START" },
+      })
+      const minTime = minSetting?.value || "16:30"
+      const [minHour, minMin] = minTime.split(":").map(Number)
+
+      // Hard stop: jika waktu pengajuan (saat ini) melewati batas maksimal
+      const now = new Date()
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      const minTotalMinutes = minHour * 60 + minMin
+      if (nowMinutes > minTotalMinutes) {
+        return NextResponse.json(
+          { error: `Pengajuan hanya bisa sebelum pukul ${minTime} (atur oleh Manager)` },
+          { status: 400 }
+        );
+      }
+    }
+
     const [startHour, startMin] = body.startTime.split(":").map(Number);
     const [endHour, endMin] = body.endTime.split(":").map(Number);
-
-    // Hard stop: jika waktu pengajuan (saat ini) melewati batas maksimal
-    const now = new Date()
-    const nowMinutes = now.getHours() * 60 + now.getMinutes()
-    const minTotalMinutes = minHour * 60 + minMin
-    if (nowMinutes > minTotalMinutes) {
-      return NextResponse.json(
-        { error: `Pengajuan hanya bisa sebelum pukul ${minTime} (atur oleh Manager)` },
-        { status: 400 }
-      );
-    }
 
     // Kalkulasi total jam
     const totalMinutes = endHour * 60 + endMin - (startHour * 60 + startMin);
@@ -180,8 +193,17 @@ export async function POST(req: NextRequest) {
 
     // --- Logika Mengirim Notifikasi (Multi-level approval) ---
     try {
+      // Format tanggal untuk notifikasi
+      const splDate = new Date(body.date);
+      const formattedDate = splDate.toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+
       const notificationTitle = "Pengajuan SPL Baru";
-      const notificationBody = `${session.user.name} telah mengajukan lembur baru.`;
+      const notificationBody = `${session.user.name} mengajukan lembur pada ${formattedDate} (${body.startTime} - ${body.endTime}).`;
       const notificationPromises: Promise<any>[] = [];
 
       if (spl.requester.supervisorId) {

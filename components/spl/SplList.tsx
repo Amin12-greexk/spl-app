@@ -22,6 +22,10 @@ export default function SplList({
     initialStatus || "ALL"
   )
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(12)
+
   const fetchSpls = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -47,6 +51,11 @@ export default function SplList({
   useEffect(() => {
     fetchSpls()
   }, [fetchSpls])
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterStatus])
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus pengajuan SPL ini?")) {
@@ -88,6 +97,22 @@ export default function SplList({
   }
 
   const stats = getFilterStats()
+
+  // Pagination logic
+  const totalPages = Math.ceil(spls.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentSpls = spls.slice(startIndex, endIndex)
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    setCurrentPage(1)
+  }
 
   if (isLoading) {
     return (
@@ -230,6 +255,32 @@ export default function SplList({
         </div>
       )}
 
+      {/* Items per page selector */}
+      {spls.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Tampilkan:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+                <option value={48}>48</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="text-sm text-gray-700">per halaman</span>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              Menampilkan <span className="font-semibold text-gray-900">{startIndex + 1}</span> - <span className="font-semibold text-gray-900">{Math.min(endIndex, spls.length)}</span> dari <span className="font-semibold text-gray-900">{spls.length}</span> SPL
+            </div>
+          </div>
+        </div>
+      )}
+
       {spls.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="flex flex-col items-center space-y-4">
@@ -243,7 +294,7 @@ export default function SplList({
                 {filterStatus === "ALL" ? "Belum Ada SPL" : `Tidak Ada SPL ${filterStatus === "PENDING" ? "Menunggu" : filterStatus === "APPROVED" ? "Disetujui" : "Ditolak"}`}
               </h3>
               <p className="text-gray-500 text-sm max-w-md mx-auto">
-                {filterStatus === "ALL" 
+                {filterStatus === "ALL"
                   ? "Belum ada pengajuan SPL yang dibuat. Mulai dengan membuat pengajuan baru."
                   : `Tidak ada SPL dengan status ${filterStatus === "PENDING" ? "menunggu persetujuan" : filterStatus === "APPROVED" ? "disetujui" : "ditolak"}.`
                 }
@@ -263,16 +314,107 @@ export default function SplList({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {spls.map((spl) => (
-            <SplCard
-              key={spl.id}
-              spl={spl}
-              userRole={userRole}
-              onDelete={userRole === "STAFF" ? handleDelete : undefined}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 lg:gap-6">
+            {currentSpls.map((spl) => (
+              <SplCard
+                key={spl.id}
+                spl={spl}
+                userRole={userRole}
+                onDelete={userRole === "STAFF" ? handleDelete : undefined}
+                compact={true}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg">
+              {/* Mobile Pagination */}
+              <div className="flex flex-1 justify-between sm:hidden">
+                <button
+                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sebelumnya
+                </button>
+                <div className="text-sm text-gray-700 flex items-center">
+                  Hal. {currentPage} dari {totalPages}
+                </div>
+                <button
+                  onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+
+              {/* Desktop Pagination */}
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Menampilkan <span className="font-medium">{startIndex + 1}</span> sampai{" "}
+                    <span className="font-medium">{Math.min(endIndex, spls.length)}</span> dari{" "}
+                    <span className="font-medium">{spls.length}</span> hasil
+                  </p>
+                </div>
+                <div>
+                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                    <button
+                      onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Sebelumnya</span>
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                              currentPage === page
+                                ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                                : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      } else if (page === currentPage - 2 || page === currentPage + 2) {
+                        return <span key={page} className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300">...</span>
+                      }
+                      return null
+                    })}
+
+                    <button
+                      onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Selanjutnya</span>
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -27,7 +27,7 @@ export default function GAPengajuanPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
           Pengajuan Lembur Saya
@@ -36,7 +36,12 @@ export default function GAPengajuanPage() {
           Isi formulir di bawah untuk mengajukan lembur Anda sendiri
         </p>
         <div className="mt-3 p-4 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-sm">
-          <div className="font-semibold mb-1">ℹ️ Informasi:</div>
+          <div className="font-semibold mb-1 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Informasi:
+          </div>
           <p>
             Pengajuan Anda akan langsung diteruskan ke Manager untuk persetujuan (melewati approval supervisor).
           </p>

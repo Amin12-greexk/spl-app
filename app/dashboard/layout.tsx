@@ -84,8 +84,8 @@ export default function DashboardLayout({
           
           {/* Main Content */}
           <main className="flex-1 lg:ml-64 transition-all duration-200">
-            <div className="p-4 sm:p-6 lg:p-8">
-              <div className="max-w-7xl mx-auto">
+            <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
+              <div className="w-full max-w-[1600px] mx-auto">
                 {children}
               </div>
             </div>

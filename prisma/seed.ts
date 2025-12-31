@@ -18,7 +18,7 @@ async function main() {
       password: hashedPassword,
       pin: "1001",
       role: "HR",
-      department: "Human Resources",
+      department: "HR",
       position: "HR Manager",
     },
   });
@@ -32,7 +32,7 @@ async function main() {
       password: hashedPassword,
       pin: "1002",
       role: "HR",
-      department: "Human Resources",
+      department: "HR",
       position: "HR Staff",
     },
   });
@@ -70,6 +70,22 @@ async function main() {
 
   // ========== DEPARTMENT HEADS ==========
 
+  // HR Department Head
+  const hrHead = await prisma.user.upsert({
+    where: { email: "kepala.hr@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "kepala.hr@tunasestaindonesia.com",
+      name: "Siti Aminah",
+      password: hashedPassword,
+      pin: "4001",
+      role: "DEPARTMENT_HEAD",
+      department: "HR",
+      position: "HR Supervisor",
+      supervisorId: null, // Department Head langsung ke Manager
+    },
+  });
+
   // IT Department Head
   const itHead = await prisma.user.upsert({
     where: { email: "kepala.it@tunasestaindonesia.com" },
@@ -78,139 +94,75 @@ async function main() {
       email: "kepala.it@tunasestaindonesia.com",
       name: "Ahmad Fauzi",
       password: hashedPassword,
-      pin: "4001",
-      role: "DEPARTMENT_HEAD",
-      department: "IT",
-      position: "IT Manager",
-      supervisorId: null, // Department Head langsung ke Manager
-    },
-  });
-
-  // Production Department Head
-  const productionHead = await prisma.user.upsert({
-    where: { email: "kepala.production@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "kepala.production@tunasestaindonesia.com",
-      name: "Siti Nurhaliza",
-      password: hashedPassword,
       pin: "4002",
       role: "DEPARTMENT_HEAD",
-      department: "Production",
-      position: "Production Manager",
+      department: "IT",
+      position: "IT Supervisor",
       supervisorId: null,
     },
   });
 
-  // Finance Department Head
-  const financeHead = await prisma.user.upsert({
-    where: { email: "kepala.finance@tunasestaindonesia.com" },
+  // Admin Department Head
+  const adminHead = await prisma.user.upsert({
+    where: { email: "kepala.admin@tunasestaindonesia.com" },
     update: {},
     create: {
-      email: "kepala.finance@tunasestaindonesia.com",
+      email: "kepala.admin@tunasestaindonesia.com",
       name: "Dewi Lestari",
       password: hashedPassword,
       pin: "4003",
       role: "DEPARTMENT_HEAD",
-      department: "Finance",
-      position: "Finance Manager",
+      department: "Admin",
+      position: "Admin Supervisor",
       supervisorId: null,
     },
   });
 
-  // Marketing Department Head
-  const marketingHead = await prisma.user.upsert({
-    where: { email: "kepala.marketing@tunasestaindonesia.com" },
+  // Lab Department Head
+  const labHead = await prisma.user.upsert({
+    where: { email: "kepala.lab@tunasestaindonesia.com" },
     update: {},
     create: {
-      email: "kepala.marketing@tunasestaindonesia.com",
-      name: "Rudi Hartono",
+      email: "kepala.lab@tunasestaindonesia.com",
+      name: "Dr. Linda Wijaya",
       password: hashedPassword,
       pin: "4004",
       role: "DEPARTMENT_HEAD",
-      department: "Marketing",
-      position: "Marketing Manager",
+      department: "Lab",
+      position: "Lab Supervisor",
       supervisorId: null,
     },
   });
 
-  // Logistics Department Head
-  const logisticsHead = await prisma.user.upsert({
-    where: { email: "kepala.logistics@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "kepala.logistics@tunasestaindonesia.com",
-      name: "Agus Prasetyo",
-      password: hashedPassword,
-      pin: "4005",
-      role: "DEPARTMENT_HEAD",
-      department: "Logistics",
-      position: "Logistics Manager",
-      supervisorId: null,
-    },
-  });
+  // ========== STAFF - HR ==========
 
-  // Quality Control Department Head
-  const qcHead = await prisma.user.upsert({
-    where: { email: "kepala.qc@tunasestaindonesia.com" },
-    update: {},
+  const hrStaff1 = await prisma.user.upsert({
+    where: { email: "hr.staff1@tunasestaindonesia.com" },
+    update: { supervisorId: hrHead.id },
     create: {
-      email: "kepala.qc@tunasestaindonesia.com",
-      name: "Linda Wijaya",
-      password: hashedPassword,
-      pin: "4006",
-      role: "DEPARTMENT_HEAD",
-      department: "Quality Control",
-      position: "QC Manager",
-      supervisorId: null,
-    },
-  });
-
-  // Purchasing Department Head
-  const purchasingHead = await prisma.user.upsert({
-    where: { email: "kepala.purchasing@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "kepala.purchasing@tunasestaindonesia.com",
-      name: "Eko Saputra",
-      password: hashedPassword,
-      pin: "4007",
-      role: "DEPARTMENT_HEAD",
-      department: "Purchasing",
-      position: "Purchasing Manager",
-      supervisorId: null,
-    },
-  });
-
-  // ========== STAFF - SECURITY (supervised by GA) ==========
-
-  const securityStaff1 = await prisma.user.upsert({
-    where: { email: "security1@tunasestaindonesia.com" },
-    update: { supervisorId: gaUser.id },
-    create: {
-      email: "security1@tunasestaindonesia.com",
-      name: "Joko Widodo",
+      email: "hr.staff1@tunasestaindonesia.com",
+      name: "Rina Anggraini",
       password: hashedPassword,
       pin: "5001",
       role: "STAFF",
-      department: "Security",
-      position: "Security",
-      supervisorId: gaUser.id, // GA adalah supervisor Security
+      department: "HR",
+      position: "HR Staff",
+      supervisorId: hrHead.id,
     },
   });
 
-  const securityStaff2 = await prisma.user.upsert({
-    where: { email: "security2@tunasestaindonesia.com" },
-    update: { supervisorId: gaUser.id },
+  const hrStaff2 = await prisma.user.upsert({
+    where: { email: "hr.staff2@tunasestaindonesia.com" },
+    update: { supervisorId: hrHead.id },
     create: {
-      email: "security2@tunasestaindonesia.com",
-      name: "Bambang Sutrisno",
+      email: "hr.staff2@tunasestaindonesia.com",
+      name: "Doni Prasetyo",
       password: hashedPassword,
       pin: "5002",
       role: "STAFF",
-      department: "Security",
-      position: "Security",
-      supervisorId: gaUser.id,
+      department: "HR",
+      position: "HR Recruitment",
+      supervisorId: hrHead.id,
     },
   });
 
@@ -246,195 +198,99 @@ async function main() {
     },
   });
 
-  // ========== STAFF - PRODUCTION ==========
+  // ========== STAFF - SECURITY (supervised by GA) ==========
 
-  const productionStaff1 = await prisma.user.upsert({
-    where: { email: "production1@tunasestaindonesia.com" },
-    update: { supervisorId: productionHead.id },
+  const securityStaff1 = await prisma.user.upsert({
+    where: { email: "security1@tunasestaindonesia.com" },
+    update: { supervisorId: gaUser.id },
     create: {
-      email: "production1@tunasestaindonesia.com",
-      name: "Andi Setiawan",
+      email: "security1@tunasestaindonesia.com",
+      name: "Joko Widodo",
       password: hashedPassword,
       pin: "5201",
       role: "STAFF",
-      department: "Production",
-      position: "Production Staff",
-      supervisorId: productionHead.id,
+      department: "Security",
+      position: "Security Guard",
+      supervisorId: gaUser.id, // GA adalah supervisor Security
     },
   });
 
-  const productionStaff2 = await prisma.user.upsert({
-    where: { email: "production2@tunasestaindonesia.com" },
-    update: { supervisorId: productionHead.id },
+  const securityStaff2 = await prisma.user.upsert({
+    where: { email: "security2@tunasestaindonesia.com" },
+    update: { supervisorId: gaUser.id },
     create: {
-      email: "production2@tunasestaindonesia.com",
-      name: "Sri Wahyuni",
+      email: "security2@tunasestaindonesia.com",
+      name: "Bambang Sutrisno",
       password: hashedPassword,
       pin: "5202",
       role: "STAFF",
-      department: "Production",
-      position: "Production Operator",
-      supervisorId: productionHead.id,
+      department: "Security",
+      position: "Security Guard",
+      supervisorId: gaUser.id, // GA adalah supervisor Security
     },
   });
 
-  // ========== STAFF - FINANCE ==========
+  // ========== STAFF - ADMIN ==========
 
-  const financeStaff1 = await prisma.user.upsert({
-    where: { email: "finance1@tunasestaindonesia.com" },
-    update: { supervisorId: financeHead.id },
+  const adminStaff1 = await prisma.user.upsert({
+    where: { email: "admin1@tunasestaindonesia.com" },
+    update: { supervisorId: adminHead.id },
     create: {
-      email: "finance1@tunasestaindonesia.com",
+      email: "admin1@tunasestaindonesia.com",
       name: "Maya Sari",
       password: hashedPassword,
       pin: "5301",
       role: "STAFF",
-      department: "Finance",
-      position: "Accountant",
-      supervisorId: financeHead.id,
+      department: "Admin",
+      position: "Admin Staff",
+      supervisorId: adminHead.id,
     },
   });
 
-  const financeStaff2 = await prisma.user.upsert({
-    where: { email: "finance2@tunasestaindonesia.com" },
-    update: { supervisorId: financeHead.id },
+  const adminStaff2 = await prisma.user.upsert({
+    where: { email: "admin2@tunasestaindonesia.com" },
+    update: { supervisorId: adminHead.id },
     create: {
-      email: "finance2@tunasestaindonesia.com",
+      email: "admin2@tunasestaindonesia.com",
       name: "Dimas Prakoso",
       password: hashedPassword,
       pin: "5302",
       role: "STAFF",
-      department: "Finance",
-      position: "Finance Staff",
-      supervisorId: financeHead.id,
+      department: "Admin",
+      position: "Admin Staff",
+      supervisorId: adminHead.id,
     },
   });
 
-  // ========== STAFF - MARKETING ==========
+  // ========== STAFF - LAB ==========
 
-  const marketingStaff1 = await prisma.user.upsert({
-    where: { email: "marketing1@tunasestaindonesia.com" },
-    update: { supervisorId: marketingHead.id },
+  const labStaff1 = await prisma.user.upsert({
+    where: { email: "lab1@tunasestaindonesia.com" },
+    update: { supervisorId: labHead.id },
     create: {
-      email: "marketing1@tunasestaindonesia.com",
-      name: "Putri Ayu",
+      email: "lab1@tunasestaindonesia.com",
+      name: "Nurul Hidayah",
       password: hashedPassword,
       pin: "5401",
       role: "STAFF",
-      department: "Marketing",
-      position: "Marketing Staff",
-      supervisorId: marketingHead.id,
+      department: "Lab",
+      position: "Lab Analyst",
+      supervisorId: labHead.id,
     },
   });
 
-  const marketingStaff2 = await prisma.user.upsert({
-    where: { email: "marketing2@tunasestaindonesia.com" },
-    update: { supervisorId: marketingHead.id },
+  const labStaff2 = await prisma.user.upsert({
+    where: { email: "lab2@tunasestaindonesia.com" },
+    update: { supervisorId: labHead.id },
     create: {
-      email: "marketing2@tunasestaindonesia.com",
-      name: "Fajar Ramadan",
+      email: "lab2@tunasestaindonesia.com",
+      name: "Tono Sudarso",
       password: hashedPassword,
       pin: "5402",
       role: "STAFF",
-      department: "Marketing",
-      position: "Sales Executive",
-      supervisorId: marketingHead.id,
-    },
-  });
-
-  // ========== STAFF - LOGISTICS ==========
-
-  const logisticsStaff1 = await prisma.user.upsert({
-    where: { email: "logistics1@tunasestaindonesia.com" },
-    update: { supervisorId: logisticsHead.id },
-    create: {
-      email: "logistics1@tunasestaindonesia.com",
-      name: "Hendra Gunawan",
-      password: hashedPassword,
-      pin: "5501",
-      role: "STAFF",
-      department: "Logistics",
-      position: "Warehouse Staff",
-      supervisorId: logisticsHead.id,
-    },
-  });
-
-  const logisticsStaff2 = await prisma.user.upsert({
-    where: { email: "logistics2@tunasestaindonesia.com" },
-    update: { supervisorId: logisticsHead.id },
-    create: {
-      email: "logistics2@tunasestaindonesia.com",
-      name: "Irfan Hakim",
-      password: hashedPassword,
-      pin: "5502",
-      role: "STAFF",
-      department: "Logistics",
-      position: "Delivery Driver",
-      supervisorId: logisticsHead.id,
-    },
-  });
-
-  // ========== STAFF - QUALITY CONTROL ==========
-
-  const qcStaff1 = await prisma.user.upsert({
-    where: { email: "qc1@tunasestaindonesia.com" },
-    update: { supervisorId: qcHead.id },
-    create: {
-      email: "qc1@tunasestaindonesia.com",
-      name: "Nurul Hidayah",
-      password: hashedPassword,
-      pin: "5601",
-      role: "STAFF",
-      department: "Quality Control",
-      position: "QC Inspector",
-      supervisorId: qcHead.id,
-    },
-  });
-
-  const qcStaff2 = await prisma.user.upsert({
-    where: { email: "qc2@tunasestaindonesia.com" },
-    update: { supervisorId: qcHead.id },
-    create: {
-      email: "qc2@tunasestaindonesia.com",
-      name: "Tono Sudarso",
-      password: hashedPassword,
-      pin: "5602",
-      role: "STAFF",
-      department: "Quality Control",
-      position: "QC Staff",
-      supervisorId: qcHead.id,
-    },
-  });
-
-  // ========== STAFF - PURCHASING ==========
-
-  const purchasingStaff1 = await prisma.user.upsert({
-    where: { email: "purchasing1@tunasestaindonesia.com" },
-    update: { supervisorId: purchasingHead.id },
-    create: {
-      email: "purchasing1@tunasestaindonesia.com",
-      name: "Vina Marlina",
-      password: hashedPassword,
-      pin: "5701",
-      role: "STAFF",
-      department: "Purchasing",
-      position: "Purchasing Staff",
-      supervisorId: purchasingHead.id,
-    },
-  });
-
-  const purchasingStaff2 = await prisma.user.upsert({
-    where: { email: "purchasing2@tunasestaindonesia.com" },
-    update: { supervisorId: purchasingHead.id },
-    create: {
-      email: "purchasing2@tunasestaindonesia.com",
-      name: "Wahyu Hidayat",
-      password: hashedPassword,
-      pin: "5702",
-      role: "STAFF",
-      department: "Purchasing",
-      position: "Procurement Officer",
-      supervisorId: purchasingHead.id,
+      department: "Lab",
+      position: "Lab Technician",
+      supervisorId: labHead.id,
     },
   });
 
@@ -451,32 +307,36 @@ async function main() {
   console.log("- HR Users: 2");
   console.log("- Manager: 1");
   console.log("- GA: 1");
-  console.log("- Department Heads: 7 (IT, Production, Finance, Marketing, Logistics, QC, Purchasing)");
-  console.log("- Staff: 16 (2 per department)");
-  console.log("- Total Users: 27");
+  console.log("- Department Heads: 4 (HR, IT, Admin, Lab)");
+  console.log("- Staff: 10 (2 per department)");
+  console.log("- Total Users: 18");
 
   console.log("\n👥 User Structure:");
   console.log("┌─ Manager: Tiyas Indah Setyowuri");
-  console.log("├─ HR: Hayyu Sabrina, Zhallila");
+  console.log("├─ HR Manager: Hayyu Sabrina");
+  console.log("├─ HR Staff: Zhallila");
+  console.log("│");
   console.log("├─ GA: Budi Santoso");
-  console.log("│  └─ Security: Joko Widodo, Bambang Sutrisno");
-  console.log("├─ IT Head: Ahmad Fauzi");
+  console.log("│  └─ Security Staff: Joko Widodo, Bambang Sutrisno");
+  console.log("│");
+  console.log("├─ HR Head: Siti Aminah (Supervisor)");
+  console.log("│  └─ HR Staff: Rina Anggraini, Doni Prasetyo");
+  console.log("│");
+  console.log("├─ IT Head: Ahmad Fauzi (Supervisor)");
   console.log("│  └─ IT Staff: Abdul Wahid Amin, Rizki Maulana");
-  console.log("├─ Production Head: Siti Nurhaliza");
-  console.log("│  └─ Production Staff: Andi Setiawan, Sri Wahyuni");
-  console.log("├─ Finance Head: Dewi Lestari");
-  console.log("│  └─ Finance Staff: Maya Sari, Dimas Prakoso");
-  console.log("├─ Marketing Head: Rudi Hartono");
-  console.log("│  └─ Marketing Staff: Putri Ayu, Fajar Ramadan");
-  console.log("├─ Logistics Head: Agus Prasetyo");
-  console.log("│  └─ Logistics Staff: Hendra Gunawan, Irfan Hakim");
-  console.log("├─ QC Head: Linda Wijaya");
-  console.log("│  └─ QC Staff: Nurul Hidayah, Tono Sudarso");
-  console.log("└─ Purchasing Head: Eko Saputra");
-  console.log("   └─ Purchasing Staff: Vina Marlina, Wahyu Hidayat");
+  console.log("│");
+  console.log("├─ Admin Head: Dewi Lestari (Supervisor)");
+  console.log("│  └─ Admin Staff: Maya Sari, Dimas Prakoso");
+  console.log("│");
+  console.log("└─ Lab Head: Dr. Linda Wijaya (Supervisor)");
+  console.log("   └─ Lab Staff: Nurul Hidayah, Tono Sudarso");
 
   console.log("\n🔑 Default password untuk SEMUA user: password123");
   console.log("\n📧 Semua email menggunakan domain: @tunasestaindonesia.com");
+  console.log("\n⚠️  CATATAN:");
+  console.log("   - Security → supervised by GA");
+  console.log("   - HR, IT, Admin, Lab → supervised by DEPARTMENT_HEAD");
+  console.log("   Staff → Supervisor/GA → Manager");
 }
 
 // Jalankan fungsi main dan tangani error

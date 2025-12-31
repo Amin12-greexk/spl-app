@@ -108,13 +108,21 @@ export async function POST(req: NextRequest) {
         },
       })
 
+      // Format tanggal SPL
+      const splDate = new Date(updatedSpl.date);
+      const formattedDate = splDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+
       managers.forEach((manager) => {
         manager.notifications.forEach((token) => {
           notificationPromises.push(
             sendNotification(
               token.endpoint,
               "SPL Baru Menunggu Persetujuan",
-              `${updatedSpl.requester.name} - SPL telah disetujui supervisor dan menunggu persetujuan Anda.`,
+              `${updatedSpl.requester.name} - SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) telah disetujui supervisor.`,
               { splId: updatedSpl.id, click_action: '/dashboard/hr/persetujuan' }
             )
           )
@@ -133,7 +141,7 @@ export async function POST(req: NextRequest) {
             sendNotification(
               token.endpoint,
               "SPL Disetujui Supervisor",
-              `Pengajuan lembur Anda telah disetujui oleh ${session.user.name} dan diteruskan ke Manager.`,
+              `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${session.user.name} dan diteruskan ke Manager.`,
               { splId: updatedSpl.id, click_action: '/dashboard/staff' }
             )
           )

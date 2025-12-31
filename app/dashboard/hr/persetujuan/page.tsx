@@ -137,9 +137,9 @@ export default function PersetujuanPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Persetujuan SPL
           </h1>
           <p className="text-gray-600 mt-1">
@@ -147,8 +147,8 @@ export default function PersetujuanPage() {
           </p>
         </div>
         {spls.length > 0 && (
-          <div className="text-sm text-gray-600">
-            Total: <span className="font-semibold">{spls.length}</span> pengajuan
+          <div className="text-sm sm:text-base text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+            Total: <span className="font-semibold text-blue-700">{spls.length}</span> pengajuan
           </div>
         )}
       </div>
@@ -184,7 +184,7 @@ export default function PersetujuanPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {currentSpls.map((spl) => (
               <SplCard
                 key={spl.id}

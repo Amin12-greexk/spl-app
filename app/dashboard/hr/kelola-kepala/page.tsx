@@ -202,7 +202,7 @@ export default function ManageDepartmentHeadPage() {
         {departmentHeads.length === 0 ? (
           <p className="text-gray-500 text-center py-8">Belum ada Kepala Departemen</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {departmentHeads.map(user => (
               <div key={user.id} className="border border-gray-200 rounded-lg p-4 bg-green-50">
                 <div className="flex items-start justify-between mb-2">
@@ -241,7 +241,7 @@ export default function ManageDepartmentHeadPage() {
         {staffUsers.length === 0 ? (
           <p className="text-gray-500 text-center py-8">Tidak ada staff</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {staffUsers.map(user => (
               <div key={user.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">

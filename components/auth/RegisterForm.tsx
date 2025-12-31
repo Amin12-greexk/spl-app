@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
+import Image from "next/image"
 
 interface SupervisorInfo {
   hasSupervisor: boolean
@@ -118,12 +119,19 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="w-full max-w-lg lg:max-w-2xl">
         {/* Logo dan Branding */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center shadow-lg mb-4">
-            <div className="text-white text-2xl font-bold">TE</div>
+          <div className="mx-auto w-20 h-20 mb-4 relative">
+            <Image
+              src="/logo.png"
+              alt="Logo PT Tunas Esta Indonesia"
+              fill
+              sizes="80px"
+              className="object-contain drop-shadow-md"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             PT Tunas Esta Indonesia
@@ -196,14 +204,11 @@ export default function RegisterForm() {
                 required
               >
                 <option value="">Pilih Departemen</option>
+                <option value="HR">HR (Supervised)</option>
+                <option value="IT">IT (Supervised)</option>
                 <option value="Security">Security (Supervised by GA)</option>
-                <option value="IT">IT</option>
-                <option value="Production">Production</option>
-                <option value="Finance">Finance</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Logistics">Logistics</option>
-                <option value="Quality Control">Quality Control</option>
-                <option value="Purchasing">Purchasing</option>
+                <option value="Admin">Admin (Supervised)</option>
+                <option value="Lab">Lab (Supervised)</option>
               </select>
 
               {/* Supervisor Info */}

@@ -116,9 +116,17 @@ export async function PATCH(
       });
 
       if (requester && requester.notifications.length > 0) {
+        // Format tanggal SPL
+        const splDate = new Date(spl.date);
+        const formattedDate = splDate.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+
         const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";
         const notificationTitle = `Pengajuan SPL Anda ${statusText}`;
-        const notificationBody = `Pengajuan lembur Anda telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
+        const notificationBody = `SPL tanggal ${formattedDate} (${spl.startTime}-${spl.endTime}) telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
 
         const notificationPromises: Promise<any>[] = [];
         requester.notifications.forEach((token) => {
