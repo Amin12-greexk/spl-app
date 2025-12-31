@@ -166,7 +166,7 @@ export default function RegisterForm() {
                 required
               />
               <p className="mt-1 text-xs text-gray-500">
-                PIN karyawan Anda sesuai data HRD (minimal 4 karakter)
+                PIN karyawan Anda sesuai data HRD
               </p>
             </div>
 
@@ -382,7 +382,7 @@ export default function RegisterForm() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  PIN minimal 4 karakter (sesuai data HRD)
+                  PIN harus sesuai, kalau tidak tahu silakan hubungi HRD
                 </li>
                 <li className="flex items-center">
                   <svg
