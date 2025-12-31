@@ -451,11 +451,11 @@ export default function DashboardPage() {
 
           {/* MANAGER ACTIONS */}
           {userRole === "MANAGER" && (
-            <div className="group bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <div className="bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-5 h-5 text-purple-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -464,47 +464,35 @@ export default function DashboardPage() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8v4m0 0v4m0-4h4m-4 0H8m4-9a9 9 0 110 18 9 9 0 010-18z"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-purple-900">
-                    Atur Batas Maksimal Pengajuan
+                  <h3 className="text-base font-bold text-gray-900">
+                    Batas Waktu Pengajuan
                   </h3>
-                  <p className="text-purple-700 text-sm">
-                    Default 16:30, bisa fleksibel saat urgent. Format 24 jam. Pengajuan setelah jam ini ditolak.
+                  <p className="text-gray-600 text-sm">
+                    Pengajuan setelah jam ini akan ditolak
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700">
-                  Batas maksimal pengajuan (HH:MM)
-                </label>
-                <div className="flex items-center gap-3 text-sm text-purple-800 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
-                  <span className="px-2 py-1 bg-purple-600 text-white text-xs font-semibold rounded-md">
-                    24 Jam
-                  </span>
-                  <span>Contoh: 07:30, 13:45. Pengajuan setelah jam ini ditolak otomatis.</span>
-                </div>
                 <input
                   type="time"
                   value={minOvertime}
                   onChange={(e) => setMinOvertime(e.target.value)}
-                  className="w-full rounded-xl border-2 border-purple-200 px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                 />
                 <button
                   type="button"
                   onClick={saveMinOvertime}
                   disabled={isSavingMin}
-                  className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
+                  className="w-full px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
                 >
-                  {isSavingMin ? "Menyimpan..." : "Simpan"}
+                  {isSavingMin ? "Menyimpan..." : "Simpan Perubahan"}
                 </button>
-                <p className="text-xs text-gray-500">
-                  Batas ini divalidasi di form dan API. Staff tidak bisa mengisi sebelum jam ini.
-                </p>
               </div>
             </div>
           )}
@@ -613,65 +601,52 @@ export default function DashboardPage() {
               {/* MANAGER ACTIONS */}
               {userRole === "MANAGER" && (
                 <>
-                  <div className="group bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
-                    <div className="flex items-center mb-4">
-                      <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                        <svg
-                          className="w-6 h-6 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
+                  <Link
+                    href="/dashboard/hr/persetujuan"
+                    className="block bg-white border border-gray-200 rounded-xl p-6 hover:border-purple-300 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                          <svg
+                            className="w-5 h-5 text-purple-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">
+                            Persetujuan SPL
+                          </h3>
+                          <p className="text-gray-600 text-sm">
+                            Review pengajuan lembur
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-purple-900">
-                          Persetujuan SPL
-                        </h3>
-                        <p className="text-purple-700 text-sm">
-                          {stats.pending} menunggu review
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* DIPERBAIKI: Menggunakan Link component */}
-                    <Link
-                      href="/dashboard/hr/persetujuan"
-                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      Review SPL
                       {stats.pending > 0 && (
-                        <span className="ml-2 bg-white text-purple-600 px-2 py-1 rounded-full text-xs font-bold">
+                        <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
                           {stats.pending}
                         </span>
                       )}
-                    </Link>
-                  </div>
+                    </div>
+                  </Link>
 
-                  <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
-                    <div className="flex items-center mb-4">
-                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                  <Link
+                    href="/dashboard/hr"
+                    className="block bg-white border border-gray-200 rounded-xl p-6 hover:border-blue-300 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center mb-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                         <svg
-                          className="w-6 h-6 text-white"
+                          className="w-5 h-5 text-blue-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -680,39 +655,20 @@ export default function DashboardPage() {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                           />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-blue-900">
-                          Laporan Tim
+                        <h3 className="text-base font-bold text-gray-900">
+                          Data & Laporan
                         </h3>
-                        <p className="text-blue-700 text-sm">
-                          Lihat statistik tim
+                        <p className="text-gray-600 text-sm">
+                          Lihat data SPL tim
                         </p>
                       </div>
                     </div>
-                    <button
-                      disabled
-                      className="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-600 font-medium rounded-lg cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                      Coming Soon
-                    </button>
-                  </div>
+                  </Link>
                 </>
               )}
             </div>
