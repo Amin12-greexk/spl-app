@@ -38,8 +38,26 @@ export default function DashboardPage() {
           rejected: data.filter((spl) => spl.status === "REJECTED").length,
         })
 
-        // Get 3 most recent SPLs
+        // Get current week range (Sunday - Saturday)
+        const now = new Date()
+        const currentDay = now.getDay() // 0 = Sunday, 6 = Saturday
+
+        // Start of week (Sunday 00:00:00)
+        const startOfWeek = new Date(now)
+        startOfWeek.setDate(now.getDate() - currentDay)
+        startOfWeek.setHours(0, 0, 0, 0)
+
+        // End of week (Saturday 23:59:59)
+        const endOfWeek = new Date(startOfWeek)
+        endOfWeek.setDate(startOfWeek.getDate() + 6)
+        endOfWeek.setHours(23, 59, 59, 999)
+
+        // Filter SPL for current week only and get 3 most recent
         const recent = data
+          .filter((spl) => {
+            const splDate = new Date(spl.createdAt)
+            return splDate >= startOfWeek && splDate <= endOfWeek
+          })
           .sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -70,7 +88,7 @@ export default function DashboardPage() {
           setMinOvertime(data.value)
         }
       } catch (err) {
-        console.error("Gagal mengambil setting minimal lembur", err)
+        // Failed to load minimal overtime setting
       }
     }
     loadMin()
@@ -781,8 +799,8 @@ export default function DashboardPage() {
 
           {/* Recent SPL Activity */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center">
+            <div className="mb-6">
+              <div className="flex items-center mb-2">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                   <svg
                     className="w-5 h-5 text-blue-600"
@@ -798,8 +816,13 @@ export default function DashboardPage() {
                     />
                   </svg>
                 </div>
-                Aktivitas Terbaru
-              </h3>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Aktivitas Minggu Ini
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 ml-11">
+                Reset setiap minggu (Minggu - Sabtu)
+              </p>
             </div>
 
             {recentSpls.length > 0 ? (
@@ -838,8 +861,11 @@ export default function DashboardPage() {
                     />
                   </svg>
                 </div>
-                <p className="text-gray-500 text-sm">
-                  Belum ada aktivitas SPL
+                <p className="text-gray-500 text-sm font-medium">
+                  Belum ada aktivitas minggu ini
+                </p>
+                <p className="text-gray-400 text-xs mt-1">
+                  Aktivitas akan muncul mulai hari Minggu
                 </p>
               </div>
             )}
