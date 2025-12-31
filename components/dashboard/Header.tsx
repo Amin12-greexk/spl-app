@@ -117,7 +117,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               return {
                 id: spl.id,
                 title: `SPL ${spl.status === "APPROVED" ? "Disetujui" : spl.status === "REJECTED" ? "Ditolak" : "Diupdate"}`,
-                message: `SPL untuk tanggal ${formatDate(spl.startDate)} telah ${statusText}${approvalDateText ? ` pada ${approvalDateText}` : ''}`,
+                message: `SPL untuk tanggal ${formatDate(spl.date)} telah ${statusText}${approvalDateText ? ` pada ${approvalDateText}` : ''}`,
                 status: spl.status,
                 createdAt: spl.approvalDate || spl.updatedAt,
               }
@@ -152,10 +152,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
               return {
                 id: spl.id,
                 title: "SPL Perlu Persetujuan",
-                message: `${spl.employee?.name || "Karyawan"} mengajukan SPL untuk tanggal ${formatDate(spl.startDate)}`,
+                message: `${spl.requester?.name || "Karyawan"} mengajukan SPL untuk tanggal ${formatDate(spl.date)}`,
                 status: spl.status,
                 createdAt: spl.createdAt,
-                employeeName: spl.employee?.name,
+                employeeName: spl.requester?.name,
               }
             })
             .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
