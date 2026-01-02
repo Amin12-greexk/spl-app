@@ -7,17 +7,18 @@ import { prisma } from "./prisma"
  * Logic:
  * - "GA" = Supervised by GA user (role GA) - khusus Security
  * - "DEPARTMENT_HEAD" = Supervised by Department Head of that department (role DEPARTMENT_HEAD)
- * - Semua department memiliki supervisor (tidak ada yang langsung ke Manager)
+ * - Department yang tidak ada di mapping = langsung ke Manager (contoh: Admin, Produksi)
  */
 export const DEPARTMENT_SUPERVISOR_MAPPING: Record<string, string> = {
   // Security supervised by GA
   "Security": "GA",
 
-  // Departemen lain dengan Department Head/Supervisor
+  // Departemen dengan Department Head/Supervisor
   "HR": "DEPARTMENT_HEAD",
   "IT": "DEPARTMENT_HEAD",
-  "Admin": "DEPARTMENT_HEAD",
   "Lab": "DEPARTMENT_HEAD",
+
+  // Note: "Admin" dan "Produksi" tidak ada mapping, jadi langsung ke Manager
 }
 
 /**

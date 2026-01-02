@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
 
     const userRole = session.user.role as Role;
 
-    if (["STAFF", "GA", "DEPARTMENT_HEAD"].includes(userRole)) {
-      // Staff, GA, dan Department Head hanya bisa melihat data miliknya
+    if (["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole)) {
+      // Staff, GA, Department Head, dan Pengawas Produksi hanya bisa melihat data miliknya
       where.requesterId = session.user.id;
     } else if (userRole === "HR") {
       // HR bisa lihat SPL mereka sendiri ATAU semua SPL
@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role as Role)) {
+    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"].includes(session.user.role as Role)) {
       return NextResponse.json(
-        { error: "Hanya STAFF, GA, DEPARTMENT_HEAD, atau HR yang bisa mengajukan SPL" },
+        { error: "Hanya STAFF, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, atau HR yang bisa mengajukan SPL" },
         { status: 403 }
       );
     }
@@ -166,8 +166,8 @@ export async function POST(req: NextRequest) {
     // Determine initial status based on role and supervisor presence
     let initialStatus = "PENDING_MANAGER"
 
-    // GA, DEPARTMENT_HEAD, dan HR langsung ke Manager (skip supervisor approval)
-    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD" || user?.role === "HR") {
+    // GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, dan HR langsung ke Manager (skip supervisor approval)
+    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD" || user?.role === "PRODUCTION_SUPERVISOR" || user?.role === "HR") {
       initialStatus = "PENDING_MANAGER"
     }
     // STAFF: cek apakah ada supervisor

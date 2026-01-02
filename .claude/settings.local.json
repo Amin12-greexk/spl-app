@@ -16,7 +16,9 @@
       "Bash(npx prisma migrate:*)",
       "Bash(npx prisma db seed:*)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(netstat:*)",
+      "Bash(fuser:*)"
     ],
     "deny": [],
     "ask": []

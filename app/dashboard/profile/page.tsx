@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation"
 import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
+import { getRoleLabel } from "@/lib/utils"
 
 export default function ProfilePage() {
   const { data: session, update } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isFetching, setIsFetching] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [email, setEmail] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
@@ -27,16 +29,44 @@ export default function ProfilePage() {
     }
 
     const fetchProfile = async () => {
+      setIsFetching(true)
       try {
         const response = await fetch("/api/user/profile")
         if (response.ok) {
           const data = await response.json()
           setProfile(data)
           setEmail(data.email)
+        } else {
+          // Jika API gagal, gunakan data dari session sebagai fallback
+          console.error("Failed to fetch profile, using session data")
+          const fallbackProfile = {
+            id: session.user.id,
+            name: session.user.name || "",
+            email: session.user.email || "",
+            role: session.user.role,
+            department: session.user.department || "-",
+            position: session.user.position || "-",
+            pin: session.user.pin || "-",
+          }
+          setProfile(fallbackProfile)
+          setEmail(session.user.email || "")
         }
       } catch (error) {
         console.error("Error fetching profile:", error)
-        toast.error("Gagal memuat profil")
+        // Gunakan data session sebagai fallback jika terjadi error
+        const fallbackProfile = {
+          id: session.user.id,
+          name: session.user.name || "",
+          email: session.user.email || "",
+          role: session.user.role,
+          department: session.user.department || "-",
+          position: session.user.position || "-",
+          pin: session.user.pin || "-",
+        }
+        setProfile(fallbackProfile)
+        setEmail(session.user.email || "")
+      } finally {
+        setIsFetching(false)
       }
     }
 
@@ -93,10 +123,13 @@ export default function ProfilePage() {
     }
   }
 
-  if (!profile) {
+  if (isFetching || !profile) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-600"></div>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-600"></div>
+          <p className="text-gray-600 text-sm">Memuat profil...</p>
+        </div>
       </div>
     )
   }
@@ -143,7 +176,7 @@ export default function ProfilePage() {
                 Role
               </label>
               <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-900">{profile.role}</p>
+                <p className="text-gray-900">{getRoleLabel(profile.role)}</p>
               </div>
             </div>
             <div>

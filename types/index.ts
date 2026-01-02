@@ -5,7 +5,7 @@
  * Mendefinisikan peran (Role) pengguna yang valid dalam aplikasi.
  * Ini adalah "sumber kebenaran" untuk tipe data Role.
  */
-export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD"
+export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD" | "PRODUCTION_SUPERVISOR"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.

@@ -157,7 +157,7 @@ export default function RegisterForm() {
               <Input
                 label="PIN Karyawan"
                 type="text"
-                placeholder="Masukkan PIN (minimal 4 karakter)"
+                placeholder="Masukkan PIN "
                 value={formData.pin}
                 onChange={(e) => {
                   setFormData({ ...formData, pin: e.target.value })
@@ -185,7 +185,7 @@ export default function RegisterForm() {
             <Input
               label="Alamat Email"
               type="email"
-              placeholder="nama@tunasesta.com"
+              placeholder="nama@tunasestaindonesia.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="border-gray-200 focus:border-green-500 focus:ring-green-500"

@@ -68,7 +68,7 @@ async function main() {
     },
   });
 
-  // ========== DEPARTMENT HEADS ==========
+  // ========== DEPARTMENT HEADS & PRODUCTION SUPERVISOR ==========
 
   // HR Department Head
   const hrHead = await prisma.user.upsert({
@@ -131,6 +131,22 @@ async function main() {
       department: "Lab",
       position: "Lab Supervisor",
       supervisorId: null,
+    },
+  });
+
+  // Pengawas Produksi
+  const productionSupervisor = await prisma.user.upsert({
+    where: { email: "pengawas.produksi@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "pengawas.produksi@tunasestaindonesia.com",
+      name: "Budi Santoso",
+      password: hashedPassword,
+      pin: "4005",
+      role: "PRODUCTION_SUPERVISOR",
+      department: "Produksi",
+      position: "Pengawas Produksi",
+      supervisorId: null, // Langsung ke Manager
     },
   });
 
@@ -232,35 +248,7 @@ async function main() {
 
   // ========== STAFF - ADMIN ==========
 
-  const adminStaff1 = await prisma.user.upsert({
-    where: { email: "admin1@tunasestaindonesia.com" },
-    update: { supervisorId: adminHead.id },
-    create: {
-      email: "admin1@tunasestaindonesia.com",
-      name: "Maya Sari",
-      password: hashedPassword,
-      pin: "5301",
-      role: "STAFF",
-      department: "Admin",
-      position: "Admin Staff",
-      supervisorId: adminHead.id,
-    },
-  });
-
-  const adminStaff2 = await prisma.user.upsert({
-    where: { email: "admin2@tunasestaindonesia.com" },
-    update: { supervisorId: adminHead.id },
-    create: {
-      email: "admin2@tunasestaindonesia.com",
-      name: "Dimas Prakoso",
-      password: hashedPassword,
-      pin: "5302",
-      role: "STAFF",
-      department: "Admin",
-      position: "Admin Staff",
-      supervisorId: adminHead.id,
-    },
-  });
+  // Note: Admin Head (Dewi Lestari) tidak supervise staff, hanya mengajukan SPL sendiri
 
   // ========== STAFF - LAB ==========
 
@@ -294,6 +282,10 @@ async function main() {
     },
   });
 
+  // ========== STAFF - PRODUKSI ==========
+
+  // Note: Pengawas Produksi tidak supervise staff, hanya mengajukan SPL sendiri
+
   // ========== SETTINGS ==========
 
   const minOvertimeSetting = await prisma.setting.upsert({
@@ -308,8 +300,12 @@ async function main() {
   console.log("- Manager: 1");
   console.log("- GA: 1");
   console.log("- Department Heads: 4 (HR, IT, Admin, Lab)");
-  console.log("- Staff: 10 (2 per department)");
-  console.log("- Total Users: 18");
+  console.log("  * HR Head & IT Head → supervise staff");
+  console.log("  * Admin Head → tidak supervise (langsung ke Manager)");
+  console.log("  * Lab Head → supervise staff");
+  console.log("- Pengawas Produksi: 1 (tidak supervise, langsung ke Manager)");
+  console.log("- Staff: 8 (HR: 2, IT: 2, Lab: 2, Security: 2)");
+  console.log("- Total Users: 17");
 
   console.log("\n👥 User Structure:");
   console.log("┌─ Manager: Tiyas Indah Setyowuri");
@@ -325,18 +321,24 @@ async function main() {
   console.log("├─ IT Head: Ahmad Fauzi (Supervisor)");
   console.log("│  └─ IT Staff: Abdul Wahid Amin, Rizki Maulana");
   console.log("│");
-  console.log("├─ Admin Head: Dewi Lestari (Supervisor)");
-  console.log("│  └─ Admin Staff: Maya Sari, Dimas Prakoso");
+  console.log("├─ Admin Head: Dewi Lestari");
+  console.log("│  (tidak supervise staff, SPL langsung ke Manager)");
   console.log("│");
-  console.log("└─ Lab Head: Dr. Linda Wijaya (Supervisor)");
-  console.log("   └─ Lab Staff: Nurul Hidayah, Tono Sudarso");
+  console.log("├─ Lab Head: Dr. Linda Wijaya (Supervisor)");
+  console.log("│  └─ Lab Staff: Nurul Hidayah, Tono Sudarso");
+  console.log("│");
+  console.log("└─ Pengawas Produksi: Budi Santoso");
+  console.log("   (tidak supervise staff, SPL langsung ke Manager)");
 
   console.log("\n🔑 Default password untuk SEMUA user: password123");
   console.log("\n📧 Semua email menggunakan domain: @tunasestaindonesia.com");
   console.log("\n⚠️  CATATAN:");
   console.log("   - Security → supervised by GA");
-  console.log("   - HR, IT, Admin, Lab → supervised by DEPARTMENT_HEAD");
-  console.log("   Staff → Supervisor/GA → Manager");
+  console.log("   - HR & IT & Lab Staff → supervised by respective DEPARTMENT_HEAD");
+  console.log("   - Admin Head & Pengawas Produksi → tidak supervise, SPL langsung ke Manager");
+  console.log("   - Alur SPL:");
+  console.log("     • Staff → Supervisor → Manager");
+  console.log("     • GA/HR/Admin Head/Pengawas Produksi → Manager (skip supervisor)");
 }
 
 // Jalankan fungsi main dan tangani error

@@ -13,7 +13,7 @@ export default function GARiwayatPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role)) {
+    if (session && !["GA", "DEPARTMENT_HEAD", "HR", "PRODUCTION_SUPERVISOR"].includes(session.user.role)) {
       toast.error("Akses ditolak!")
       router.push("/dashboard")
     }

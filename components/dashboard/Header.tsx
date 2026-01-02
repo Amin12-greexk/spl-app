@@ -3,8 +3,8 @@
 import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useCallback, memo } from "react"
-import Image from "next/image"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
+import { getRoleLabel } from "@/lib/utils"
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -421,13 +421,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
               </button>
 
               <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 transition-transform hover:scale-105">
-                  <Image
+                <div className="w-10 h-10 transition-transform hover:scale-105">
+                  <img
                     src="/logo.png"
                     alt="Logo"
-                    fill
-                    className="object-contain"
-                    priority
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 {/* Vertical Divider */}
@@ -605,7 +603,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {session?.user?.name?.split(" ")[0]}
                     </span>
                     <span className="text-[10px] text-gray-500 font-medium">
-                      {session?.user?.role}
+                      {session?.user?.role ? getRoleLabel(session.user.role) : ''}
                     </span>
                   </div>
                   <svg 
@@ -635,7 +633,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
-                            {session?.user?.role}
+                            {session?.user?.role ? getRoleLabel(session.user.role) : ''}
                           </span>
                           {session?.user?.pin && (
                             <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">

@@ -12,8 +12,8 @@ export default function GAPengajuanPage() {
 
   // Authorization check
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD", "HR"].includes(session.user.role)) {
-      toast.error("Akses ditolak! Hanya GA/Kepala Dept/HR yang dapat mengakses halaman ini.")
+    if (session && !["GA", "DEPARTMENT_HEAD", "HR", "PRODUCTION_SUPERVISOR"].includes(session.user.role)) {
+      toast.error("Akses ditolak! Hanya GA/Kepala Dept/HR/Pengawas Produksi yang dapat mengakses halaman ini.")
       router.push("/dashboard")
     }
   }, [session, router])

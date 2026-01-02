@@ -43,7 +43,7 @@ export async function GET(
     // Periksa hak akses
     const userRole = session.user.role as Role;
     if (
-      ["STAFF", "GA", "DEPARTMENT_HEAD"].includes(userRole) &&
+      ["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole) &&
       spl.requesterId !== session.user.id
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
