@@ -9,8 +9,8 @@ import { sendNotification } from "@/lib/firebase-admin";
 /**
  * GET /api/spl
  * Mengambil daftar SPL.
- * - STAFF hanya bisa melihat SPL miliknya sendiri.
- * - HR/MANAGER bisa melihat semua SPL atau memfilter berdasarkan userId.
+ * - STAFF/TEKNISI/DRIVER hanya bisa melihat SPL miliknya sendiri.
+ * - HR/MANAGER/SUPER_ADMIN bisa melihat semua SPL atau memfilter berdasarkan userId.
  * - Bisa memfilter berdasarkan status.
  */
 export async function GET(req: NextRequest) {
@@ -34,24 +34,29 @@ export async function GET(req: NextRequest) {
     }
 
     const userRole = session.user.role as Role;
+    const selfOnlyRoles: Role[] = [
+      "STAFF",
+      "TEKNISI",
+      "DRIVER",
+      "GA",
+      "DEPARTMENT_HEAD",
+      "PRODUCTION_SUPERVISOR",
+    ];
+    const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"];
 
-    if (["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole)) {
-      // Staff, GA, Department Head, dan Pengawas Produksi hanya bisa melihat data miliknya
+    if (selfOnlyRoles.includes(userRole)) {
+      // Staff/TEKNISI/DRIVER/GA/Department Head/Pengawas Produksi hanya bisa melihat data miliknya
       where.requesterId = session.user.id;
-    } else if (userRole === "HR") {
-      // HR bisa lihat SPL mereka sendiri ATAU semua SPL
-      // Jika ada userId parameter (termasuk userId mereka sendiri), filter by userId
-      // Jika tidak ada userId, lihat SEMUA SPL (untuk halaman Data & Laporan)
+    } else if (canViewAllRoles.includes(userRole)) {
+      // HR/Manager/Super Admin bisa lihat SPL mereka sendiri ATAU semua SPL
+      // Jika ada userId parameter, filter by userId
       if (userId) {
         where.requesterId = userId;
       }
       // Jika tidak ada userId, tidak ada filter (lihat semua)
-    } else if (userRole === "MANAGER") {
-      // Manager bisa memfilter berdasarkan ID staff atau lihat semua
-      if (userId) {
-        where.requesterId = userId;
-      }
-      // Jika tidak ada userId, tidak ada filter (lihat semua)
+    } else {
+      // Fallback: batasi ke data milik sendiri
+      where.requesterId = session.user.id;
     }
 
     const spls = await prisma.spl.findMany({
