@@ -3,68 +3,73 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-
 // Blok ENUM sudah dihapus
 
 model User {
-  id                      String             @id @default(cuid())
-  email                   String             @unique
-  password                String
-  pin                     String
-  name                    String
-  role                    String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI
-  department              String?
-  position                String?            // Security, IT Staff, Admin, etc
-  supervisorId            String?            // ID atasan langsung
-  supervisor              User?              @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates            User[]             @relation("SupervisorRelation")
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-  splRequests             Spl[]              @relation("requester")
-  splApprovals            Spl[]              @relation("approver")
-  splSupervisorApprovals  Spl[]              @relation("supervisor")
-  notifications           UserNotification[]
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  password               String
+  pin                    String
+  name                   String
+  role                   String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI, SUPER_ADMIN
+  department             String?
+  position               String? // Security, IT Staff, Admin, etc
+  supervisorId           String? // ID atasan langsung
+  supervisor             User?              @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates           User[]             @relation("SupervisorRelation")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  splRequests            Spl[]              @relation("requester")
+  splApprovals           Spl[]              @relation("approver")
+  splSupervisorApprovals Spl[]              @relation("supervisor")
+  notifications          UserNotification[]
 
   @@map("users")
 }
 
 model Spl {
-  id                        String    @id @default(cuid())
-  requesterId               String
-  requester                 User      @relation("requester", fields: [requesterId], references: [id])
-  date                      DateTime
-  startTime                 String
-  endTime                   String
-  totalHours                Float
-  reason                    String
-  signature                 String?   // Tanda tangan pemohon
-  projectName               String?
-  proofImage                String?   // Foto bukti pengerjaan lembur
+  id          String   @id @default(cuid())
+  requesterId String
+  requester   User     @relation("requester", fields: [requesterId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  date        DateTime
+  startTime   String
+  endTime     String
+  totalHours  Float
+  reason      String
+  signature   String? // Tanda tangan pemohon
+  projectName String?
+  proofImage  String? // Foto bukti pengerjaan lembur
 
   // Status: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED, REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
-  status                    String    @default("PENDING_SUPERVISOR")
+  status String @default("PENDING_SUPERVISOR")
 
   // Approval Level 1: Supervisor (GA/Department Head)
   supervisorId              String?
-  supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id])
+  supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   supervisorApprovalDate    DateTime?
-  supervisorSignature       String?   // Tanda tangan supervisor
+  supervisorSignature       String? // Tanda tangan supervisor
   supervisorRejectionReason String?
 
   // Approval Level 2: Manager (existing)
-  approverId                String?
-  approver                  User?     @relation("approver", fields: [approverId], references: [id])
-  approvalDate              DateTime?
-  rejectionReason           String?   // Alasan penolakan manager
+  approverId      String?
+  approver        User?     @relation("approver", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvalDate    DateTime?
+  rejectionReason String? // Alasan penolakan manager
 
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  // Manual Entry (by Super Admin)
+  isManualEntry     Boolean   @default(false)
+  manualEntryBy     String? // Super Admin ID yang buat manual entry
+  requesterSignedAt DateTime? // Waktu user sign manual SPL
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("spls")
 }
@@ -72,7 +77,7 @@ model Spl {
 model UserNotification {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   endpoint  String
   p256dh    String
   auth      String

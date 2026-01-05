@@ -168,7 +168,51 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
-      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI"],
+      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI", "SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Admin Panel",
+      href: "/dashboard/admin",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Kelola User",
+      href: "/dashboard/admin/users",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Input SPL Manual",
+      href: "/dashboard/admin/spl-manual",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Riwayat SPL",
+      href: "/dashboard/admin/spl-history",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
       badge: null,
     },
   ]

@@ -19,7 +19,12 @@
       "Bash(find:*)",
       "Bash(netstat:*)",
       "Bash(fuser:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run db:clear:*)",
+      "Bash(npx prisma format)",
+      "Bash(npm run db:seed:*)"
     ],
     "deny": [],
     "ask": []

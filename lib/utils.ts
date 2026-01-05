@@ -18,6 +18,7 @@ export function getRoleLabel(role: Role | string): string {
     "GA": "GA",
     "DEPARTMENT_HEAD": "Kepala Departemen",
     "PRODUCTION_SUPERVISOR": "Pengawas Produksi",
+    "SUPER_ADMIN": "Super Admin",
   }
 
   return roleMap[role] || role
