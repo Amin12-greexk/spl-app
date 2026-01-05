@@ -8,8 +8,8 @@ import { sendNotification } from "@/lib/firebase-admin"; // Impor fungsi pengiri
 /**
  * GET /api/spl/[id]
  * Mengambil detail satu SPL.
- * - STAFF hanya bisa melihat detail SPL miliknya.
- * - HR/MANAGER bisa melihat detail SPL siapa pun.
+ * - STAFF/TEKNISI/DRIVER hanya bisa melihat detail SPL miliknya.
+ * - HR/MANAGER/SUPER_ADMIN bisa melihat detail SPL siapa pun.
  */
 export async function GET(
   req: NextRequest,
@@ -43,7 +43,7 @@ export async function GET(
     // Periksa hak akses
     const userRole = session.user.role as Role;
     if (
-      ["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole) &&
+      ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole) &&
       spl.requesterId !== session.user.id
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

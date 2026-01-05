@@ -277,7 +277,7 @@ export default function SplForm() {
                 <p>Format 24 jam (contoh: 13:30).</p>
                 {session?.user?.department === "Security" ? (
                   <p className="text-blue-600 font-medium">
-                    ℹ️ Security: Tidak ada batasan waktu pengajuan (karena berbeda-beda shift).
+                    ℹ️ Security
                   </p>
                 ) : (
                   <p>Batas maksimal pengajuan: {minStart} (atur oleh Manager). Jika sudah melewati batas tersebut, pengajuan ditolak; hubungi Manager langsung.</p>
