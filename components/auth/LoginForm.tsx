@@ -188,11 +188,11 @@ export default function LoginForm() {
               />
             </div>
             <p className="text-gray-500 text-xs">
-              (c) 2024 PT Tunas Esta Indonesia. All rights reserved.
+              (c) 2026 PT Tunas Esta Indonesia. All rights reserved.
             </p>
           </div>
           <p className="text-gray-400 text-xs">
-            Sistem SPL v1.0
+            Sistem SPL
           </p>
         </div>
       </div>

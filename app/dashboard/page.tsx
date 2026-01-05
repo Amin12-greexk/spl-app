@@ -38,18 +38,32 @@ export default function DashboardPage() {
           rejected: data.filter((spl) => spl.status === "REJECTED").length,
         })
 
-        // Get current week range (Sunday - Saturday)
+        // Get current week range (Monday - Saturday)
+        // Reset on Sunday (no activity shown)
         const now = new Date()
-        const currentDay = now.getDay() // 0 = Sunday, 6 = Saturday
+        const currentDay = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
-        // Start of week (Sunday 00:00:00)
+        // Start of week (Monday 00:00:00)
         const startOfWeek = new Date(now)
-        startOfWeek.setDate(now.getDate() - currentDay)
+        if (currentDay === 0) {
+          // If Sunday, show no activities (reset day)
+          startOfWeek.setDate(now.getDate() + 1) // Set to next Monday (future)
+        } else {
+          // Otherwise, go back to Monday of this week
+          const daysFromMonday = currentDay - 1 // Monday = 0 days back, Tuesday = 1 day back, etc.
+          startOfWeek.setDate(now.getDate() - daysFromMonday)
+        }
         startOfWeek.setHours(0, 0, 0, 0)
 
         // End of week (Saturday 23:59:59)
         const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(startOfWeek.getDate() + 6)
+        if (currentDay === 0) {
+          // If Sunday, set end before start (no results)
+          endOfWeek.setDate(startOfWeek.getDate() - 1)
+        } else {
+          // Otherwise, set to Saturday of this week
+          endOfWeek.setDate(startOfWeek.getDate() + 5) // Monday + 5 days = Saturday
+        }
         endOfWeek.setHours(23, 59, 59, 999)
 
         // Filter SPL for current week only and get 3 most recent
@@ -821,7 +835,7 @@ export default function DashboardPage() {
                 </h3>
               </div>
               <p className="text-xs text-gray-500 ml-11">
-                Reset setiap minggu (Minggu - Sabtu)
+                Senin - Sabtu (Reset setiap Minggu)
               </p>
             </div>
 
@@ -865,7 +879,7 @@ export default function DashboardPage() {
                   Belum ada aktivitas minggu ini
                 </p>
                 <p className="text-gray-400 text-xs mt-1">
-                  Aktivitas akan muncul mulai hari Minggu
+                  Aktivitas akan ditampilkan Senin - Sabtu
                 </p>
               </div>
             )}

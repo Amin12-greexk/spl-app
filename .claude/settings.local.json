@@ -18,7 +18,8 @@
       "Bash(grep:*)",
       "Bash(find:*)",
       "Bash(netstat:*)",
-      "Bash(fuser:*)"
+      "Bash(fuser:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
