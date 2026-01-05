@@ -18,6 +18,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Special handling for Produksi (PRODUCTION_SUPERVISOR) - no supervisor, direct to Manager
+    if (department.toLowerCase().includes("produksi")) {
+      return NextResponse.json({
+        hasSupervisor: false,
+        message: "Sebagai Pengawas Produksi, SPL Anda akan langsung diajukan ke Manager",
+        approvalFlow: ["Pengawas Produksi (Anda)", "Manager", "Approved"],
+      })
+    }
+
     // Check if department has supervisor mapping
     const hasMapping = hasSupervisorMapping(department)
 

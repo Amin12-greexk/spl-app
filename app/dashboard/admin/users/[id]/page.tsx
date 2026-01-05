@@ -32,6 +32,7 @@ interface User {
 const ROLES = [
   { value: "STAFF", label: "Staff" },
   { value: "TEKNISI", label: "Teknisi" },
+  { value: "DRIVER", label: "Driver" },
   { value: "GA", label: "GA" },
   { value: "HR", label: "HR" },
   { value: "PRODUCTION_SUPERVISOR", label: "Production Supervisor" },

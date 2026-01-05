@@ -10,9 +10,10 @@ import { prisma } from "./prisma"
  * - Department yang tidak ada di mapping = langsung ke Manager (contoh: Admin, Produksi)
  */
 export const DEPARTMENT_SUPERVISOR_MAPPING: Record<string, string> = {
-  // Security & Teknik (TEKNISI) supervised by GA
+  // Security, Teknik (TEKNISI), dan Driver supervised by GA
   "Security": "GA",
   "Teknik": "GA",
+  "Driver": "GA",
 
   // Departemen dengan Department Head/Supervisor
   "HR": "DEPARTMENT_HEAD",
@@ -48,7 +49,7 @@ export async function getSupervisorForDepartment(department: string | null) {
   let supervisor = null
 
   if (supervisorRole === "GA") {
-    // Find GA user (khusus untuk Security dan Teknik/TEKNISI)
+    // Find GA user (khusus untuk Security, Teknik/TEKNISI, dan Driver)
     supervisor = await prisma.user.findFirst({
       where: {
         role: "GA",

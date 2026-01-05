@@ -39,9 +39,6 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 🆕 AUTO-ASSIGN SUPERVISOR berdasarkan department
-    const supervisor = await getSupervisorForDepartment(department)
-
     // Set position and role based on department
     let position = null
     let role = "STAFF" // Default role
@@ -52,7 +49,13 @@ export async function POST(req: NextRequest) {
         position = "Security Staff"
       } else if (deptLower.includes("teknik")) {
         position = "Teknisi"
-        role = "TEKNISI" // 🆕 Khusus untuk department Teknik, role = TEKNISI
+        role = "TEKNISI"
+      } else if (deptLower.includes("driver") || deptLower.includes("supir")) {
+        position = "Driver"
+        role = "DRIVER"
+      } else if (deptLower.includes("produksi")) {
+        position = "Pengawas Produksi"
+        role = "PRODUCTION_SUPERVISOR"
       } else if (deptLower.includes("it")) {
         position = "IT Staff"
       } else if (deptLower.includes("cleaning")) {
@@ -60,6 +63,13 @@ export async function POST(req: NextRequest) {
       } else {
         position = `${department} Staff`
       }
+    }
+
+    // 🆕 AUTO-ASSIGN SUPERVISOR berdasarkan department
+    // KECUALI untuk PRODUCTION_SUPERVISOR yang langsung ke Manager
+    let supervisor = null
+    if (role !== "PRODUCTION_SUPERVISOR") {
+      supervisor = await getSupervisorForDepartment(department)
     }
 
     // Buat user baru dengan supervisor (jika ada)

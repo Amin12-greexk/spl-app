@@ -9,7 +9,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:clear": "npx tsx prisma/clear-data.ts",
-    "db:seed": "npx tsx prisma/seed.ts"
+    "db:seed": "npx prisma db push && npx tsx prisma/seed.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

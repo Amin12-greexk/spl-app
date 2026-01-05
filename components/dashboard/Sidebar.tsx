@@ -54,7 +54,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v14l-5-3-5 3V5z" />
         </svg>
       ),
-      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI"],
+      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI", "DRIVER"],
       badge: null,
     },
     {
@@ -65,7 +65,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       ),
-      roles: ["STAFF", "TEKNISI"],
+      roles: ["STAFF", "TEKNISI", "DRIVER"],
       badge: null,
     },
     {
@@ -76,7 +76,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      roles: ["STAFF", "TEKNISI"],
+      roles: ["STAFF", "TEKNISI", "DRIVER"],
       badge: null,
     },
     {
@@ -168,7 +168,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
-      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI", "SUPER_ADMIN"],
+      roles: ["STAFF", "HR", "MANAGER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "TEKNISI", "DRIVER", "SUPER_ADMIN"],
       badge: null,
     },
     {
