@@ -60,11 +60,29 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
     setLoadingNotifications(true)
     try {
+      const fetchJson = async (url: string) => {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 8000)
+        try {
+          const response = await fetch(url, { signal: controller.signal })
+          if (!response.ok) {
+            return null
+          }
+          return await response.json()
+        } catch {
+          return null
+        } finally {
+          clearTimeout(timeoutId)
+        }
+      }
+
       if (session.user.role === "STAFF" || session.user.role === "TEKNISI") {
-        const response = await fetch("/api/spl")
-        if (response.ok) {
-          const data = await response.json()
-          const recentUpdates = data
+        const data = await fetchJson("/api/spl")
+        if (!data) {
+          setNotifications([])
+          return
+        }
+        const recentUpdates = data
             .filter((spl: any) => {
               // Filter harus sama dengan logic di NotificationProvider
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
@@ -121,7 +139,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
             .slice(0, 10) // Limit to 10 recent notifications
 
           setNotifications(recentUpdates)
-        }
       } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
         // GA/DEPT_HEAD punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri
@@ -130,9 +147,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const allNotifications: any[] = []
 
         // 1. Fetch own SPL updates
-        const ownResponse = await fetch("/api/spl")
-        if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
+        const ownData = await fetchJson("/api/spl")
+        if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
@@ -168,9 +184,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
 
         // 2. Fetch team SPL pending approval
-        const teamResponse = await fetch("/api/spl/my-team")
-        if (teamResponse.ok) {
-          const teamData = await teamResponse.json()
+        const teamData = await fetchJson("/api/spl/my-team")
+        if (teamData) {
           const pendingApprovals = teamData
             .filter((spl: any) => spl.status === "PENDING_SUPERVISOR")
             .map((spl: any) => {
@@ -213,9 +228,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const allNotifications: any[] = []
 
         // 1. Fetch own SPL updates
-        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
-        if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
+        const ownData = await fetchJson(`/api/spl?userId=${session.user.id}`)
+        if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
@@ -251,9 +265,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
 
         // 2. Fetch pending manager approvals (view only, tidak bisa approve)
-        const pendingResponse = await fetch("/api/spl?status=PENDING_MANAGER")
-        if (pendingResponse.ok) {
-          const data = await pendingResponse.json()
+        const data = await fetchJson("/api/spl?status=PENDING_MANAGER")
+        if (data) {
           const pendingNotifications = data.slice(0, 5).map((spl: any) => {
               // Format tanggal dengan validasi
               const formatDate = (dateString: string) => {
@@ -289,10 +302,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
       } else if (session.user.role === "MANAGER") {
         // MANAGER hanya lihat pending approvals
-        const response = await fetch("/api/spl?status=PENDING_MANAGER")
-        if (response.ok) {
-          const data = await response.json()
-          const pendingNotifications = data
+        const data = await fetchJson("/api/spl?status=PENDING_MANAGER")
+        if (!data) {
+          setNotifications([])
+          return
+        }
+        const pendingNotifications = data
             .map((spl: any) => {
               const formatDate = (dateString: string) => {
                 if (!dateString) return 'tanggal tidak tersedia'
@@ -322,10 +337,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
             .slice(0, 10)
 
           setNotifications(pendingNotifications)
-        }
       }
     } catch (error) {
-      // Error fetching notifications - silent fail
+      setNotifications([])
     } finally {
       setLoadingNotifications(false)
     }

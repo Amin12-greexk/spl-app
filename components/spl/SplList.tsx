@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { Spl, SplStatus } from "@/types"
 import SplCard from "./SplCard"
 import toast from "react-hot-toast"
@@ -18,6 +19,7 @@ export default function SplList({
   initialStatus,
   userId,
 }: SplListProps) {
+  const { data: session } = useSession()
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<SplStatus | "ALL">(
@@ -45,13 +47,22 @@ export default function SplList({
       }
 
       const data = await response.json()
-      setSpls(data)
+      const effectiveRole = session?.user?.role || userRole
+      const selfOnlyRoles = ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"]
+
+      const filteredData =
+        session?.user?.id && effectiveRole && selfOnlyRoles.includes(effectiveRole)
+          ? data.filter((spl: Spl) => spl.requester?.id === session.user.id)
+          : data
+
+      setSpls(filteredData)
     } catch (error: any) {
+      setSpls([])
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
       setIsLoading(false)
     }
-  }, [filterStatus, userId])
+  }, [filterStatus, userId, session?.user?.id, session?.user?.role, userRole])
 
   useEffect(() => {
     fetchSpls()
