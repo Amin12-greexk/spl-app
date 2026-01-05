@@ -2,7 +2,7 @@
 
 import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState, useEffect, useCallback, memo } from "react"
+import { useState, useEffect, useCallback, useRef, memo } from "react"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 import { getRoleLabel } from "@/lib/utils"
 
@@ -28,6 +28,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(false)
+  const loadingNotificationsRef = useRef(false)
 
   // Get notification count from context (real-time updates via Firebase)
   const { notificationCount, refreshNotificationCount, clearNotificationCount } = useNotificationContext()
@@ -56,8 +57,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   // Fetch notifications when dropdown is opened
   const fetchNotifications = useCallback(async () => {
-    if (loadingNotifications || !session) return
+    if (loadingNotificationsRef.current || !session) return
 
+    loadingNotificationsRef.current = true
     setLoadingNotifications(true)
     try {
       const fetchJson = async (url: string) => {
@@ -341,9 +343,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
     } catch (error) {
       setNotifications([])
     } finally {
+      loadingNotificationsRef.current = false
       setLoadingNotifications(false)
     }
-  }, [session, loadingNotifications])
+  }, [session])
 
   // Auto-refresh notifications list when dropdown is open and count changes
   useEffect(() => {
@@ -360,9 +363,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
     if (willOpen) {
       clearNotificationCount()
-      fetchNotifications()
     }
-  }, [showNotificationMenu, clearNotificationCount, fetchNotifications])
+  }, [showNotificationMenu, clearNotificationCount])
 
   // Handle notification item click
   const handleNotificationItemClick = useCallback((notification: any) => {
