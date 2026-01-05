@@ -346,8 +346,8 @@ export default function NotificationProvider({ children }: NotificationProviderP
       const lastViewedStr = localStorage.getItem(lastViewedKey)
       const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
 
-      if (session.user.role === "STAFF") {
-        // STAFF: count updates to their own SPL submissions
+      if (session.user.role === "STAFF" || session.user.role === "TEKNISI") {
+        // STAFF/TEKNISI: count updates to their own SPL submissions
         const response = await fetch("/api/spl")
         if (response.ok) {
           const data = await response.json()

@@ -42,12 +42,17 @@ export async function POST(req: NextRequest) {
     // 🆕 AUTO-ASSIGN SUPERVISOR berdasarkan department
     const supervisor = await getSupervisorForDepartment(department)
 
-    // Set position based on department (optional, can be customized)
+    // Set position and role based on department
     let position = null
+    let role = "STAFF" // Default role
+
     if (department) {
       const deptLower = department.toLowerCase()
       if (deptLower.includes("security") || deptLower.includes("satpam")) {
         position = "Security Staff"
+      } else if (deptLower.includes("teknik")) {
+        position = "Teknisi"
+        role = "TEKNISI" // 🆕 Khusus untuk department Teknik, role = TEKNISI
       } else if (deptLower.includes("it")) {
         position = "IT Staff"
       } else if (deptLower.includes("cleaning")) {
@@ -66,7 +71,7 @@ export async function POST(req: NextRequest) {
         pin: pin.trim(),
         department,
         position,
-        role: "STAFF", // Default role untuk user baru
+        role, // 🆕 Role sesuai department (TEKNISI untuk Teknik, STAFF untuk lainnya)
         supervisorId: supervisor?.id || null, // 🆕 Auto-assign supervisor
       },
       include: {

@@ -169,6 +169,7 @@ export default function DashboardPage() {
   const getStatsSubtitle = () => {
     switch (userRole) {
       case "STAFF":
+      case "TEKNISI":
         return "Total pengajuan Anda"
       case "HR":
         return "Semua pengajuan di sistem"
@@ -286,9 +287,19 @@ export default function DashboardPage() {
                   </svg>
                   {userRole === "STAFF"
                     ? "Staff"
+                    : userRole === "TEKNISI"
+                    ? "Teknisi"
                     : userRole === "HR"
                     ? "Human Resources"
-                    : "Manager"}
+                    : userRole === "MANAGER"
+                    ? "Manager"
+                    : userRole === "GA"
+                    ? "General Affair"
+                    : userRole === "DEPARTMENT_HEAD"
+                    ? "Kepala Departemen"
+                    : userRole === "PRODUCTION_SUPERVISOR"
+                    ? "Pengawas Produksi"
+                    : userRole}
                 </span>
                 {session?.user?.department && (
                   <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
@@ -378,8 +389,8 @@ export default function DashboardPage() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* STAFF ACTIONS */}
-              {userRole === "STAFF" && (
+              {/* STAFF & TEKNISI ACTIONS */}
+              {(userRole === "STAFF" || userRole === "TEKNISI") && (
                 <>
                   <div className="group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105">
                     <div className="flex items-center mb-4">
@@ -789,11 +800,21 @@ export default function DashboardPage() {
                         : "bg-blue-100 text-blue-800"
                     }`}
                   >
-                    {userRole === "HR"
+                    {userRole === "STAFF"
+                      ? "Staff"
+                      : userRole === "TEKNISI"
+                      ? "Teknisi"
+                      : userRole === "HR"
                       ? "Human Resources"
                       : userRole === "MANAGER"
                       ? "Manager"
-                      : "Staff"}
+                      : userRole === "GA"
+                      ? "General Affair"
+                      : userRole === "DEPARTMENT_HEAD"
+                      ? "Kepala Departemen"
+                      : userRole === "PRODUCTION_SUPERVISOR"
+                      ? "Pengawas Produksi"
+                      : userRole}
                   </span>
                 </div>
 

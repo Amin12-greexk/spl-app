@@ -12,6 +12,7 @@ export function cn(...inputs: ClassValue[]) {
 export function getRoleLabel(role: Role | string): string {
   const roleMap: Record<string, string> = {
     "STAFF": "Staff",
+    "TEKNISI": "Teknisi",
     "HR": "HR",
     "MANAGER": "Manager",
     "GA": "GA",

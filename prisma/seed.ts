@@ -246,6 +246,38 @@ async function main() {
     },
   });
 
+  // ========== TEKNISI (supervised by GA) ==========
+
+  const teknisi1 = await prisma.user.upsert({
+    where: { email: "teknisi1@tunasestaindonesia.com" },
+    update: { supervisorId: gaUser.id },
+    create: {
+      email: "teknisi1@tunasestaindonesia.com",
+      name: "Andi Setiawan",
+      password: hashedPassword,
+      pin: "5301",
+      role: "TEKNISI",
+      department: "Teknik",
+      position: "Teknisi Mesin",
+      supervisorId: gaUser.id, // GA adalah supervisor Teknisi
+    },
+  });
+
+  const teknisi2 = await prisma.user.upsert({
+    where: { email: "teknisi2@tunasestaindonesia.com" },
+    update: { supervisorId: gaUser.id },
+    create: {
+      email: "teknisi2@tunasestaindonesia.com",
+      name: "Rudi Hartono",
+      password: hashedPassword,
+      pin: "5302",
+      role: "TEKNISI",
+      department: "Teknik",
+      position: "Teknisi Listrik",
+      supervisorId: gaUser.id, // GA adalah supervisor Teknisi
+    },
+  });
+
   // ========== STAFF - ADMIN ==========
 
   // Note: Admin Head (Dewi Lestari) tidak supervise staff, hanya mengajukan SPL sendiri
@@ -305,7 +337,8 @@ async function main() {
   console.log("  * Lab Head → supervise staff");
   console.log("- Pengawas Produksi: 1 (tidak supervise, langsung ke Manager)");
   console.log("- Staff: 8 (HR: 2, IT: 2, Lab: 2, Security: 2)");
-  console.log("- Total Users: 17");
+  console.log("- Teknisi: 2 (supervised by GA)");
+  console.log("- Total Users: 19");
 
   console.log("\n👥 User Structure:");
   console.log("┌─ Manager: Tiyas Indah Setyowuri");
@@ -313,7 +346,8 @@ async function main() {
   console.log("├─ HR Staff: Zhallila");
   console.log("│");
   console.log("├─ GA: Budi Santoso");
-  console.log("│  └─ Security Staff: Joko Widodo, Bambang Sutrisno");
+  console.log("│  ├─ Security Staff: Joko Widodo, Bambang Sutrisno");
+  console.log("│  └─ Teknisi: Andi Setiawan, Rudi Hartono");
   console.log("│");
   console.log("├─ HR Head: Siti Aminah (Supervisor)");
   console.log("│  └─ HR Staff: Rina Anggraini, Doni Prasetyo");
@@ -333,11 +367,11 @@ async function main() {
   console.log("\n🔑 Default password untuk SEMUA user: password123");
   console.log("\n📧 Semua email menggunakan domain: @tunasestaindonesia.com");
   console.log("\n⚠️  CATATAN:");
-  console.log("   - Security → supervised by GA");
+  console.log("   - Security & Teknisi → supervised by GA");
   console.log("   - HR & IT & Lab Staff → supervised by respective DEPARTMENT_HEAD");
   console.log("   - Admin Head & Pengawas Produksi → tidak supervise, SPL langsung ke Manager");
   console.log("   - Alur SPL:");
-  console.log("     • Staff → Supervisor → Manager");
+  console.log("     • Staff & Teknisi → Supervisor → Manager");
   console.log("     • GA/HR/Admin Head/Pengawas Produksi → Manager (skip supervisor)");
 }
 

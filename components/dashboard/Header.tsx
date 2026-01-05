@@ -60,7 +60,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
     setLoadingNotifications(true)
     try {
-      if (session.user.role === "STAFF") {
+      if (session.user.role === "STAFF" || session.user.role === "TEKNISI") {
         const response = await fetch("/api/spl")
         if (response.ok) {
           const data = await response.json()
@@ -355,7 +355,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setShowNotificationMenu(false)
     clearNotificationCount()
 
-    if (session?.user?.role === "STAFF") {
+    if (session?.user?.role === "STAFF" || session?.user?.role === "TEKNISI") {
       router.push(`/dashboard/staff/pengajuan/${notification.id}`)
     } else if (session?.user?.role === "GA" || session?.user?.role === "DEPARTMENT_HEAD") {
       if (notification.notificationType === "own_spl") {
@@ -562,7 +562,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                               setShowNotificationMenu(false)
                               clearNotificationCount() // Clear badge for smooth UX
 
-                              if (session?.user?.role === "STAFF") {
+                              if (session?.user?.role === "STAFF" || session?.user?.role === "TEKNISI") {
                                 router.push("/dashboard/staff/pengajuan")
                               } else if (session?.user?.role === "HR") {
                                 router.push("/dashboard/hr/persetujuan")

@@ -5,13 +5,14 @@ import { prisma } from "./prisma"
  * Menentukan role supervisor berdasarkan department
  *
  * Logic:
- * - "GA" = Supervised by GA user (role GA) - khusus Security
+ * - "GA" = Supervised by GA user (role GA) - khusus Security dan Teknik (TEKNISI)
  * - "DEPARTMENT_HEAD" = Supervised by Department Head of that department (role DEPARTMENT_HEAD)
  * - Department yang tidak ada di mapping = langsung ke Manager (contoh: Admin, Produksi)
  */
 export const DEPARTMENT_SUPERVISOR_MAPPING: Record<string, string> = {
-  // Security supervised by GA
+  // Security & Teknik (TEKNISI) supervised by GA
   "Security": "GA",
+  "Teknik": "GA",
 
   // Departemen dengan Department Head/Supervisor
   "HR": "DEPARTMENT_HEAD",
@@ -47,7 +48,7 @@ export async function getSupervisorForDepartment(department: string | null) {
   let supervisor = null
 
   if (supervisorRole === "GA") {
-    // Find GA user (khusus untuk Security)
+    // Find GA user (khusus untuk Security dan Teknik/TEKNISI)
     supervisor = await prisma.user.findFirst({
       where: {
         role: "GA",

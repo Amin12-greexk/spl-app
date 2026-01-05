@@ -207,6 +207,7 @@ export default function RegisterForm() {
                 <option value="HR">HR (Supervised)</option>
                 <option value="IT">IT (Supervised)</option>
                 <option value="Security">Security (Supervised by GA)</option>
+                <option value="Teknik">TEKNISI (Supervised by GA)</option>
                 <option value="Admin">Admin (Supervised)</option>
                 <option value="Lab">Lab (Supervised)</option>
               </select>
