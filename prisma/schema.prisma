@@ -18,7 +18,7 @@ model User {
   password               String
   pin                    String
   name                   String
-  role                   String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI, SUPER_ADMIN
+  role                   String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI, DRIVER, SUPER_ADMIN
   department             String?
   position               String? // Security, IT Staff, Admin, etc
   supervisorId           String? // ID atasan langsung

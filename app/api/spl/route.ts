@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !["STAFF", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"].includes(session.user.role as Role)) {
+    if (!session || !["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"].includes(session.user.role as Role)) {
       return NextResponse.json(
-        { error: "Hanya STAFF, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, atau HR yang bisa mengajukan SPL" },
+        { error: "Hanya STAFF, TEKNISI, DRIVER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, atau HR yang bisa mengajukan SPL" },
         { status: 403 }
       );
     }
@@ -170,13 +170,13 @@ export async function POST(req: NextRequest) {
     if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD" || user?.role === "PRODUCTION_SUPERVISOR" || user?.role === "HR") {
       initialStatus = "PENDING_MANAGER"
     }
-    // STAFF: cek apakah ada supervisor
-    else if (user?.role === "STAFF") {
+    // STAFF, TEKNISI, dan DRIVER: cek apakah ada supervisor
+    else if (user?.role === "STAFF" || user?.role === "TEKNISI" || user?.role === "DRIVER") {
       // If user has supervisor -> PENDING_SUPERVISOR
       // If no supervisor -> PENDING_MANAGER (direct to manager)
       initialStatus = user.supervisorId ? "PENDING_SUPERVISOR" : "PENDING_MANAGER"
     }
-    // Role lain (HR, MANAGER): langsung ke Manager
+    // Role lain: langsung ke Manager
     else {
       initialStatus = "PENDING_MANAGER"
     }
