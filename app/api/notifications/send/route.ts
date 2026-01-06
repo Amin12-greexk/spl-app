@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { sendNotification } from "@/lib/firebase-admin"
-import { prisma } from "@/lib/prisma"
+import { sendNotificationToUser } from "@/lib/notification-utils"
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,50 +21,36 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Ambil semua token notifikasi user
-    const userNotifications = await prisma.userNotification.findMany({
-      where: {
-        userId,
-      },
-    })
+    const summary = await sendNotificationToUser(
+      userId,
+      title,
+      notificationBody,
+      data
+    )
 
-    if (userNotifications.length === 0) {
+    if (summary.total === 0) {
       return NextResponse.json(
         { message: "No notification tokens found for user" },
         { status: 200 }
       )
     }
 
-    // Kirim notifikasi ke semua token
-    const notificationPromises = userNotifications.map((token) =>
-      sendNotification(token.endpoint, title, notificationBody, data).catch((error) => {
-        console.error(`Failed to send to token ${token.id}:`, error.message)
-        return { error: error.message, tokenId: token.id }
-      })
+    console.log(
+      `dY"S Notification results: ${summary.successful} sent, ${summary.failed} failed`
     )
 
-    const results = await Promise.allSettled(notificationPromises)
-
-    // Count success and failures
-    const successful = results.filter(
-      (result) => result.status === "fulfilled" && !(result.value as any)?.error
-    ).length
-    const failed = results.length - successful
-
-    console.log(`📊 Notification results: ${successful} sent, ${failed} failed`)
-
-    if (successful > 0) {
+    if (summary.successful > 0) {
       return NextResponse.json({
-        message: `Notifications sent to ${successful} device(s)${failed > 0 ? `, ${failed} failed` : ""}`,
-        successful,
-        failed,
+        message: `Notifications sent to ${summary.successful} device(s)${summary.failed > 0 ? `, ${summary.failed} failed` : ""}`,
+        successful: summary.successful,
+        failed: summary.failed,
       })
-    } else {
-      return NextResponse.json(
-        { error: "Failed to send notifications to all devices" },
-        { status: 500 }
-      )
     }
+
+    return NextResponse.json(
+      { error: "Failed to send notifications to all devices" },
+      { status: 500 }
+    )
   } catch (error) {
     console.error("Error sending notifications:", error)
     return NextResponse.json(

@@ -15,6 +15,14 @@ export async function GET(req: NextRequest) {
 
     const users = await prisma.user.findMany({
       include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            supervised: true,
+            approvalMode: true,
+          },
+        },
         supervisor: {
           select: {
             id: true,
@@ -53,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { email, password, name, pin, role, department, position, supervisorId } = body
+    const { email, password, name, pin, role, departmentId, departmentName, department, position, supervisorId } = body
 
     // Validation
     if (!email || !password || !name || !pin || !role) {
@@ -79,6 +87,32 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create user
+    const departmentRecord = departmentId
+      ? await prisma.department.findUnique({
+          where: { id: departmentId },
+          select: { id: true, name: true },
+        })
+      : typeof departmentName === "string" || typeof department === "string"
+      ? await prisma.department.findFirst({
+          where: {
+            name: {
+              equals: (departmentName || department || "").toString().trim(),
+              mode: "insensitive",
+            },
+          },
+          select: { id: true, name: true },
+        })
+      : null
+
+    if (departmentId && !departmentRecord) {
+      return NextResponse.json(
+        { error: "Departemen tidak ditemukan" },
+        { status: 400 }
+      )
+    }
+
+    const resolvedDepartmentName = departmentRecord?.name || departmentName || department || null
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -86,7 +120,8 @@ export async function POST(req: NextRequest) {
         name,
         pin,
         role,
-        department,
+        departmentId: departmentRecord?.id || null,
+        departmentName: resolvedDepartmentName,
         position,
         supervisorId: supervisorId || null,
       },

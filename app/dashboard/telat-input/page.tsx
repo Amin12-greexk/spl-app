@@ -124,7 +124,7 @@ export default function TelatInputPage() {
   if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-600"></div>
+        <div className="spinner h-12 w-12"></div>
       </div>
     )
   }
@@ -161,7 +161,7 @@ export default function TelatInputPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {spls.map((spl) => (
-            <div key={spl.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div key={spl.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover-lift glow-green">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-gray-900">
@@ -197,7 +197,7 @@ export default function TelatInputPage() {
               <Button
                 onClick={() => openSignature(spl)}
                 size="sm"
-                className="w-full"
+                className="w-full motion-safe:hover:scale-[1.02]"
               >
                 Tanda Tangan
               </Button>
@@ -209,8 +209,8 @@ export default function TelatInputPage() {
       {/* Signature Modal */}
       {selectedSpl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={closeSignature} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6">
+          <div className="absolute inset-0 bg-black/40 motion-safe:animate-fade-in" onClick={closeSignature} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 motion-safe:animate-scale-in">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">
               Tanda Tangan SPL
             </h2>
@@ -228,9 +228,16 @@ export default function TelatInputPage() {
               <Button
                 onClick={handleSign}
                 disabled={submitting}
-                className="flex-1"
+                className={`flex-1 ${submitting ? 'btn-loading' : ''}`}
               >
-                {submitting ? "Menyimpan..." : "Simpan Tanda Tangan"}
+                {submitting ? (
+                  <>
+                    <div className="spinner h-5 w-5 mr-2"></div>
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Tanda Tangan"
+                )}
               </Button>
               <Button
                 type="button"

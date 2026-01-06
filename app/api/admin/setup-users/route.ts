@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
       updated: [],
       errors: [],
     }
+    const departments = await prisma.department.findMany({
+      select: { id: true, name: true },
+    })
+    const departmentIdByName = new Map(
+      departments.map((dept) => [dept.name, dept.id])
+    )
+    const getDepartmentId = (name: string) => departmentIdByName.get(name) || null
 
     // 1. Create/Update GA User
     try {
@@ -38,7 +45,8 @@ export async function POST(req: NextRequest) {
         where: { email: "ga@tunasestaindonesia.com" },
         update: {
           role: "GA",
-          department: "General Affair",
+          departmentName: "General Affair",
+          departmentId: getDepartmentId("General Affair"),
           position: "GA Supervisor",
           supervisorId: null,
         },
@@ -48,7 +56,8 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           pin: "8888",
           role: "GA",
-          department: "General Affair",
+          departmentName: "General Affair",
+          departmentId: getDepartmentId("General Affair"),
           position: "GA Supervisor",
           supervisorId: null,
         },
@@ -61,7 +70,8 @@ export async function POST(req: NextRequest) {
         update: {
           supervisorId: gaUser.id,
           position: "Security",
-          department: "Security",
+          departmentName: "Security",
+          departmentId: getDepartmentId("Security"),
         },
         create: {
           email: "security1@tunasestaindonesia.com",
@@ -69,7 +79,8 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           pin: "1001",
           role: "STAFF",
-          department: "Security",
+          departmentName: "Security",
+          departmentId: getDepartmentId("Security"),
           position: "Security",
           supervisorId: gaUser.id,
         },
@@ -81,7 +92,8 @@ export async function POST(req: NextRequest) {
         update: {
           supervisorId: gaUser.id,
           position: "Security",
-          department: "Security",
+          departmentName: "Security",
+          departmentId: getDepartmentId("Security"),
         },
         create: {
           email: "security2@tunasestaindonesia.com",
@@ -89,7 +101,8 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           pin: "1002",
           role: "STAFF",
-          department: "Security",
+          departmentName: "Security",
+          departmentId: getDepartmentId("Security"),
           position: "Security",
           supervisorId: gaUser.id,
         },
@@ -105,7 +118,8 @@ export async function POST(req: NextRequest) {
         where: { email: "it.head@tunasestaindonesia.com" },
         update: {
           role: "DEPARTMENT_HEAD",
-          department: "IT",
+          departmentName: "IT",
+          departmentId: getDepartmentId("IT"),
           position: "IT Manager",
           supervisorId: null,
         },
@@ -115,7 +129,8 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           pin: "9999",
           role: "DEPARTMENT_HEAD",
-          department: "IT",
+          departmentName: "IT",
+          departmentId: getDepartmentId("IT"),
           position: "IT Manager",
           supervisorId: null,
         },
@@ -125,7 +140,7 @@ export async function POST(req: NextRequest) {
       // 4. Update existing IT staff
       const itStaff = await prisma.user.findMany({
         where: {
-          department: "IT",
+          departmentName: "IT",
           role: "STAFF",
         },
       })
@@ -160,7 +175,9 @@ export async function POST(req: NextRequest) {
             name: true,
             email: true,
             position: true,
-            department: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
           },
         },
       },
@@ -222,7 +239,9 @@ export async function GET(req: NextRequest) {
             email: true,
             pin: true,
             position: true,
-            department: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
             role: true,
           },
         },
@@ -244,7 +263,9 @@ export async function GET(req: NextRequest) {
         email: true,
         pin: true,
         position: true,
-        department: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { id: true, name: true } },
       },
     })
 

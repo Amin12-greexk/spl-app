@@ -19,6 +19,14 @@ export async function GET(
     const user = await prisma.user.findUnique({
       where: { id: params.id },
       include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            supervised: true,
+            approvalMode: true,
+          },
+        },
         supervisor: {
           select: {
             id: true,
@@ -70,7 +78,7 @@ export async function PUT(
     }
 
     const body = await req.json()
-    const { email, password, name, pin, role, department, position, supervisorId } = body
+    const { email, password, name, pin, role, departmentId, departmentName, department, position, supervisorId } = body
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -96,12 +104,39 @@ export async function PUT(
     }
 
     // Prepare update data
+    const departmentRecord = departmentId
+      ? await prisma.department.findUnique({
+          where: { id: departmentId },
+          select: { id: true, name: true },
+        })
+      : typeof departmentName === "string" || typeof department === "string"
+      ? await prisma.department.findFirst({
+          where: {
+            name: {
+              equals: (departmentName || department || "").toString().trim(),
+              mode: "insensitive",
+            },
+          },
+          select: { id: true, name: true },
+        })
+      : null
+
+    if (departmentId && !departmentRecord) {
+      return NextResponse.json(
+        { error: "Departemen tidak ditemukan" },
+        { status: 400 }
+      )
+    }
+
+    const resolvedDepartmentName = departmentRecord?.name || departmentName || department || null
+
     const updateData: any = {
       email,
       name,
       pin,
       role,
-      department,
+      departmentId: departmentRecord?.id || null,
+      departmentName: resolvedDepartmentName,
       position,
       supervisorId: supervisorId || null,
     }

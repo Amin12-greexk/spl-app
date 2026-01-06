@@ -3,8 +3,9 @@
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Role } from "@/types"
+import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 
 interface SidebarProps {
   isOpen?: boolean
@@ -17,25 +18,89 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const userRole = session?.user?.role as Role
   const userPosition = session?.user?.position || ""
   const isHeadHR = userRole === "HR" && userPosition.toLowerCase().includes("head")
-  const [pendingCount, setPendingCount] = useState(0)
+  const [manualPendingCount, setManualPendingCount] = useState(0)
+  const [teamPendingCount, setTeamPendingCount] = useState(0)
+  const [managerPendingCount, setManagerPendingCount] = useState(0)
+  const { clearNotificationCount } = useNotificationContext()
 
-  // Ambil jumlah SPL pending hanya untuk Manager
-  useEffect(() => {
-    if (userRole === "MANAGER") {
-      const fetchPendingCount = async () => {
-        try {
-          const response = await fetch("/api/spl?status=PENDING")
-          if (response.ok) {
-            const data = await response.json()
-            setPendingCount(data.length)
-          }
-        } catch (error) {
-          console.error("Error fetching pending count:", error)
-        }
-      }
-      fetchPendingCount()
+  const refreshSidebarBadges = useCallback(async () => {
+    if (!session?.user?.id || !userRole) return
+
+    const lastViewedKey = `notif_last_viewed_${session.user.id}`
+    const lastViewedStr = typeof window !== "undefined" ? localStorage.getItem(lastViewedKey) : null
+    const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
+
+    const countManual = async () => {
+      const response = await fetch("/api/spl/telat-input")
+      if (!response.ok) return 0
+      const data = await response.json()
+      return data.filter((spl: any) => {
+        const createdAt = new Date(spl.createdAt || spl.date)
+        return createdAt > lastViewedTime
+      }).length
     }
-  }, [userRole])
+
+    const countTeamPending = async () => {
+      const response = await fetch("/api/spl/my-team")
+      if (!response.ok) return 0
+      const data = await response.json()
+      return data.filter((spl: any) => {
+        const createdAt = new Date(spl.createdAt)
+        return spl.status === "PENDING_SUPERVISOR" && createdAt > lastViewedTime
+      }).length
+    }
+
+    const countManagerPending = async () => {
+      const response = await fetch("/api/spl?status=PENDING_MANAGER")
+      if (!response.ok) return 0
+      const data = await response.json()
+      return data.filter((spl: any) => {
+        const createdAt = new Date(spl.createdAt)
+        return createdAt > lastViewedTime
+      }).length
+    }
+
+    try {
+      if (["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR", "SUPER_ADMIN"].includes(userRole)) {
+        setManualPendingCount(await countManual())
+      } else {
+        setManualPendingCount(0)
+      }
+
+      if (userRole === "GA" || userRole === "DEPARTMENT_HEAD") {
+        setTeamPendingCount(await countTeamPending())
+      } else {
+        setTeamPendingCount(0)
+      }
+
+      if (userRole === "MANAGER") {
+        setManagerPendingCount(await countManagerPending())
+      } else {
+        setManagerPendingCount(0)
+      }
+    } catch (error) {
+      console.error("Error fetching sidebar notification counts:", error)
+    }
+  }, [session?.user?.id, userRole])
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      refreshSidebarBadges()
+    }
+  }, [session?.user?.id, userRole, pathname, refreshSidebarBadges])
+
+  const handleBadgeClick = (badgeKey?: "manual" | "team" | "manager") => {
+    if (!badgeKey) return
+    clearNotificationCount()
+
+    if (badgeKey === "manual") {
+      setManualPendingCount(0)
+    } else if (badgeKey === "team") {
+      setTeamPendingCount(0)
+    } else if (badgeKey === "manager") {
+      setManagerPendingCount(0)
+    }
+  }
 
   const navItems: Array<{
     name: string
@@ -43,6 +108,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     icon: React.ReactNode
     roles: Role[]
     badge: number | null
+    badgeKey?: "manual" | "team" | "manager"
     customCondition?: (role: string, position: string) => boolean
   }> = [
     {
@@ -88,7 +154,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </svg>
       ),
       roles: ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR", "SUPER_ADMIN"],
-      badge: null,
+      badge: manualPendingCount > 0 ? manualPendingCount : null,
+      badgeKey: "manual",
     },
     {
       name: "Pengajuan SPL Saya",
@@ -132,7 +199,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </svg>
       ),
       roles: ["GA", "DEPARTMENT_HEAD"],
-      badge: null,
+      badge: teamPendingCount > 0 ? teamPendingCount : null,
+      badgeKey: "team",
     },
     {
       name: "Data SPL Tim",
@@ -154,7 +222,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </svg>
       ),
       roles: ["MANAGER"],
-      badge: pendingCount > 0 ? pendingCount : null,
+      badge: managerPendingCount > 0 ? managerPendingCount : null,
+      badgeKey: "manager",
     },
     {
       name: "Kelola Kepala Dept",
@@ -263,6 +332,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => handleBadgeClick(item.badgeKey)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative ${
                     isActive
                       ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md"
@@ -278,7 +348,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   </div>
                   <span className="font-medium text-sm">{item.name}</span>
                   {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
                       {item.badge}
                     </span>
                   )}
@@ -291,7 +361,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`lg:hidden fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
+        className={`lg:hidden fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform motion-safe:transition-transform motion-safe:duration-300 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } mt-[85px]`}
       >
@@ -317,7 +387,10 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={onClose}
+                  onClick={() => {
+                    handleBadgeClick(item.badgeKey)
+                    onClose?.()
+                  }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                     isActive
                       ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md"
@@ -333,7 +406,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   </div>
                   <span className="font-medium text-sm">{item.name}</span>
                   {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
                       {item.badge}
                     </span>
                   )}

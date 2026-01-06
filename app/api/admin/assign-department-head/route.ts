@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
         name: true,
         email: true,
         role: true,
-        department: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { id: true, name: true } },
         position: true,
       },
     });
@@ -87,7 +89,9 @@ export async function POST(req: NextRequest) {
         name: true,
         email: true,
         role: true,
-        department: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { id: true, name: true } },
         position: true,
       },
     });
@@ -130,21 +134,24 @@ export async function GET(req: NextRequest) {
         role: {
           in: ["STAFF", "DEPARTMENT_HEAD"],
         },
-        department: {
-          not: "Security", // Security tidak bisa jadi Department Head, mereka supervised by GA
-        },
+        OR: [
+          { department: { name: { not: "Security" } } },
+          { departmentName: { not: "Security" } },
+        ],
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        department: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { id: true, name: true } },
         position: true,
         pin: true,
       },
       orderBy: [
-        { department: "asc" },
+        { departmentName: "asc" },
         { name: "asc" },
       ],
     });

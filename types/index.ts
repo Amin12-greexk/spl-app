@@ -7,6 +7,8 @@
  */
 export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD" | "PRODUCTION_SUPERVISOR" | "TEKNISI" | "DRIVER" | "SUPER_ADMIN"
 
+export type DepartmentApprovalMode = "DIRECT" | "GA" | "DEPARTMENT_HEAD"
+
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
  * - PENDING_SUPERVISOR: Menunggu persetujuan supervisor/GA/Kepala Dept
@@ -34,11 +36,20 @@ export interface User {
   name: string
   role: Role // <-- Menggunakan tipe Role yang kita definisikan di atas
   pin?: string
-  department?: string | null
+  departmentId?: string | null
+  departmentName?: string | null
+  department?: Department | null
   position?: string | null
   supervisorId?: string | null
   supervisor?: User | null
   subordinates?: User[]
+}
+
+export interface Department {
+  id: string
+  name: string
+  supervised: boolean
+  approvalMode: DepartmentApprovalMode
 }
 
 export interface Spl {
@@ -103,6 +114,7 @@ declare module "next-auth" {
   interface User {
     role: Role
     department?: string | null
+    departmentId?: string | null
     pin?: string
     position?: string | null
     supervisorId?: string | null
@@ -113,6 +125,7 @@ declare module "next-auth" {
       id: string
       role: Role
       department?: string | null
+      departmentId?: string | null
       pin?: string
       position?: string | null
       supervisorId?: string | null
@@ -125,6 +138,7 @@ declare module "next-auth/jwt" {
     id: string
     role: Role // <-- Menggunakan tipe Role
     department?: string | null
+    departmentId?: string | null
     pin?: string
     position?: string | null
     supervisorId?: string | null

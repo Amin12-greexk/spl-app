@@ -42,7 +42,8 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role as Role,
-            department: user.department,
+            department: user.departmentName,
+            departmentId: user.departmentId,
             pin: user.pin,
             position: user.position,
             supervisorId: user.supervisorId,
@@ -66,6 +67,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.department = user.department
+        token.departmentId = user.departmentId
         token.pin = user.pin
         token.position = user.position
         token.supervisorId = user.supervisorId
@@ -77,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.role = token.role as Role
         session.user.department = token.department as string | null
+        session.user.departmentId = token.departmentId as string | null
         session.user.pin = token.pin as string
         session.user.position = token.position as string | null
         session.user.supervisorId = token.supervisorId as string | null

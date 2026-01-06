@@ -34,7 +34,17 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""
-    const supervised = Boolean(body.supervised)
+    const supervised =
+      typeof body.supervised === "boolean"
+        ? body.supervised
+        : String(body.supervised).toLowerCase() === "true"
+    const approvalModeInput = typeof body.approvalMode === "string" ? body.approvalMode : null
+    const approvalMode =
+      supervised && approvalModeInput && ["GA", "DEPARTMENT_HEAD", "DIRECT"].includes(approvalModeInput)
+        ? approvalModeInput
+        : supervised
+        ? "DEPARTMENT_HEAD"
+        : "DIRECT"
 
     if (!name) {
       return NextResponse.json({ error: "Nama departemen wajib diisi" }, { status: 400 })
@@ -58,6 +68,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         supervised,
+        approvalMode,
       },
     })
 

@@ -8,7 +8,7 @@
   --background-start-rgb: 249, 250, 251; /* bg-gray-50 */
   --background-end-rgb: 255, 255, 255; /* white */
 
-  /* * Warna Aksen Hijau untuk PT Tunas Esta Indonesia 
+  /* * Warna Aksen Hijau untuk PT Tunas Esta Indonesia
    * (Menggunakan warna yang mirip dengan Tailwind green-600)
    */
   --accent-primary: 22, 163, 74;
@@ -40,4 +40,85 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+}
+
+/* ========================================
+   MICRO-ANIMATIONS & MOTION UTILITIES
+   ======================================== */
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Smooth transitions for interactive elements */
+@layer utilities {
+  .transition-micro {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .transition-micro-fast {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  /* Shimmer effect for skeleton loading */
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      rgba(243, 244, 246, 0) 0%,
+      rgba(243, 244, 246, 0.5) 50%,
+      rgba(243, 244, 246, 0) 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply motion-safe:transition-all motion-safe:duration-200;
+  }
+
+  .hover-lift:hover {
+    @apply motion-safe:-translate-y-1 motion-safe:shadow-lg;
+  }
+
+  /* Focus ring animation */
+  .focus-ring-animated {
+    @apply focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 motion-safe:transition-all motion-safe:duration-200;
+  }
+
+  /* Subtle glow effect */
+  .glow-green {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+    transition: box-shadow 0.2s ease-out;
+  }
+
+  .glow-green:hover {
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+  }
+}
+
+/* Custom loading spinner with smooth animation */
+@layer components {
+  .spinner {
+    @apply motion-safe:animate-spin-slow;
+    border: 2px solid rgba(22, 163, 74, 0.2);
+    border-top-color: rgb(22, 163, 74);
+    border-radius: 50%;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    @apply bg-gray-200 motion-safe:animate-shimmer shimmer-bg rounded;
+  }
+
+  /* Button with loading state */
+  .btn-loading {
+    @apply relative pointer-events-none opacity-70;
+  }
 }

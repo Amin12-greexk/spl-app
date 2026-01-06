@@ -16,6 +16,9 @@ async function clearDatabase() {
     console.log("Menghapus Users...")
     await prisma.user.deleteMany({})
 
+    console.log("Menghapus Departments...")
+    await prisma.department.deleteMany({})
+
     console.log("Menghapus Settings...")
     await prisma.setting.deleteMany({})
 

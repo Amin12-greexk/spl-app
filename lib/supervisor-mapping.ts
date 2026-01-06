@@ -1,5 +1,7 @@
 import { prisma } from "./prisma"
 
+export type ApprovalMode = "DIRECT" | "GA" | "DEPARTMENT_HEAD"
+
 /**
  * Legacy Department to Supervisor Role Mapping
  * Digunakan sebagai fallback jika belum ada data departemen di database.
@@ -15,7 +17,20 @@ export const LEGACY_DEPARTMENT_SUPERVISOR_MAPPING: Record<string, string> = {
 
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 
-async function getDepartmentRecord(department: string | null) {
+async function getDepartmentById(departmentId: string | null) {
+  if (!departmentId) return null
+  return prisma.department.findUnique({
+    where: { id: departmentId },
+    select: {
+      id: true,
+      name: true,
+      supervised: true,
+      approvalMode: true,
+    },
+  })
+}
+
+async function getDepartmentByName(department: string | null) {
   if (!department) return null
   const normalizedDept = department.trim()
   if (!normalizedDept) return null
@@ -28,8 +43,10 @@ async function getDepartmentRecord(department: string | null) {
       },
     },
     select: {
+      id: true,
       name: true,
       supervised: true,
+      approvalMode: true,
     },
   })
 }
@@ -44,31 +61,45 @@ function isGaSupervisedDepartment(department: string): boolean {
   return GA_SUPERVISED_DEPARTMENTS.has(department.trim().toLowerCase())
 }
 
+function resolveApprovalMode(departmentName: string, supervised: boolean, approvalMode: string | null): ApprovalMode | null {
+  if (!supervised) return null
+  if (approvalMode === "GA" || approvalMode === "DEPARTMENT_HEAD" || approvalMode === "DIRECT") {
+    return approvalMode === "DIRECT" ? null : approvalMode
+  }
+  return isGaSupervisedDepartment(departmentName) ? "GA" : "DEPARTMENT_HEAD"
+}
+
 /**
  * Get supervisor for a department
  * @param department - Department name
  * @returns User object of supervisor or null if no supervisor needed
  */
-export async function getSupervisorForDepartment(department: string | null) {
-  if (!department) {
-    return null
-  }
+export async function getSupervisorForDepartment(params: {
+  departmentId?: string | null
+  departmentName?: string | null
+}) {
+  const departmentRecord =
+    (await getDepartmentById(params.departmentId || null)) ||
+    (await getDepartmentByName(params.departmentName || null))
 
-  const normalizedDept = department.trim()
-  const departmentRecord = await getDepartmentRecord(normalizedDept)
-
-  let supervisorRole: string | null = null
+  let supervisorRole: ApprovalMode | null = null
+  let departmentName = params.departmentName || null
+  let departmentId = params.departmentId || null
 
   if (departmentRecord) {
-    if (!departmentRecord.supervised) {
-      return null
-    }
-    supervisorRole = isGaSupervisedDepartment(normalizedDept) ? "GA" : "DEPARTMENT_HEAD"
-  } else {
-    supervisorRole = getLegacySupervisorRole(normalizedDept)
+    departmentName = departmentRecord.name
+    departmentId = departmentRecord.id
+    supervisorRole = resolveApprovalMode(
+      departmentRecord.name,
+      departmentRecord.supervised,
+      departmentRecord.approvalMode
+    )
+  } else if (departmentName) {
+    const legacyRole = getLegacySupervisorRole(departmentName)
+    supervisorRole = legacyRole === "GA" || legacyRole === "DEPARTMENT_HEAD" ? legacyRole : null
   }
 
-  if (!supervisorRole) return null
+  if (!supervisorRole || !departmentName) return null
 
   // Find supervisor user by role and department
   let supervisor = null
@@ -84,7 +115,8 @@ export async function getSupervisorForDepartment(department: string | null) {
         name: true,
         email: true,
         role: true,
-        department: true,
+        departmentName: true,
+        departmentId: true,
         position: true,
       },
     })
@@ -93,14 +125,23 @@ export async function getSupervisorForDepartment(department: string | null) {
     supervisor = await prisma.user.findFirst({
       where: {
         role: "DEPARTMENT_HEAD",
-        department: normalizedDept,
+        OR: [
+          departmentId ? { departmentId } : undefined,
+          {
+            departmentName: {
+              equals: departmentName,
+              mode: "insensitive",
+            },
+          },
+        ].filter(Boolean) as any,
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        department: true,
+        departmentName: true,
+        departmentId: true,
         position: true,
       },
     })
@@ -114,13 +155,17 @@ export async function getSupervisorForDepartment(department: string | null) {
  * @param department - Department name
  * @returns true if department has supervisor mapping
  */
-export async function hasSupervisorMapping(department: string | null): Promise<boolean> {
-  if (!department) return false
-  const departmentRecord = await getDepartmentRecord(department)
+export async function hasSupervisorMapping(params: {
+  departmentId?: string | null
+  departmentName?: string | null
+}): Promise<boolean> {
+  const departmentRecord =
+    (await getDepartmentById(params.departmentId || null)) ||
+    (await getDepartmentByName(params.departmentName || null))
   if (departmentRecord) {
-    return departmentRecord.supervised
+    return Boolean(resolveApprovalMode(departmentRecord.name, departmentRecord.supervised, departmentRecord.approvalMode))
   }
-  return Boolean(getLegacySupervisorRole(department))
+  return Boolean(getLegacySupervisorRole(params.departmentName || null))
 }
 
 /**
@@ -128,14 +173,17 @@ export async function hasSupervisorMapping(department: string | null): Promise<b
  * @param department - Department name
  * @returns Supervisor role name or null
  */
-export async function getSupervisorRoleName(department: string | null): Promise<string | null> {
-  if (!department) return null
-  const departmentRecord = await getDepartmentRecord(department)
+export async function getSupervisorRoleName(params: {
+  departmentId?: string | null
+  departmentName?: string | null
+}): Promise<string | null> {
+  const departmentRecord =
+    (await getDepartmentById(params.departmentId || null)) ||
+    (await getDepartmentByName(params.departmentName || null))
   if (departmentRecord) {
-    if (!departmentRecord.supervised) return null
-    return isGaSupervisedDepartment(departmentRecord.name) ? "GA" : "DEPARTMENT_HEAD"
+    return resolveApprovalMode(departmentRecord.name, departmentRecord.supervised, departmentRecord.approvalMode)
   }
-  return getLegacySupervisorRole(department)
+  return getLegacySupervisorRole(params.departmentName || null)
 }
 
 /**
@@ -145,12 +193,14 @@ export async function getSupervisorRoleName(department: string | null): Promise<
 export async function getDepartmentsWithSupervisor(): Promise<string[]> {
   const departments = await prisma.department.findMany({
     where: { supervised: true },
-    select: { name: true },
+    select: { name: true, approvalMode: true },
     orderBy: { name: "asc" },
   })
 
   if (departments.length > 0) {
-    return departments.map((dept) => dept.name)
+    return departments
+      .filter((dept) => resolveApprovalMode(dept.name, true, dept.approvalMode) !== null)
+      .map((dept) => dept.name)
   }
 
   return Object.keys(LEGACY_DEPARTMENT_SUPERVISOR_MAPPING)

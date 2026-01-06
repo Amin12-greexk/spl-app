@@ -9,26 +9,18 @@ import { getSupervisorForDepartment, hasSupervisorMapping } from "@/lib/supervis
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const department = searchParams.get("department")
+    const departmentId = searchParams.get("departmentId")
+    const departmentName = searchParams.get("department")
 
-    if (!department) {
+    if (!departmentId && !departmentName) {
       return NextResponse.json(
-        { error: "Parameter 'department' diperlukan" },
+        { error: "Parameter 'departmentId' atau 'department' diperlukan" },
         { status: 400 }
       )
     }
 
-    // Special handling for Produksi (PRODUCTION_SUPERVISOR) - no supervisor, direct to Manager
-    if (department.toLowerCase().includes("produksi")) {
-      return NextResponse.json({
-        hasSupervisor: false,
-        message: "Sebagai Pengawas Produksi, SPL Anda akan langsung diajukan ke Manager",
-        approvalFlow: ["Pengawas Produksi (Anda)", "Manager", "Approved"],
-      })
-    }
-
     // Check if department has supervisor mapping
-    const hasMapping = await hasSupervisorMapping(department)
+    const hasMapping = await hasSupervisorMapping({ departmentId, departmentName })
 
     if (!hasMapping) {
       return NextResponse.json({
@@ -39,12 +31,13 @@ export async function GET(req: NextRequest) {
     }
 
     // Get supervisor for department
-    const supervisor = await getSupervisorForDepartment(department)
+    const supervisor = await getSupervisorForDepartment({ departmentId, departmentName })
 
     if (!supervisor) {
+      const departmentLabel = departmentName || "departemen ini"
       return NextResponse.json({
         hasSupervisor: false,
-        message: `Supervisor untuk department ${department} belum tersedia. SPL akan langsung ke Manager.`,
+        message: `Supervisor untuk department ${departmentLabel} belum tersedia. SPL akan langsung ke Manager.`,
         warning: "Hubungi HR untuk setup supervisor department Anda.",
         approvalFlow: ["Staff (Anda)", "Manager", "Approved"],
       })
@@ -56,7 +49,7 @@ export async function GET(req: NextRequest) {
         id: supervisor.id,
         name: supervisor.name,
         position: supervisor.position || supervisor.role,
-        department: supervisor.department,
+        department: supervisor.departmentName || null,
       },
       message: `Atasan Anda: ${supervisor.name}`,
       approvalFlow: [

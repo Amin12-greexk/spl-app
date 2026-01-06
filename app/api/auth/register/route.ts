@@ -6,7 +6,7 @@ import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, name, department, pin } = body
+    const { email, password, name, departmentId, department, pin } = body
 
     // Validasi input
     if (!email || !password || !name || !pin) {
@@ -39,12 +39,28 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    const departmentRecord = departmentId
+      ? await prisma.department.findUnique({
+          where: { id: departmentId },
+          select: { id: true, name: true },
+        })
+      : null
+
+    if (departmentId && !departmentRecord) {
+      return NextResponse.json(
+        { error: "Departemen tidak ditemukan" },
+        { status: 400 }
+      )
+    }
+
+    const departmentName = departmentRecord?.name || (typeof department === "string" ? department : null)
+
     // Set position and role based on department
     let position = null
     let role = "STAFF" // Default role
 
-    if (department) {
-      const deptLower = department.toLowerCase()
+    if (departmentName) {
+      const deptLower = departmentName.toLowerCase()
       if (deptLower.includes("security") || deptLower.includes("satpam")) {
         position = "Security Staff"
       } else if (deptLower.includes("teknik")) {
@@ -61,7 +77,7 @@ export async function POST(req: NextRequest) {
       } else if (deptLower.includes("cleaning")) {
         position = "Cleaning Service"
       } else {
-        position = `${department} Staff`
+        position = `${departmentName} Staff`
       }
     }
 
@@ -69,7 +85,10 @@ export async function POST(req: NextRequest) {
     // KECUALI untuk PRODUCTION_SUPERVISOR yang langsung ke Manager
     let supervisor = null
     if (role !== "PRODUCTION_SUPERVISOR") {
-      supervisor = await getSupervisorForDepartment(department)
+      supervisor = await getSupervisorForDepartment({
+        departmentId: departmentRecord?.id || null,
+        departmentName,
+      })
     }
 
     // Buat user baru dengan supervisor (jika ada)
@@ -79,7 +98,8 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         name,
         pin: pin.trim(),
-        department,
+        departmentId: departmentRecord?.id || null,
+        departmentName,
         position,
         role, // 🆕 Role sesuai department (TEKNISI untuk Teknik, STAFF untuk lainnya)
         supervisorId: supervisor?.id || null, // 🆕 Auto-assign supervisor

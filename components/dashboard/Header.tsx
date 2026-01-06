@@ -18,6 +18,7 @@ interface Notification {
   createdAt: string
   approvalDate?: string
   employeeName?: string
+  notificationType?: string
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
@@ -28,6 +29,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const loadingNotificationsRef = useRef(false)
   const sessionUserId = session?.user?.id
   const sessionUserRole = session?.user?.role
@@ -52,9 +54,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
   }, [session])
 
   const handleLogout = useCallback(async () => {
-    setShowUserMenu(false)
-    await signOut({ redirect: false })
-    router.push("/login")
+    setIsLoggingOut(true)
+    try {
+      await signOut({ redirect: false })
+      router.push("/login")
+    } finally {
+      setIsLoggingOut(false)
+      setShowUserMenu(false)
+    }
   }, [router])
 
   // Fetch notifications when dropdown is opened
@@ -80,7 +87,34 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
       }
 
-      if (sessionUserRole === "STAFF" || sessionUserRole === "TEKNISI") {
+      const buildManualEntryNotifications = (manualData: any[]) => {
+        const formatDate = (dateString: string) => {
+          if (!dateString) return 'tanggal tidak tersedia'
+          try {
+            const date = new Date(dateString)
+            if (isNaN(date.getTime())) return 'tanggal tidak valid'
+            return date.toLocaleDateString('id-ID', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            })
+          } catch {
+            return 'tanggal tidak valid'
+          }
+        }
+
+        return manualData.map((spl: any) => ({
+          id: spl.id,
+          title: "SPL Telat Input",
+          message: `SPL ${formatDate(spl.date)} (${spl.startTime}-${spl.endTime}) menunggu tanda tangan`,
+          status: "PENDING_SIGNATURE",
+          createdAt: spl.createdAt || spl.date,
+          notificationType: "manual_entry",
+        }))
+      }
+
+      if (sessionUserRole === "STAFF" || sessionUserRole === "TEKNISI" || sessionUserRole === "DRIVER" || sessionUserRole === "PRODUCTION_SUPERVISOR") {
+        const allNotifications: any[] = []
         const data = await fetchJson("/api/spl")
         if (!data) {
           setNotifications([])
@@ -140,9 +174,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
               }
             })
             .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 10) // Limit to 10 recent notifications
+        allNotifications.push(...recentUpdates)
 
-          setNotifications(recentUpdates)
+        const manualData = await fetchJson("/api/spl/telat-input")
+        if (manualData) {
+          allNotifications.push(...buildManualEntryNotifications(manualData))
+        }
+
+        allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        setNotifications(allNotifications.slice(0, 10))
       } else if (sessionUserRole === "GA" || sessionUserRole === "DEPARTMENT_HEAD") {
         // GA/DEPT_HEAD punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri
@@ -218,6 +258,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
               }
             })
           allNotifications.push(...pendingApprovals)
+        }
+
+        const manualData = await fetchJson("/api/spl/telat-input")
+        if (manualData) {
+          allNotifications.push(...buildManualEntryNotifications(manualData))
         }
 
         // Sort and limit
@@ -300,6 +345,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
           allNotifications.push(...pendingNotifications)
         }
 
+        const manualData = await fetchJson("/api/spl/telat-input")
+        if (manualData) {
+          allNotifications.push(...buildManualEntryNotifications(manualData))
+        }
+
         // Sort and limit
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setNotifications(allNotifications.slice(0, 10))
@@ -373,7 +423,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setShowNotificationMenu(false)
     clearNotificationCount()
 
-    if (session?.user?.role === "STAFF" || session?.user?.role === "TEKNISI") {
+    if (notification.notificationType === "manual_entry") {
+      router.push("/dashboard/telat-input")
+      return
+    }
+    if (session?.user?.role === "STAFF" || session?.user?.role === "TEKNISI" || session?.user?.role === "DRIVER" || session?.user?.role === "PRODUCTION_SUPERVISOR") {
       router.push(`/dashboard/staff/pengajuan/${notification.id}`)
     } else if (session?.user?.role === "GA" || session?.user?.role === "DEPARTMENT_HEAD") {
       if (notification.notificationType === "own_spl") {
@@ -479,8 +533,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
                   {notificationCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 flex h-5 w-5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] font-bold text-white items-center justify-center border-2 border-white shadow-sm">
+                      <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] font-bold text-white items-center justify-center border-2 border-white shadow-sm motion-safe:animate-pulse-subtle">
                         {notificationCount > 9 ? '9+' : notificationCount}
                       </span>
                     </span>
@@ -490,11 +544,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 {/* Notification Dropdown */}
                 {showNotificationMenu && (
                   <>
-                    <div className="fixed inset-0 z-30" onClick={() => {
+                    <div className="fixed inset-0 z-30 motion-safe:animate-fade-in" onClick={() => {
                       setShowNotificationMenu(false)
                     }} />
 
-                    <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col">
+                    <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden motion-safe:animate-scale-in max-h-[500px] flex flex-col">
                       {/* Header */}
                       <div className="p-4 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center justify-between">
@@ -511,8 +565,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       <div className="overflow-y-auto flex-1">
                         {loadingNotifications ? (
                           <div className="p-8 text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                            <p className="text-sm text-gray-500 mt-3">Memuat notifikasi...</p>
+                            <div className="spinner h-8 w-8 mx-auto"></div>
+                            <p className="text-sm text-gray-500 mt-3 motion-safe:animate-pulse-subtle">Memuat notifikasi...</p>
                           </div>
                         ) : notifications.length === 0 ? (
                           <div className="p-8 text-center">
@@ -530,7 +584,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                               <button
                                 key={notification.id}
                                 onClick={() => handleNotificationItemClick(notification)}
-                                className="w-full p-4 hover:bg-gray-50 transition-colors text-left group"
+                                className="w-full p-4 hover:bg-gray-50 transition-micro text-left group"
                               >
                                 <div className="flex items-start gap-3">
                                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
@@ -636,8 +690,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 {/* Dropdown Menu */}
                 {showUserMenu && (
                   <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowUserMenu(false)} />
-                    <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="fixed inset-0 z-30 motion-safe:animate-fade-in" onClick={() => setShowUserMenu(false)} />
+                    <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden motion-safe:animate-scale-in">
                       {/* User Info Header */}
                       <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center gap-3 mb-3">
@@ -677,12 +731,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       <div className="p-2 border-t border-gray-100">
                         <button
                           onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-all group"
+                          disabled={isLoggingOut}
+                          className={`flex items-center w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-micro group ${isLoggingOut ? 'btn-loading' : ''}`}
                         >
-                          <svg className="w-5 h-5 mr-3 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                          Keluar Aplikasi
+                          {isLoggingOut ? (
+                            <>
+                              <div className="spinner h-5 w-5 mr-3"></div>
+                              Sedang Keluar...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5 mr-3 motion-safe:group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                              </svg>
+                              Keluar Aplikasi
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>

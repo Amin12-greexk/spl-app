@@ -27,10 +27,13 @@ function SplCard({
   compact = false,
   currentUserId,
 }: SplCardProps) {
+  const requesterDepartmentName =
+    spl.requester?.department?.name || spl.requester?.departmentName || "-"
+
   // Determine detailed status label based on supervisor and role - memoized
   const detailedStatus = useMemo(() => {
     // Determine supervisor type
-    const supervisorRole = spl.supervisor?.role || spl.requester?.department
+    const supervisorRole = spl.supervisor?.role || requesterDepartmentName
     let supervisorLabel = "Supervisor"
 
     if (supervisorRole === "GA") {
@@ -84,7 +87,7 @@ function SplCard({
           description: "Menunggu proses",
         }
     }
-  }, [spl.status, spl.supervisor?.role, spl.requester?.department, spl.approver?.name])
+  }, [spl.status, spl.supervisor?.role, requesterDepartmentName, spl.approver?.name])
 
   const getStatusBadge = (status: string, isCompact = false) => {
     const statusInfo = detailedStatus
@@ -169,7 +172,7 @@ function SplCard({
 
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
-    const hasSubordinate = spl.requester?.department !== undefined
+    const hasSubordinate = Boolean(requesterDepartmentName && requesterDepartmentName !== "-")
     const supervisorRole = spl.supervisor?.role || "DEPARTMENT_HEAD"
     const supervisorLabel = supervisorRole === "GA" ? "GA" : "Kepala Dept"
 
@@ -192,14 +195,14 @@ function SplCard({
   // Compact version for HR view with many records
   if (compact) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow transition-shadow text-gray-900">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover-lift glow-green text-gray-900">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-gray-900 truncate">
               {spl.requester.name}
             </h3>
             <p className="text-xs text-gray-500 truncate">
-              {spl.requester.department} · PIN: {spl.requester.pin || "-"}
+              {requesterDepartmentName} · PIN: {spl.requester.pin || "-"}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -301,7 +304,7 @@ function SplCard({
                   {onApprove && (
                     <button
                       onClick={() => onApprove(spl.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                     >
                       ✓ Setujui
                     </button>
@@ -309,7 +312,7 @@ function SplCard({
                   {onReject && (
                     <button
                       onClick={() => onReject(spl.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                     >
                       ✕ Tolak
                     </button>
@@ -323,7 +326,7 @@ function SplCard({
                   {onApprove && (
                     <button
                       onClick={() => onApprove(spl.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                     >
                       ✓ Setujui
                     </button>
@@ -331,7 +334,7 @@ function SplCard({
                   {onReject && (
                     <button
                       onClick={() => onReject(spl.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                     >
                       ✕ Tolak
                     </button>
@@ -344,7 +347,7 @@ function SplCard({
               onDelete && (
               <button
                 onClick={() => onDelete(spl.id)}
-                className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
               >
                 🗑 Hapus
               </button>
@@ -357,14 +360,14 @@ function SplCard({
 
   // Full version for detailed view
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 p-4 hover:shadow-md transition-shadow text-gray-900">
+    <div className="bg-white rounded-lg shadow border border-gray-200 p-4 hover-lift glow-green text-gray-900">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-gray-900 truncate">
             {spl.requester.name}
           </h3>
           <p className="text-sm text-gray-600 truncate">
-            {spl.requester.department} · {spl.requester.email}
+            {requesterDepartmentName} · {spl.requester.email}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -559,7 +562,7 @@ function SplCard({
           {onView && (
             <button
               onClick={() => onView(spl.id)}
-              className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-micro motion-safe:hover:scale-[1.02]"
             >
               Lihat Detail
             </button>
@@ -570,7 +573,7 @@ function SplCard({
             onDelete && (
             <button
               onClick={() => onDelete(spl.id)}
-              className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-micro motion-safe:hover:scale-[1.02]"
             >
               Hapus
             </button>
@@ -582,7 +585,7 @@ function SplCard({
                 {onApprove && (
                   <button
                     onClick={() => onApprove(spl.id)}
-                    className="px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                   >
                     Setujui
                   </button>
@@ -590,7 +593,7 @@ function SplCard({
                 {onReject && (
                   <button
                     onClick={() => onReject(spl.id)}
-                    className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
                   >
                     Tolak
                   </button>
