@@ -48,6 +48,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "SPL tidak ditemukan" }, { status: 404 })
     }
 
+    if (spl.isManualEntry && !spl.requesterSignedAt) {
+      return NextResponse.json(
+        { error: "SPL manual belum ditandatangani oleh pemohon" },
+        { status: 400 }
+      )
+    }
+
     // Validate: SPL must be in PENDING_SUPERVISOR status
     if (spl.status !== "PENDING_SUPERVISOR") {
       return NextResponse.json(

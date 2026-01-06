@@ -42,6 +42,15 @@ export async function GET(
 
     // Periksa hak akses
     const userRole = session.user.role as Role;
+    const isUnsignedManual = spl.isManualEntry && !spl.requesterSignedAt;
+
+    if (
+      isUnsignedManual &&
+      userRole !== "SUPER_ADMIN" &&
+      spl.requesterId !== session.user.id
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     if (
       ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"].includes(userRole) &&
       spl.requesterId !== session.user.id
@@ -85,6 +94,22 @@ export async function PATCH(
     // Validasi input
     if (!body.status || ((body.status === "REJECTED" || body.status === "REJECTED_BY_MANAGER") && !body.rejectionReason)) {
         return NextResponse.json({ error: "Status dan alasan penolakan (jika ditolak) wajib diisi." }, { status: 400 });
+    }
+
+    const existingSpl = await prisma.spl.findUnique({
+      where: { id: params.id },
+      select: { isManualEntry: true, requesterSignedAt: true },
+    });
+
+    if (!existingSpl) {
+      return NextResponse.json({ error: "SPL not found" }, { status: 404 });
+    }
+
+    if (existingSpl.isManualEntry && !existingSpl.requesterSignedAt) {
+      return NextResponse.json(
+        { error: "SPL manual belum ditandatangani oleh pemohon" },
+        { status: 400 }
+      );
     }
 
     const spl = await prisma.spl.update({

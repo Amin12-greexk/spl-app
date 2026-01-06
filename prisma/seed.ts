@@ -9,6 +9,29 @@ async function main() {
   // Hash password: password123
   const hashedPassword = await bcrypt.hash("password123", 10)
 
+  const departments = [
+    { name: "System", supervised: false },
+    { name: "Management", supervised: false },
+    { name: "General Affair", supervised: false },
+    { name: "HR", supervised: true },
+    { name: "Produksi", supervised: false },
+    { name: "IT", supervised: true },
+    { name: "Lab", supervised: true },
+    { name: "Admin", supervised: false },
+    { name: "Teknik", supervised: true },
+    { name: "Driver", supervised: true },
+    { name: "Security", supervised: true },
+  ]
+
+  for (const department of departments) {
+    await prisma.department.upsert({
+      where: { name: department.name },
+      update: { supervised: department.supervised },
+      create: department,
+    })
+  }
+  console.log("Departments seeded")
+
   // 1. Create Super Admin
   const superAdmin = await prisma.user.upsert({
     where: { email: "admin@tunasestaindonesia.com" },

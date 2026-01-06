@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if department has supervisor mapping
-    const hasMapping = hasSupervisorMapping(department)
+    const hasMapping = await hasSupervisorMapping(department)
 
     if (!hasMapping) {
       return NextResponse.json({

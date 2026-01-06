@@ -161,6 +161,12 @@ function SplCard({
     )
   }
 
+  const manualBadge = spl.isManualEntry ? (
+    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-red-50 text-red-700 border-red-200">
+      Telat Input
+    </span>
+  ) : null
+
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
     const hasSubordinate = spl.requester?.department !== undefined
@@ -196,7 +202,10 @@ function SplCard({
               {spl.requester.department} · PIN: {spl.requester.pin || "-"}
             </p>
           </div>
-          {getStatusBadge(spl.status, true)}
+          <div className="flex flex-col items-end gap-1">
+            {manualBadge}
+            {getStatusBadge(spl.status, true)}
+          </div>
         </div>
 
         <div className="space-y-1.5 text-xs">
@@ -358,7 +367,10 @@ function SplCard({
             {spl.requester.department} · {spl.requester.email}
           </p>
         </div>
-        {getStatusBadge(spl.status, false)}
+        <div className="flex flex-col items-end gap-1">
+          {manualBadge}
+          {getStatusBadge(spl.status, false)}
+        </div>
       </div>
 
       {/* Approval Flow Progress */}

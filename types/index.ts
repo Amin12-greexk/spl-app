@@ -54,6 +54,8 @@ export interface Spl {
   projectName?: string | null
   proofImage?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
+  isManualEntry?: boolean
+  requesterSignedAt?: Date | null
 
   // Supervisor approval (Level 1)
   supervisorId?: string | null

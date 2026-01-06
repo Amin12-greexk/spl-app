@@ -80,6 +80,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       badge: null,
     },
     {
+      name: "Telat Input",
+      href: "/dashboard/telat-input",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      roles: ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR", "SUPER_ADMIN"],
+      badge: null,
+    },
+    {
       name: "Pengajuan SPL Saya",
       href: "/dashboard/ga/pengajuan",
       icon: (
@@ -188,6 +199,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Kelola Departemen",
+      href: "/dashboard/admin/departments",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
         </svg>
       ),
       roles: ["SUPER_ADMIN"],

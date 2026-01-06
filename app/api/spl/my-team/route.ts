@@ -25,6 +25,10 @@ export async function GET(req: NextRequest) {
         requester: {
           supervisorId: session.user.id,
         },
+        OR: [
+          { isManualEntry: false },
+          { requesterSignedAt: { not: null } },
+        ],
       },
       include: {
         requester: {
