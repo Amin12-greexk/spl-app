@@ -134,6 +134,9 @@ export default function ProfilePage() {
     )
   }
 
+  const departmentLabel =
+    profile?.department?.name || profile?.departmentName || profile?.department || "-"
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -168,7 +171,7 @@ export default function ProfilePage() {
                 Departemen
               </label>
               <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-900">{profile.department}</p>
+                <p className="text-gray-900">{departmentLabel}</p>
               </div>
             </div>
             <div>
