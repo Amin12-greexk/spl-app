@@ -22,6 +22,10 @@ export default function DashboardPage() {
   const [isSavingMin, setIsSavingMin] = useState(false)
 
   useEffect(() => {
+    if (!session) {
+      return
+    }
+
     const fetchData = async () => {
       try {
         const response = await fetch("/api/spl")
@@ -66,11 +70,16 @@ export default function DashboardPage() {
         }
         endOfWeek.setHours(23, 59, 59, 999)
 
-        // Filter SPL for current week only and get 3 most recent
+        // Filter SPL for current week only, per user, and get 3 most recent
         const recent = data
           .filter((spl) => {
             const splDate = new Date(spl.createdAt)
-            return splDate >= startOfWeek && splDate <= endOfWeek
+            const requesterId = spl.requesterId || spl.requester?.id
+            return (
+              splDate >= startOfWeek &&
+              splDate <= endOfWeek &&
+              requesterId === session.user.id
+            )
           })
           .sort(
             (a, b) =>
@@ -90,7 +99,7 @@ export default function DashboardPage() {
     }
 
     fetchData()
-  }, [])
+  }, [session])
 
   // Load minimal lembur for manager view
   useEffect(() => {
