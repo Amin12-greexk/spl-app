@@ -34,6 +34,13 @@ export default function AdminDashboard() {
       color: "from-blue-500 to-blue-600",
     },
     {
+      title: "Kelola Departemen",
+      description: "Tambah, edit, dan atur status supervised",
+      href: "/dashboard/admin/departments",
+      icon: "DEP",
+      color: "from-orange-500 to-orange-600",
+    },
+    {
       title: "Input SPL Manual",
       description: "Buat SPL untuk user yang lupa/terlewat",
       href: "/dashboard/admin/spl-manual",

@@ -20,6 +20,25 @@ interface SupervisorInfo {
   approvalFlow: string[]
 }
 
+interface DepartmentOption {
+  id?: string
+  name: string
+  supervised: boolean
+}
+
+const DEFAULT_DEPARTMENTS: DepartmentOption[] = [
+  { name: "HR", supervised: true },
+  { name: "IT", supervised: true },
+  { name: "Security", supervised: true },
+  { name: "Teknik", supervised: true },
+  { name: "Driver", supervised: true },
+  { name: "Admin", supervised: false },
+  { name: "Lab", supervised: true },
+  { name: "Produksi", supervised: false },
+]
+
+const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
+
 export default function RegisterForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -27,6 +46,8 @@ export default function RegisterForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [supervisorInfo, setSupervisorInfo] = useState<SupervisorInfo | null>(null)
   const [isLoadingSupervisor, setIsLoadingSupervisor] = useState(false)
+  const [departments, setDepartments] = useState<DepartmentOption[]>(DEFAULT_DEPARTMENTS)
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false)
   const [formData, setFormData] = useState({
     pin: "",
     name: "",
@@ -35,6 +56,27 @@ export default function RegisterForm() {
     confirmPassword: "",
     department: "",
   })
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setIsLoadingDepartments(true)
+      try {
+        const response = await fetch("/api/departments")
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data) && data.length > 0) {
+            setDepartments(data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching departments:", error)
+      } finally {
+        setIsLoadingDepartments(false)
+      }
+    }
+
+    fetchDepartments()
+  }, [])
 
   // Fetch supervisor info when department changes
   useEffect(() => {
@@ -116,6 +158,17 @@ export default function RegisterForm() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const getDepartmentLabel = (department: DepartmentOption) => {
+    const name = department.name
+    if (!department.supervised) {
+      return `${name} (Direct to Manager)`
+    }
+    if (GA_SUPERVISED_DEPARTMENTS.has(name.toLowerCase())) {
+      return `${name} (Supervised by GA)`
+    }
+    return `${name} (Supervised)`
   }
 
   return (
@@ -202,17 +255,22 @@ export default function RegisterForm() {
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                 required
+                disabled={isLoadingDepartments}
               >
                 <option value="">Pilih Departemen</option>
-                <option value="HR">HR (Supervised)</option>
-                <option value="IT">IT (Supervised)</option>
-                <option value="Security">Security (Supervised by GA)</option>
-                <option value="Teknik">TEKNISI (Supervised by GA)</option>
-                <option value="Driver">Driver (Supervised by GA)</option>
-                <option value="Admin">Admin (Supervised)</option>
-                <option value="Lab">Lab (Supervised)</option>
-                <option value="Produksi">Produksi - Pengawas (Direct to Manager)</option>
+                {departments.map((department) => (
+                  <option key={department.id || department.name} value={department.name}>
+                    {getDepartmentLabel(department)}
+                  </option>
+                ))}
               </select>
+
+              {isLoadingDepartments && (
+                <div className="mt-2 flex items-center text-sm text-gray-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-500 border-t-transparent mr-2"></div>
+                  Memuat daftar departemen...
+                </div>
+              )}
 
               {/* Supervisor Info */}
               {isLoadingSupervisor && (

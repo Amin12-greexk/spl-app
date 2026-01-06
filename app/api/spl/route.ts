@@ -11,6 +11,7 @@ import { sendNotification } from "@/lib/firebase-admin";
  * Mengambil daftar SPL.
  * - STAFF/TEKNISI/DRIVER hanya bisa melihat SPL miliknya sendiri.
  * - HR/MANAGER/SUPER_ADMIN bisa melihat semua SPL atau memfilter berdasarkan userId.
+ * - SPL manual yang belum ditandatangani disembunyikan untuk selain SUPER_ADMIN.
  * - Bisa memfilter berdasarkan status.
  */
 export async function GET(req: NextRequest) {
@@ -43,6 +44,11 @@ export async function GET(req: NextRequest) {
       "PRODUCTION_SUPERVISOR",
     ];
     const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"];
+    const hideUnsignedManual = userRole !== "SUPER_ADMIN";
+
+    if (hideUnsignedManual) {
+      where.NOT = { isManualEntry: true, requesterSignedAt: null };
+    }
 
     if (selfOnlyRoles.includes(userRole)) {
       // Staff/TEKNISI/DRIVER/GA/Department Head/Pengawas Produksi hanya bisa melihat data miliknya

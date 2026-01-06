@@ -29,6 +29,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(false)
   const loadingNotificationsRef = useRef(false)
+  const sessionUserId = session?.user?.id
+  const sessionUserRole = session?.user?.role
 
   // Get notification count from context (real-time updates via Firebase)
   const { notificationCount, refreshNotificationCount, clearNotificationCount } = useNotificationContext()
@@ -57,7 +59,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   // Fetch notifications when dropdown is opened
   const fetchNotifications = useCallback(async () => {
-    if (loadingNotificationsRef.current || !session) return
+    if (loadingNotificationsRef.current || !sessionUserId || !sessionUserRole) return
 
     loadingNotificationsRef.current = true
     setLoadingNotifications(true)
@@ -78,7 +80,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
       }
 
-      if (session.user.role === "STAFF" || session.user.role === "TEKNISI") {
+      if (sessionUserRole === "STAFF" || sessionUserRole === "TEKNISI") {
         const data = await fetchJson("/api/spl")
         if (!data) {
           setNotifications([])
@@ -141,7 +143,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             .slice(0, 10) // Limit to 10 recent notifications
 
           setNotifications(recentUpdates)
-      } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
+      } else if (sessionUserRole === "GA" || sessionUserRole === "DEPARTMENT_HEAD") {
         // GA/DEPT_HEAD punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri
         // 2. Pending approval dari team mereka
@@ -222,7 +224,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setNotifications(allNotifications.slice(0, 10))
 
-      } else if (session.user.role === "HR") {
+      } else if (sessionUserRole === "HR") {
         // HR punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri (jika mereka submit)
         // 2. Pending approval MANAGER dari semua staff
@@ -230,7 +232,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const allNotifications: any[] = []
 
         // 1. Fetch own SPL updates
-        const ownData = await fetchJson(`/api/spl?userId=${session.user.id}`)
+        const ownData = await fetchJson(`/api/spl?userId=${sessionUserId}`)
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
@@ -302,7 +304,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setNotifications(allNotifications.slice(0, 10))
 
-      } else if (session.user.role === "MANAGER") {
+      } else if (sessionUserRole === "MANAGER") {
         // MANAGER hanya lihat pending approvals
         const data = await fetchJson("/api/spl?status=PENDING_MANAGER")
         if (!data) {
@@ -346,14 +348,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
       loadingNotificationsRef.current = false
       setLoadingNotifications(false)
     }
-  }, [session])
+  }, [sessionUserId, sessionUserRole])
 
   // Auto-refresh notifications list when dropdown is open and count changes
   useEffect(() => {
-    if (showNotificationMenu && session) {
+    if (showNotificationMenu && sessionUserId && sessionUserRole) {
       fetchNotifications()
     }
-  }, [showNotificationMenu, session, fetchNotifications])
+  }, [showNotificationMenu, sessionUserId, sessionUserRole, fetchNotifications])
 
   // Handle notification menu toggle
   const handleNotificationClick = useCallback(() => {

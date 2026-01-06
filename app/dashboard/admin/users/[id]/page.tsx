@@ -211,7 +211,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             required
           />
         </div>
@@ -225,7 +225,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             required
           />
         </div>
@@ -240,7 +240,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
               placeholder="Kosongkan jika tidak ingin mengubah"
             />
           </div>
@@ -254,7 +254,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
               maxLength={6}
               pattern="\d{6}"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
               required
             />
           </div>
@@ -268,7 +268,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           <select
             value={formData.role}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             required
           >
             {ROLES.map((role) => (
@@ -290,7 +290,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               value={formData.department}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               placeholder="IT, HR, Production, etc"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
           <div>
@@ -302,7 +302,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               value={formData.position}
               onChange={(e) => setFormData({ ...formData, position: e.target.value })}
               placeholder="Security, IT Staff, Admin, etc"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
         </div>
@@ -315,7 +315,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           <select
             value={formData.supervisorId}
             onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="">-- Tidak Ada Supervisor --</option>
             {supervisors.map((supervisor) => (
