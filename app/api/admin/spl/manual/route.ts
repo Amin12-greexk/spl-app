@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
+import { sendNotificationToUser } from "@/lib/notification-utils"
 
 // POST - Create manual SPL for user (by Super Admin)
 export async function POST(req: NextRequest) {
@@ -26,8 +28,12 @@ export async function POST(req: NextRequest) {
     // Get user info
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        supervisor: true,
+      select: {
+        id: true,
+        role: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { name: true } },
       },
     })
 
@@ -41,14 +47,20 @@ export async function POST(req: NextRequest) {
     const durationMs = end.getTime() - start.getTime()
     const totalHours = durationMs / (1000 * 60 * 60)
 
-    // Determine initial status based on supervisor
+    // Determine initial status based on department approval rules
     let status = "PENDING_MANAGER"
-    let supervisorId = null
+    let supervisorId: string | null = null
+    const routingDepartmentName = user.department?.name || user.departmentName || null
 
-    // If user has supervisor, set to PENDING_SUPERVISOR
-    if (user.supervisorId) {
-      status = "PENDING_SUPERVISOR"
-      supervisorId = user.supervisorId
+    if (user.role === "STAFF" || user.role === "TEKNISI" || user.role === "DRIVER") {
+      const supervisor = await getSupervisorForDepartment({
+        departmentId: user.departmentId || null,
+        departmentName: routingDepartmentName,
+      })
+      if (supervisor) {
+        status = "PENDING_SUPERVISOR"
+        supervisorId = supervisor.id
+      }
     }
 
     // Create SPL
@@ -73,7 +85,9 @@ export async function POST(req: NextRequest) {
             id: true,
             name: true,
             email: true,
-            department: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
             position: true,
           },
         },
@@ -86,6 +100,24 @@ export async function POST(req: NextRequest) {
         },
       },
     })
+
+    try {
+      const splDate = new Date(date)
+      const formattedDate = splDate.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+      const notificationTitle = "SPL Telat Input Baru"
+      const notificationBody = `SPL ${formattedDate} (${startTime}-${endTime}) telah dibuat oleh Super Admin. Silakan tanda tangan di menu Telat Input.`
+
+      await sendNotificationToUser(userId, notificationTitle, notificationBody, {
+        splId: spl.id,
+        click_action: "/dashboard/telat-input",
+      })
+    } catch (notificationError) {
+      console.error("Gagal mengirim notifikasi SPL manual:", notificationError)
+    }
 
     return NextResponse.json({
       ...spl,

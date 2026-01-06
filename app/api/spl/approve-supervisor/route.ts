@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendNotification } from "@/lib/firebase-admin"
+import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils"
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,20 +101,7 @@ export async function POST(req: NextRequest) {
 
     // Send notifications
     try {
-      const notificationPromises: Promise<any>[] = []
-
       // 1. Notify MANAGER/HR about new SPL to approve
-      const managers = await prisma.user.findMany({
-        where: {
-          role: {
-            in: ["HR", "MANAGER"],
-          },
-        },
-        include: {
-          notifications: true,
-        },
-      })
-
       // Format tanggal SPL
       const splDate = new Date(updatedSpl.date);
       const formattedDate = splDate.toLocaleDateString('id-ID', {
@@ -123,39 +110,20 @@ export async function POST(req: NextRequest) {
         year: 'numeric'
       });
 
-      managers.forEach((manager) => {
-        manager.notifications.forEach((token) => {
-          notificationPromises.push(
-            sendNotification(
-              token.endpoint,
-              "SPL Baru Menunggu Persetujuan",
-              `${updatedSpl.requester.name} - SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) telah disetujui supervisor.`,
-              { splId: updatedSpl.id, click_action: '/dashboard/hr/persetujuan' }
-            )
-          )
-        })
-      })
+      await sendNotificationToRoles(
+        ["HR", "MANAGER"],
+        "SPL Baru Menunggu Persetujuan",
+        `${updatedSpl.requester.name} - SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) telah disetujui supervisor.`,
+        { splId: updatedSpl.id, click_action: "/dashboard/hr/persetujuan" }
+      )
 
       // 2. Notify requester that supervisor approved
-      const requester = await prisma.user.findUnique({
-        where: { id: updatedSpl.requesterId },
-        include: { notifications: true },
-      })
-
-      if (requester && requester.notifications.length > 0) {
-        requester.notifications.forEach((token) => {
-          notificationPromises.push(
-            sendNotification(
-              token.endpoint,
-              "SPL Disetujui Supervisor",
-              `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${session.user.name} dan diteruskan ke Manager.`,
-              { splId: updatedSpl.id, click_action: '/dashboard/staff' }
-            )
-          )
-        })
-      }
-
-      await Promise.allSettled(notificationPromises)
+      await sendNotificationToUser(
+        updatedSpl.requesterId,
+        "SPL Disetujui Supervisor",
+        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${session.user.name} dan diteruskan ke Manager.`,
+        { splId: updatedSpl.id, click_action: "/dashboard/staff" }
+      )
       console.log("Notifikasi supervisor approval telah dikirim")
     } catch (notificationError) {
       console.error("Gagal mengirim notifikasi:", notificationError)

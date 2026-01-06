@@ -2,13 +2,14 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Swal from "sweetalert2"
 
 interface Department {
   id: string
   name: string
   supervised: boolean
+  approvalMode: string
   createdAt: string
   updatedAt: string
 }
@@ -20,9 +21,11 @@ export default function AdminDepartmentsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     supervised: false,
+    approvalMode: "DIRECT",
   })
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export default function AdminDepartmentsPage() {
 
   const resetForm = () => {
     setEditingId(null)
-    setFormData({ name: "", supervised: false })
+    setFormData({ name: "", supervised: false, approvalMode: "DIRECT" })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +80,7 @@ export default function AdminDepartmentsPage() {
           body: JSON.stringify({
             name: trimmedName,
             supervised: formData.supervised,
+            approvalMode: formData.supervised ? formData.approvalMode : "DIRECT",
           }),
         }
       )
@@ -107,7 +111,12 @@ export default function AdminDepartmentsPage() {
     setFormData({
       name: department.name,
       supervised: department.supervised,
+      approvalMode: department.approvalMode || (department.supervised ? "DEPARTMENT_HEAD" : "DIRECT"),
     })
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      setTimeout(() => nameInputRef.current?.focus(), 100)
+    }
   }
 
   const handleDelete = async (department: Department) => {
@@ -143,9 +152,17 @@ export default function AdminDepartmentsPage() {
   }
 
   const getStatusBadge = (supervised: boolean) => {
-    return supervised
-      ? "bg-green-100 text-green-800"
-      : "bg-gray-100 text-gray-800"
+    return supervised ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+  }
+
+  const getStatusLabel = (department: Department) => {
+    if (!department.supervised || department.approvalMode === "DIRECT") {
+      return "Direct to Manager"
+    }
+    if (department.approvalMode === "GA") {
+      return "Supervised (GA)"
+    }
+    return "Supervised (Kepala Dept)"
   }
 
   if (loading) {
@@ -179,6 +196,7 @@ export default function AdminDepartmentsPage() {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            ref={nameInputRef}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             placeholder="Contoh: Finance, Marketing"
             required
@@ -189,14 +207,36 @@ export default function AdminDepartmentsPage() {
           <input
             type="checkbox"
             checked={formData.supervised}
-            onChange={(e) => setFormData({ ...formData, supervised: e.target.checked })}
+            onChange={(e) => {
+              const checked = e.target.checked
+              setFormData({
+                ...formData,
+                supervised: checked,
+                approvalMode: checked ? formData.approvalMode : "DIRECT",
+              })
+            }}
             className="h-4 w-4 text-red-600 border-gray-300 rounded"
           />
           Supervised (butuh approval supervisor)
         </label>
-        <p className="text-xs text-gray-500">
-          Departemen Security, Teknik, dan Driver akan diarahkan ke GA jika supervised aktif.
-        </p>
+        {formData.supervised && (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Tipe Supervisor
+            </label>
+            <select
+              value={formData.approvalMode}
+              onChange={(e) => setFormData({ ...formData, approvalMode: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="DEPARTMENT_HEAD">Kepala Departemen</option>
+              <option value="GA">GA</option>
+            </select>
+            <p className="text-xs text-gray-500">
+              Pilih GA untuk departemen seperti Security, Teknik, atau Driver.
+            </p>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-2">
           <button
@@ -240,8 +280,10 @@ export default function AdminDepartmentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {departments.map((department) => (
-                <tr key={department.id} className="hover:bg-gray-50">
+              {departments.map((department) => {
+                const isEditing = editingId === department.id
+                return (
+                <tr key={department.id} className={isEditing ? "bg-green-50" : "hover:bg-gray-50"}>
                   <td className="px-6 py-4 text-sm text-gray-900">{department.name}</td>
                   <td className="px-6 py-4">
                     <span
@@ -249,15 +291,15 @@ export default function AdminDepartmentsPage() {
                         department.supervised
                       )}`}
                     >
-                      {department.supervised ? "Supervised" : "Direct to Manager"}
+                      {getStatusLabel(department)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
                     <button
                       onClick={() => handleEdit(department)}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      className={isEditing ? "text-green-700 text-sm font-semibold" : "text-blue-600 hover:text-blue-800 text-sm font-medium"}
                     >
-                      Edit
+                      {isEditing ? "Sedang Edit" : "Edit"}
                     </button>
                     <button
                       onClick={() => handleDelete(department)}
@@ -267,7 +309,7 @@ export default function AdminDepartmentsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

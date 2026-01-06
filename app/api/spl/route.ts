@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // <-- PATH DIPERBAIKI
 import { prisma } from "@/lib/prisma";
 import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBAIKI
-import { sendNotification } from "@/lib/firebase-admin";
+import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils";
+import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
 
 /**
  * GET /api/spl
@@ -69,7 +70,16 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         requester: {
-          select: { id: true, name: true, email: true, pin: true, department: true, position: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            pin: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
+            position: true,
+          },
         },
         supervisor: {
           select: { id: true, name: true, email: true, role: true },
@@ -121,14 +131,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
-    // Check user's department first
-    const userDepartment = await prisma.user.findUnique({
+    const userRecord = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { department: true },
+      select: {
+        role: true,
+        departmentId: true,
+        departmentName: true,
+        department: { select: { name: true } },
+      },
     })
 
+    if (!userRecord) {
+      return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 })
+    }
+
+    const currentDepartmentName =
+      userRecord.department?.name || userRecord.departmentName || null
+
     // Security tidak memiliki batasan waktu karena berbeda-beda shift
-    const isSecurityDepartment = userDepartment?.department === "Security"
+    const isSecurityDepartment = (currentDepartmentName || "").toLowerCase() === "security"
 
     // Validasi waktu pengajuan (tidak berlaku untuk Security)
     if (!isSecurityDepartment) {
@@ -166,29 +187,36 @@ export async function POST(req: NextRequest) {
     }
 
     // Check user's role and supervisor
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        supervisorId: true,
-        role: true,
-      },
-    })
-
-    // Determine initial status based on role and supervisor presence
+    // Determine initial status based on role and department approval rules
     let initialStatus = "PENDING_MANAGER"
+    let supervisorId: string | null = null
+    const routingDepartmentName = currentDepartmentName || null
 
     // GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, dan HR langsung ke Manager (skip supervisor approval)
-    if (user?.role === "GA" || user?.role === "DEPARTMENT_HEAD" || user?.role === "PRODUCTION_SUPERVISOR" || user?.role === "HR") {
+    if (
+      userRecord.role === "GA" ||
+      userRecord.role === "DEPARTMENT_HEAD" ||
+      userRecord.role === "PRODUCTION_SUPERVISOR" ||
+      userRecord.role === "HR"
+    ) {
       initialStatus = "PENDING_MANAGER"
-    }
-    // STAFF, TEKNISI, dan DRIVER: cek apakah ada supervisor
-    else if (user?.role === "STAFF" || user?.role === "TEKNISI" || user?.role === "DRIVER") {
-      // If user has supervisor -> PENDING_SUPERVISOR
-      // If no supervisor -> PENDING_MANAGER (direct to manager)
-      initialStatus = user.supervisorId ? "PENDING_SUPERVISOR" : "PENDING_MANAGER"
-    }
-    // Role lain: langsung ke Manager
-    else {
+    } else if (
+      userRecord.role === "STAFF" ||
+      userRecord.role === "TEKNISI" ||
+      userRecord.role === "DRIVER"
+    ) {
+      const supervisor = await getSupervisorForDepartment({
+        departmentId: userRecord.departmentId || null,
+        departmentName: routingDepartmentName,
+      })
+
+      if (supervisor) {
+        initialStatus = "PENDING_SUPERVISOR"
+        supervisorId = supervisor.id
+      } else {
+        initialStatus = "PENDING_MANAGER"
+      }
+    } else {
       initialStatus = "PENDING_MANAGER"
     }
 
@@ -204,10 +232,11 @@ export async function POST(req: NextRequest) {
         projectName: body.projectName,
         proofImage: body.proofImage || null,
         status: initialStatus,
+        supervisorId,
       },
       include: {
         requester: {
-          select: { id: true, name: true, email: true, supervisorId: true },
+          select: { id: true, name: true, email: true },
         },
       },
     });
@@ -225,56 +254,23 @@ export async function POST(req: NextRequest) {
 
       const notificationTitle = "Pengajuan SPL Baru";
       const notificationBody = `${session.user.name} mengajukan lembur pada ${formattedDate} (${body.startTime} - ${body.endTime}).`;
-      const notificationPromises: Promise<any>[] = [];
-
-      if (spl.requester.supervisorId) {
-        // If user has supervisor, notify supervisor
-        const supervisor = await prisma.user.findUnique({
-          where: { id: spl.requester.supervisorId },
-          include: { notifications: true },
-        });
-
-        if (supervisor) {
-          supervisor.notifications.forEach((token) => {
-            notificationPromises.push(
-              sendNotification(
-                token.endpoint,
-                notificationTitle,
-                notificationBody,
-                { splId: spl.id, click_action: '/dashboard/ga/persetujuan' } // Supervisor notification
-              )
-            );
-          });
-        }
+      if (spl.supervisorId) {
+        await sendNotificationToUser(
+          spl.supervisorId,
+          notificationTitle,
+          notificationBody,
+          { splId: spl.id, click_action: "/dashboard/ga/persetujuan" } // Supervisor notification
+        );
       } else {
         // If no supervisor, notify managers directly
-        const managers = await prisma.user.findMany({
-          where: {
-            role: {
-              in: ["HR", "MANAGER"],
-            },
-          },
-          include: {
-            notifications: true,
-          },
-        });
-
-        managers.forEach((manager) => {
-          manager.notifications.forEach((token) => {
-            notificationPromises.push(
-              sendNotification(
-                token.endpoint,
-                notificationTitle,
-                notificationBody,
-                { splId: spl.id, click_action: '/dashboard/hr/persetujuan' } // Manager notification - FIXED ROUTE
-              )
-            );
-          });
-        });
+        await sendNotificationToRoles(
+          ["HR", "MANAGER"],
+          notificationTitle,
+          notificationBody,
+          { splId: spl.id, click_action: "/dashboard/hr/persetujuan" } // Manager notification - FIXED ROUTE
+        );
       }
 
-      // Send all notifications in parallel
-      await Promise.allSettled(notificationPromises);
       console.log("Notifikasi telah dikirim");
 
     } catch (notificationError) {

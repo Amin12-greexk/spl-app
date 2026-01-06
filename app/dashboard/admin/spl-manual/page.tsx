@@ -10,7 +10,12 @@ interface User {
   name: string
   email: string
   role: string
-  department: string | null
+  departmentId: string | null
+  departmentName: string | null
+  department: {
+    id: string
+    name: string
+  } | null
   supervisor: {
     name: string
     role: string
@@ -154,7 +159,8 @@ export default function ManualSPLPage() {
           {selectedUser && (
             <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
               <p className="text-gray-700">
-                <strong>Department:</strong> {selectedUser.department || "-"}
+                <strong>Department:</strong>{" "}
+                {selectedUser.department?.name || selectedUser.departmentName || "-"}
               </p>
               <p className="text-gray-700">
                 <strong>Supervisor:</strong> {selectedUser.supervisor?.name || "Langsung ke Manager"}

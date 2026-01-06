@@ -10,27 +10,37 @@ async function main() {
   const hashedPassword = await bcrypt.hash("password123", 10)
 
   const departments = [
-    { name: "System", supervised: false },
-    { name: "Management", supervised: false },
-    { name: "General Affair", supervised: false },
-    { name: "HR", supervised: true },
-    { name: "Produksi", supervised: false },
-    { name: "IT", supervised: true },
-    { name: "Lab", supervised: true },
-    { name: "Admin", supervised: false },
-    { name: "Teknik", supervised: true },
-    { name: "Driver", supervised: true },
-    { name: "Security", supervised: true },
+    { name: "System", supervised: false, approvalMode: "DIRECT" },
+    { name: "Management", supervised: false, approvalMode: "DIRECT" },
+    { name: "General Affair", supervised: false, approvalMode: "DIRECT" },
+    { name: "HR", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+    { name: "Produksi", supervised: false, approvalMode: "DIRECT" },
+    { name: "IT", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+    { name: "Lab", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+    { name: "Admin", supervised: false, approvalMode: "DIRECT" },
+    { name: "Teknik", supervised: true, approvalMode: "GA" },
+    { name: "Driver", supervised: true, approvalMode: "GA" },
+    { name: "Security", supervised: true, approvalMode: "GA" },
   ]
 
   for (const department of departments) {
     await prisma.department.upsert({
       where: { name: department.name },
-      update: { supervised: department.supervised },
+      update: {
+        supervised: department.supervised,
+        approvalMode: department.approvalMode,
+      },
       create: department,
     })
   }
   console.log("Departments seeded")
+
+  const departmentRecords = await prisma.department.findMany({
+    select: { id: true, name: true },
+  })
+  const departmentIdByName = new Map(
+    departmentRecords.map((dept) => [dept.name, dept.id])
+  )
 
   // 1. Create Super Admin
   const superAdmin = await prisma.user.upsert({
@@ -42,7 +52,8 @@ async function main() {
       password: hashedPassword,
       pin: "000000",
       role: "SUPER_ADMIN",
-      department: "System",
+      departmentName: "System",
+      departmentId: departmentIdByName.get("System") || null,
       position: "Super Admin",
     },
   })
@@ -58,7 +69,8 @@ async function main() {
       password: hashedPassword,
       pin: "210",
       role: "MANAGER",
-      department: "Management",
+      departmentName: "Management",
+      departmentId: departmentIdByName.get("Management") || null,
       position: "General Manager",
     },
   })
@@ -74,7 +86,8 @@ async function main() {
       password: hashedPassword,
       pin: "222",
       role: "GA",
-      department: "General Affair",
+      departmentName: "General Affair",
+      departmentId: departmentIdByName.get("General Affair") || null,
       position: "GA Supervisor",
     },
   })
@@ -90,7 +103,8 @@ async function main() {
       password: hashedPassword,
       pin: "212",
       role: "HR",
-      department: "HR",
+      departmentName: "HR",
+      departmentId: departmentIdByName.get("HR") || null,
       position: "HR Manager",
     },
   })
@@ -106,7 +120,8 @@ async function main() {
       password: hashedPassword,
       pin: "137",
       role: "PRODUCTION_SUPERVISOR",
-      department: "Produksi",
+      departmentName: "Produksi",
+      departmentId: departmentIdByName.get("Produksi") || null,
       position: "Pengawas Produksi",
     },
   })
@@ -122,7 +137,8 @@ async function main() {
       password: hashedPassword,
       pin: "209",
       role: "STAFF",
-      department: "IT",
+      departmentName: "IT",
+      departmentId: departmentIdByName.get("IT") || null,
       position: "IT Staff",
       supervisorId: null, // Will be updated if IT Head exists
     },
@@ -139,7 +155,8 @@ async function main() {
       password: hashedPassword,
       pin: "219",
       role: "STAFF",
-      department: "Lab",
+      departmentName: "Lab",
+      departmentId: departmentIdByName.get("Lab") || null,
       position: "Lab Analyst",
       supervisorId: null, // Will be updated if Lab Head exists
     },
@@ -156,7 +173,8 @@ async function main() {
       password: hashedPassword,
       pin: "218",
       role: "STAFF",
-      department: "Admin",
+      departmentName: "Admin",
+      departmentId: departmentIdByName.get("Admin") || null,
       position: "Admin",
       supervisorId: null,
     },
@@ -173,7 +191,8 @@ async function main() {
       password: hashedPassword,
       pin: "221",
       role: "TEKNISI",
-      department: "Teknik",
+      departmentName: "Teknik",
+      departmentId: departmentIdByName.get("Teknik") || null,
       position: "Teknisi",
       supervisorId: ga.id,
     },
@@ -190,7 +209,8 @@ async function main() {
       password: hashedPassword,
       pin: "206",
       role: "DRIVER",
-      department: "Driver",
+      departmentName: "Driver",
+      departmentId: departmentIdByName.get("Driver") || null,
       position: "Driver",
       supervisorId: ga.id,
     },
@@ -217,7 +237,8 @@ async function main() {
         password: hashedPassword,
         pin: staff.pin,
         role: "STAFF",
-        department: "Security",
+        departmentName: "Security",
+        departmentId: departmentIdByName.get("Security") || null,
         position: "Security Guard",
         supervisorId: ga.id,
       },

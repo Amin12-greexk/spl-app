@@ -11,7 +11,12 @@ interface User {
   name: string
   email: string
   role: string
-  department: string | null
+  departmentId: string | null
+  departmentName: string | null
+  department: {
+    id: string
+    name: string
+  } | null
   position: string | null
   supervisor: {
     id: string
@@ -163,7 +168,9 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((user) => {
+                const departmentLabel = user.department?.name || user.departmentName || "-"
+                return (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div>
@@ -175,7 +182,7 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4">
                     <span className={getRoleBadge(user.role)}>{user.role}</span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{user.department || "-"}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{departmentLabel}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {user.supervisor ? user.supervisor.name : "-"}
                   </td>
@@ -196,7 +203,7 @@ export default function AdminUsersPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

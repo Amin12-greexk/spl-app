@@ -24,17 +24,18 @@ interface DepartmentOption {
   id?: string
   name: string
   supervised: boolean
+  approvalMode?: string | null
 }
 
 const DEFAULT_DEPARTMENTS: DepartmentOption[] = [
-  { name: "HR", supervised: true },
-  { name: "IT", supervised: true },
-  { name: "Security", supervised: true },
-  { name: "Teknik", supervised: true },
-  { name: "Driver", supervised: true },
-  { name: "Admin", supervised: false },
-  { name: "Lab", supervised: true },
-  { name: "Produksi", supervised: false },
+  { name: "HR", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+  { name: "IT", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+  { name: "Security", supervised: true, approvalMode: "GA" },
+  { name: "Teknik", supervised: true, approvalMode: "GA" },
+  { name: "Driver", supervised: true, approvalMode: "GA" },
+  { name: "Admin", supervised: false, approvalMode: "DIRECT" },
+  { name: "Lab", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
+  { name: "Produksi", supervised: false, approvalMode: "DIRECT" },
 ]
 
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
@@ -44,6 +45,7 @@ export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const [supervisorInfo, setSupervisorInfo] = useState<SupervisorInfo | null>(null)
   const [isLoadingSupervisor, setIsLoadingSupervisor] = useState(false)
   const [departments, setDepartments] = useState<DepartmentOption[]>(DEFAULT_DEPARTMENTS)
@@ -54,7 +56,8 @@ export default function RegisterForm() {
     email: "",
     password: "",
     confirmPassword: "",
-    department: "",
+    departmentId: "",
+    departmentName: "",
   })
 
   useEffect(() => {
@@ -81,16 +84,17 @@ export default function RegisterForm() {
   // Fetch supervisor info when department changes
   useEffect(() => {
     const fetchSupervisorInfo = async () => {
-      if (!formData.department || formData.department.trim().length < 2) {
+      if (!formData.departmentId && (!formData.departmentName || formData.departmentName.trim().length < 2)) {
         setSupervisorInfo(null)
         return
       }
 
       setIsLoadingSupervisor(true)
       try {
-        const response = await fetch(
-          `/api/auth/supervisor-info?department=${encodeURIComponent(formData.department)}`
-        )
+        const query = formData.departmentId
+          ? `departmentId=${encodeURIComponent(formData.departmentId)}`
+          : `department=${encodeURIComponent(formData.departmentName)}`
+        const response = await fetch(`/api/auth/supervisor-info?${query}`)
         if (response.ok) {
           const data = await response.json()
           setSupervisorInfo(data)
@@ -105,27 +109,34 @@ export default function RegisterForm() {
     // Debounce: Wait 500ms after user stops typing
     const timeoutId = setTimeout(fetchSupervisorInfo, 500)
     return () => clearTimeout(timeoutId)
-  }, [formData.department])
+  }, [formData.departmentId, formData.departmentName])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (formData.password !== formData.confirmPassword) {
+      setHasError(true)
       toast.error("Password tidak cocok!")
+      setTimeout(() => setHasError(false), 400)
       return
     }
 
     if (!formData.pin || formData.pin.trim().length < 4) {
+      setHasError(true)
       toast.error("PIN minimal 4 karakter!")
+      setTimeout(() => setHasError(false), 400)
       return
     }
 
     if (formData.password.length < 6) {
+      setHasError(true)
       toast.error("Password minimal 6 karakter!")
+      setTimeout(() => setHasError(false), 400)
       return
     }
 
     setIsLoading(true)
+    setHasError(false)
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -137,7 +148,8 @@ export default function RegisterForm() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          department: formData.department,
+          departmentId: formData.departmentId || null,
+          department: formData.departmentName,
           pin: formData.pin,
         }),
       })
@@ -145,6 +157,8 @@ export default function RegisterForm() {
       const data = await response.json()
 
       if (!response.ok) {
+        setHasError(true)
+        setTimeout(() => setHasError(false), 400)
         throw new Error(data.error || "Gagal mendaftar")
       }
 
@@ -162,10 +176,10 @@ export default function RegisterForm() {
 
   const getDepartmentLabel = (department: DepartmentOption) => {
     const name = department.name
-    if (!department.supervised) {
+    if (!department.supervised || department.approvalMode === "DIRECT") {
       return `${name} (Direct to Manager)`
     }
-    if (GA_SUPERVISED_DEPARTMENTS.has(name.toLowerCase())) {
+    if (department.approvalMode === "GA" || GA_SUPERVISED_DEPARTMENTS.has(name.toLowerCase())) {
       return `${name} (Supervised by GA)`
     }
     return `${name} (Supervised)`
@@ -193,7 +207,7 @@ export default function RegisterForm() {
         </div>
 
         {/* Register Card */}
-        <div className="bg-white shadow-xl rounded-2xl p-8 border border-green-100">
+        <div className={`bg-white shadow-xl rounded-2xl p-8 border border-green-100 ${hasError ? 'motion-safe:animate-shake' : ''}`}>
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
               Buat Akun Baru
@@ -251,15 +265,25 @@ export default function RegisterForm() {
                 Departemen <span className="text-red-500">*</span>
               </label>
               <select
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                value={formData.departmentId || formData.departmentName}
+                onChange={(e) => {
+                  const value = e.target.value
+                  const selected = departments.find(
+                    (dept) => dept.id === value || dept.name === value
+                  )
+                  setFormData({
+                    ...formData,
+                    departmentId: selected?.id || "",
+                    departmentName: selected?.name || "",
+                  })
+                }}
                 className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                 required
                 disabled={isLoadingDepartments}
               >
                 <option value="">Pilih Departemen</option>
                 {departments.map((department) => (
-                  <option key={department.id || department.name} value={department.name}>
+                  <option key={department.id || department.name} value={department.id || department.name}>
                     {getDepartmentLabel(department)}
                   </option>
                 ))}
@@ -520,7 +544,7 @@ export default function RegisterForm() {
             <p className="text-gray-600 text-sm mb-3">Sudah memiliki akun?</p>
             <a
               href="/login"
-              className="inline-flex items-center justify-center w-full px-4 py-3 border-2 border-green-600 text-green-600 font-medium rounded-xl hover:bg-green-50 transition-colors duration-200"
+              className="inline-flex items-center justify-center w-full px-4 py-3 border-2 border-green-600 text-green-600 font-medium rounded-xl hover:bg-green-50 transition-micro motion-safe:hover:scale-[1.01]"
             >
               <svg
                 className="w-5 h-5 mr-2"

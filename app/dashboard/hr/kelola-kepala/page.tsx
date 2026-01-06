@@ -12,7 +12,12 @@ interface User {
   name: string
   email: string
   role: string
-  department: string | null
+  departmentId: string | null
+  departmentName: string | null
+  department: {
+    id: string
+    name: string
+  } | null
   position: string | null
   pin: string
 }
@@ -100,7 +105,13 @@ export default function ManageDepartmentHeadPage() {
   }
 
   // Get unique departments
-  const departments = Array.from(new Set(users.map(u => u.department).filter(Boolean))) as string[]
+  const departments = Array.from(
+    new Set(
+      users
+        .map((u) => u.department?.name || u.departmentName)
+        .filter(Boolean)
+    )
+  ) as string[]
 
   // Filter users
   const filteredUsers = users.filter(user => {
@@ -117,7 +128,8 @@ export default function ManageDepartmentHeadPage() {
     }
 
     // Filter by department
-    if (filterDepartment !== "ALL" && user.department !== filterDepartment) {
+    const departmentLabel = user.department?.name || user.departmentName || ""
+    if (filterDepartment !== "ALL" && departmentLabel !== filterDepartment) {
       return false
     }
 
@@ -216,7 +228,7 @@ export default function ManageDepartmentHeadPage() {
                 </div>
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p>PIN: {user.pin || "-"}</p>
-                  <p>Dept: {user.department || "-"}</p>
+                  <p>Dept: {user.department?.name || user.departmentName || "-"}</p>
                   <p>Posisi: {user.position || "-"}</p>
                 </div>
                 <Button
@@ -255,7 +267,7 @@ export default function ManageDepartmentHeadPage() {
                 </div>
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p>PIN: {user.pin || "-"}</p>
-                  <p>Dept: {user.department || "-"}</p>
+                  <p>Dept: {user.department?.name || user.departmentName || "-"}</p>
                   <p>Posisi: {user.position || "-"}</p>
                 </div>
                 <Button

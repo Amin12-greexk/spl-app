@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendNotification } from "@/lib/firebase-admin"
+import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils"
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
             id: true,
             name: true,
             email: true,
-            department: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
             position: true,
           },
         },
@@ -146,51 +148,22 @@ export async function PATCH(req: NextRequest) {
       })
       const notificationTitle = "SPL Manual Ditandatangani"
       const notificationBody = `${updatedSpl.requester.name} menandatangani SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}).`
-      const notificationPromises: Promise<any>[] = []
-
       if (updatedSpl.supervisorId) {
-        const supervisor = await prisma.user.findUnique({
-          where: { id: updatedSpl.supervisorId },
-          include: { notifications: true },
-        })
-
-        if (supervisor) {
-          supervisor.notifications.forEach((token) => {
-            notificationPromises.push(
-              sendNotification(
-                token.endpoint,
-                notificationTitle,
-                notificationBody,
-                { splId: updatedSpl.id, click_action: "/dashboard/ga/persetujuan" }
-              )
-            )
-          })
-        }
+        await sendNotificationToUser(
+          updatedSpl.supervisorId,
+          notificationTitle,
+          notificationBody,
+          { splId: updatedSpl.id, click_action: "/dashboard/ga/persetujuan" }
+        )
       } else {
-        const managers = await prisma.user.findMany({
-          where: {
-            role: {
-              in: ["HR", "MANAGER"],
-            },
-          },
-          include: { notifications: true },
-        })
-
-        managers.forEach((manager) => {
-          manager.notifications.forEach((token) => {
-            notificationPromises.push(
-              sendNotification(
-                token.endpoint,
-                notificationTitle,
-                notificationBody,
-                { splId: updatedSpl.id, click_action: "/dashboard/hr/persetujuan" }
-              )
-            )
-          })
-        })
+        await sendNotificationToRoles(
+          ["HR", "MANAGER"],
+          notificationTitle,
+          notificationBody,
+          { splId: updatedSpl.id, click_action: "/dashboard/hr/persetujuan" }
+        )
       }
 
-      await Promise.allSettled(notificationPromises)
     } catch (notificationError) {
       console.error("Gagal mengirim notifikasi telat input:", notificationError)
     }

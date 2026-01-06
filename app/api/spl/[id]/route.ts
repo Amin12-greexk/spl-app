@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UpdateSplStatusInput, Role, SplStatus } from "@/types"; // Impor semua tipe yang dibutuhkan
-import { sendNotification } from "@/lib/firebase-admin"; // Impor fungsi pengirim notifikasi
+import { sendNotificationToUser } from "@/lib/notification-utils"; // Impor fungsi pengirim notifikasi
 
 /**
  * GET /api/spl/[id]
@@ -28,7 +28,15 @@ export async function GET(
       },
       include: {
         requester: {
-          select: { id: true, name: true, email: true, pin: true, department: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            pin: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
+          },
         },
         approver: {
           select: { id: true, name: true, email: true },
@@ -134,40 +142,25 @@ export async function PATCH(
 
     // --- Logika Mengirim Notifikasi Balasan ---
     try {
-      // Dapatkan data requester (termasuk token notifikasinya)
-      const requester = await prisma.user.findUnique({
-        where: { id: spl.requesterId },
-        include: { notifications: true }, // Ambil semua token FCM
+      // Format tanggal SPL
+      const splDate = new Date(spl.date);
+      const formattedDate = splDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
       });
 
-      if (requester && requester.notifications.length > 0) {
-        // Format tanggal SPL
-        const splDate = new Date(spl.date);
-        const formattedDate = splDate.toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
+      const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";
+      const notificationTitle = `Pengajuan SPL Anda ${statusText}`;
+      const notificationBody = `SPL tanggal ${formattedDate} (${spl.startTime}-${spl.endTime}) telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
 
-        const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";
-        const notificationTitle = `Pengajuan SPL Anda ${statusText}`;
-        const notificationBody = `SPL tanggal ${formattedDate} (${spl.startTime}-${spl.endTime}) telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
-
-        const notificationPromises: Promise<any>[] = [];
-        requester.notifications.forEach((token) => {
-          notificationPromises.push(
-            sendNotification(
-              token.endpoint,
-              notificationTitle,
-              notificationBody,
-              { splId: spl.id, click_action: '/dashboard/history' } // Arahkan ke halaman riwayat
-            )
-          );
-        });
-
-        await Promise.allSettled(notificationPromises);
-        console.log(`Notifikasi status ${statusText} telah dikirim ke ${requester.name}`);
-      }
+      await sendNotificationToUser(
+        spl.requesterId,
+        notificationTitle,
+        notificationBody,
+        { splId: spl.id, click_action: '/dashboard/history' } // Arahkan ke halaman riwayat
+      );
+      console.log(`Notifikasi status ${statusText} telah dikirim ke requester`);
     } catch (notificationError) {
       console.error("Gagal mengirim notifikasi balasan:", notificationError);
     }

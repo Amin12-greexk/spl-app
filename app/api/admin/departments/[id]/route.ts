@@ -17,7 +17,17 @@ export async function PUT(
 
     const body = await req.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""
-    const supervised = Boolean(body.supervised)
+    const supervised =
+      typeof body.supervised === "boolean"
+        ? body.supervised
+        : String(body.supervised).toLowerCase() === "true"
+    const approvalModeInput = typeof body.approvalMode === "string" ? body.approvalMode : null
+    const approvalMode =
+      supervised && approvalModeInput && ["GA", "DEPARTMENT_HEAD", "DIRECT"].includes(approvalModeInput)
+        ? approvalModeInput
+        : supervised
+        ? "DEPARTMENT_HEAD"
+        : "DIRECT"
 
     if (!name) {
       return NextResponse.json({ error: "Nama departemen wajib diisi" }, { status: 400 })
@@ -52,19 +62,20 @@ export async function PUT(
       data: {
         name,
         supervised,
+        approvalMode,
       },
     })
 
     if (existing.name.toLowerCase() !== name.toLowerCase()) {
       await prisma.user.updateMany({
         where: {
-          department: {
+          departmentName: {
             equals: existing.name,
             mode: "insensitive",
           },
         },
         data: {
-          department: name,
+          departmentName: name,
         },
       })
     }
@@ -99,7 +110,7 @@ export async function DELETE(
 
     const userCount = await prisma.user.count({
       where: {
-        department: {
+        departmentName: {
           equals: department.name,
           mode: "insensitive",
         },

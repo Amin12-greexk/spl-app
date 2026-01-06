@@ -19,7 +19,12 @@ interface Spl {
     id: string
     name: string
     email: string
-    department: string | null
+    departmentId: string | null
+    departmentName: string | null
+    department: {
+      id: string
+      name: string
+    } | null
     position: string | null
   }
   supervisor: {
@@ -228,7 +233,7 @@ export default function SplHistoryPage() {
                     <div>
                       <div className="font-medium text-gray-900">{spl.requester.name}</div>
                       <div className="text-xs text-gray-500">
-                        {spl.requester.department || "-"} • {spl.requester.position || "-"}
+                        {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
                       </div>
                     </div>
                   </td>

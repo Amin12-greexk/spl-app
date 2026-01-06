@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendNotification } from "@/lib/firebase-admin"
+import { sendNotificationToUser } from "@/lib/notification-utils"
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,36 +101,21 @@ export async function POST(req: NextRequest) {
 
     // Send notification to requester
     try {
-      const requester = await prisma.user.findUnique({
-        where: { id: updatedSpl.requesterId },
-        include: { notifications: true },
+      // Format tanggal SPL
+      const splDate = new Date(updatedSpl.date)
+      const formattedDate = splDate.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
       })
 
-      if (requester && requester.notifications.length > 0) {
-        // Format tanggal SPL
-        const splDate = new Date(updatedSpl.date);
-        const formattedDate = splDate.toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
-
-        const notificationPromises: Promise<any>[] = []
-
-        requester.notifications.forEach((token) => {
-          notificationPromises.push(
-            sendNotification(
-              token.endpoint,
-              "SPL Ditolak Supervisor",
-              `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
-              { splId: updatedSpl.id, click_action: '/dashboard/staff' }
-            )
-          )
-        })
-
-        await Promise.allSettled(notificationPromises)
-        console.log("Notifikasi supervisor rejection telah dikirim")
-      }
+      await sendNotificationToUser(
+        updatedSpl.requesterId,
+        "SPL Ditolak Supervisor",
+        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
+        { splId: updatedSpl.id, click_action: "/dashboard/staff" }
+      )
+      console.log("Notifikasi supervisor rejection telah dikirim")
     } catch (notificationError) {
       console.error("Gagal mengirim notifikasi:", notificationError)
     }

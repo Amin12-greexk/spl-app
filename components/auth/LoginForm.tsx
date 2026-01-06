@@ -12,6 +12,7 @@ export default function LoginForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,6 +21,7 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setHasError(false)
 
     try {
       const result = await signIn("credentials", {
@@ -29,14 +31,18 @@ export default function LoginForm() {
       })
 
       if (result?.error) {
+        setHasError(true)
         toast.error(result.error)
+        setTimeout(() => setHasError(false), 400)
       } else {
         toast.success("Login berhasil!")
         router.push("/dashboard")
         router.refresh()
       }
     } catch (error) {
+      setHasError(true)
       toast.error("Terjadi kesalahan saat login")
+      setTimeout(() => setHasError(false), 400)
     } finally {
       setIsLoading(false)
     }
@@ -68,7 +74,7 @@ export default function LoginForm() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white shadow-xl rounded-2xl p-8 border border-green-100">
+        <div className={`bg-white shadow-xl rounded-2xl p-8 border border-green-100 ${hasError ? 'motion-safe:animate-shake' : ''}`}>
           {/* Header */}
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -104,16 +110,17 @@ export default function LoginForm() {
                   type={showPassword ? "text" : "password"}
                   placeholder="*****************"
                   value={formData.password}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 pr-10"
+                    setHasError(false)
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 pr-10 motion-safe:transition-all motion-safe:duration-200 focus:shadow-sm"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-micro"
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,9 +170,9 @@ export default function LoginForm() {
             <p className="text-gray-600 text-sm mb-3">
               Belum memiliki akun?
             </p>
-            <a 
-              href="/register" 
-              className="inline-flex items-center justify-center w-full px-4 py-3 border-2 border-green-600 text-green-600 font-medium rounded-xl hover:bg-green-50 transition-colors duration-200"
+            <a
+              href="/register"
+              className="inline-flex items-center justify-center w-full px-4 py-3 border-2 border-green-600 text-green-600 font-medium rounded-xl hover:bg-green-50 transition-micro motion-safe:hover:scale-[1.01]"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />

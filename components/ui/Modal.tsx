@@ -43,12 +43,12 @@ export default function Modal({
       <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black/50 transition-opacity"
+          className="fixed inset-0 bg-black/50 motion-safe:animate-fade-in"
           onClick={onClose}
         />
 
         {/* Modal */}
-        <div className="relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-md sm:max-w-lg p-4 sm:p-6 z-10 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+        <div className="relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-md sm:max-w-lg p-4 sm:p-6 z-10 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between mb-4 sticky top-0 bg-white pb-3 border-b sm:border-0">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
@@ -56,7 +56,7 @@ export default function Modal({
             </h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2"
+              className="text-gray-400 hover:text-gray-600 transition-micro p-2 -mr-2 rounded-lg hover:bg-gray-100"
               aria-label="Close modal"
             >
               <svg

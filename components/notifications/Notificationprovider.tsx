@@ -346,7 +346,18 @@ export default function NotificationProvider({ children }: NotificationProviderP
       const lastViewedStr = localStorage.getItem(lastViewedKey)
       const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
 
-      if (session.user.role === "STAFF" || session.user.role === "TEKNISI") {
+      const fetchManualCount = async () => {
+        const response = await fetch("/api/spl/telat-input")
+        if (!response.ok) return 0
+        const data = await response.json()
+        const newManualEntries = data.filter((spl: any) => {
+          const createdDate = new Date(spl.createdAt || spl.date)
+          return createdDate > lastViewedTime
+        })
+        return newManualEntries.length
+      }
+
+      if (session.user.role === "STAFF" || session.user.role === "TEKNISI" || session.user.role === "DRIVER" || session.user.role === "PRODUCTION_SUPERVISOR") {
         // STAFF/TEKNISI: count updates to their own SPL submissions
         const response = await fetch("/api/spl")
         if (response.ok) {
@@ -357,7 +368,9 @@ export default function NotificationProvider({ children }: NotificationProviderP
             const isNewUpdate = updateDate > lastViewedTime
             return isNotPending && isNewUpdate
           })
-          setNotificationCount(recentUpdates.length)
+          let count = recentUpdates.length
+          count += await fetchManualCount()
+          setNotificationCount(count)
         }
       } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
         // GA/DEPT_HEAD: count both their own SPL updates AND pending supervisor approvals
@@ -389,6 +402,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
           count += pendingApprovals.length
         }
 
+        count += await fetchManualCount()
         setNotificationCount(count)
       } else if (session.user.role === "HR") {
         // HR: count both their own SPL updates AND pending manager approvals (informational)
@@ -418,6 +432,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
           count += newPendingSPLs.length
         }
 
+        count += await fetchManualCount()
         setNotificationCount(count)
       } else if (session.user.role === "MANAGER") {
         // MANAGER: count only pending manager approvals

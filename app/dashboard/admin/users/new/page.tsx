@@ -13,6 +13,13 @@ interface User {
   position: string | null
 }
 
+interface Department {
+  id: string
+  name: string
+  supervised: boolean
+  approvalMode: string
+}
+
 const ROLES = [
   { value: "STAFF", label: "Staff" },
   { value: "TEKNISI", label: "Teknisi" },
@@ -30,13 +37,16 @@ export default function NewUserPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [supervisors, setSupervisors] = useState<User[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [loadingDepartments, setLoadingDepartments] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     pin: "",
     role: "STAFF",
-    department: "",
+    departmentId: "",
+    departmentName: "",
     position: "",
     supervisorId: "",
   })
@@ -48,6 +58,7 @@ export default function NewUserPage() {
       router.push("/dashboard")
     } else {
       fetchSupervisors()
+      fetchDepartments()
     }
   }, [session, status, router])
 
@@ -67,6 +78,21 @@ export default function NewUserPage() {
     }
   }
 
+  const fetchDepartments = async () => {
+    setLoadingDepartments(true)
+    try {
+      const response = await fetch("/api/admin/departments")
+      if (response.ok) {
+        const data = await response.json()
+        setDepartments(data)
+      }
+    } catch (error) {
+      console.error("Error fetching departments:", error)
+    } finally {
+      setLoadingDepartments(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -75,7 +101,11 @@ export default function NewUserPage() {
       const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          departmentId: formData.departmentId || null,
+          departmentName: formData.departmentName || null,
+        }),
       })
 
       const data = await response.json()
@@ -206,13 +236,30 @@ export default function NewUserPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Departemen
             </label>
-            <input
-              type="text"
-              value={formData.department}
-              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              placeholder="IT, HR, Production, etc"
+            <select
+              value={formData.departmentId || formData.departmentName}
+              onChange={(e) => {
+                const value = e.target.value
+                const selected = departments.find((dept) => dept.id === value || dept.name === value)
+                setFormData({
+                  ...formData,
+                  departmentId: selected?.id || "",
+                  departmentName: selected?.name || "",
+                })
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
+              disabled={loadingDepartments}
+            >
+              <option value="">-- Pilih Departemen --</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+            {loadingDepartments && (
+              <p className="text-xs text-gray-500 mt-1">Memuat departemen...</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

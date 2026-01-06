@@ -19,7 +19,9 @@ model User {
   pin                    String
   name                   String
   role                   String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI, DRIVER, SUPER_ADMIN
-  department             String?
+  departmentName         String?            @map("department")
+  departmentId           String?
+  department             Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   position               String? // Security, IT Staff, Admin, etc
   supervisorId           String? // ID atasan langsung
   supervisor             User?              @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -31,6 +33,9 @@ model User {
   splSupervisorApprovals Spl[]              @relation("supervisor")
   notifications          UserNotification[]
 
+  @@index([role], map: "users_role_idx")
+  @@index([supervisorId], map: "users_supervisorId_idx")
+  @@index([departmentId], map: "users_departmentId_idx")
   @@map("users")
 }
 
@@ -38,8 +43,10 @@ model Department {
   id         String   @id @default(cuid())
   name       String   @unique
   supervised Boolean  @default(false)
+  approvalMode String @default("DIRECT") // DIRECT | GA | DEPARTMENT_HEAD
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  users      User[]
 
   @@map("departments")
 }
@@ -81,6 +88,10 @@ model Spl {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([requesterId, createdAt], map: "spls_requesterId_createdAt_idx")
+  @@index([status, createdAt], map: "spls_status_createdAt_idx")
+  @@index([supervisorId, createdAt], map: "spls_supervisorId_createdAt_idx")
+  @@index([isManualEntry, requesterSignedAt], map: "spls_manual_unsigned_idx")
   @@map("spls")
 }
 

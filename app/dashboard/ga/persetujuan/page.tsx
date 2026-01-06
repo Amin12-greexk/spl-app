@@ -187,7 +187,9 @@ export default function GAApprovalPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{spl.requester.name}</h3>
                   <p className="text-sm text-gray-500">PIN: {spl.requester.pin || "-"}</p>
-                  <p className="text-xs text-gray-500">{spl.requester.department}</p>
+                  <p className="text-xs text-gray-500">
+                    {spl.requester.department?.name || spl.requester.departmentName || "-"}
+                  </p>
                 </div>
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
                   Menunggu

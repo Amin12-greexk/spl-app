@@ -22,12 +22,17 @@ export async function GET(req: NextRequest) {
     // Get all SPLs from subordinates (users who have this user as supervisor)
     const spls = await prisma.spl.findMany({
       where: {
-        requester: {
-          supervisorId: session.user.id,
-        },
         OR: [
-          { isManualEntry: false },
-          { requesterSignedAt: { not: null } },
+          { supervisorId: session.user.id },
+          { supervisorId: null, requester: { supervisorId: session.user.id } },
+        ],
+        AND: [
+          {
+            OR: [
+              { isManualEntry: false },
+              { requesterSignedAt: { not: null } },
+            ],
+          },
         ],
       },
       include: {
@@ -37,7 +42,9 @@ export async function GET(req: NextRequest) {
             name: true,
             email: true,
             pin: true,
-            department: true,
+            departmentId: true,
+            departmentName: true,
+            department: { select: { id: true, name: true } },
             position: true,
           },
         },
