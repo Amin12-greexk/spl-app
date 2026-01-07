@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
 import Modal from "@/components/ui/Modal"
@@ -10,6 +11,7 @@ import { useSession } from "next-auth/react"
 
 export default function PersetujuanPage() {
   const { data: session } = useSession()
+  const router = useRouter()
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedSpl, setSelectedSpl] = useState<string | null>(null)
@@ -39,8 +41,16 @@ export default function PersetujuanPage() {
   }
 
   useEffect(() => {
+    if (!session?.user?.role) {
+      return
+    }
+    if (session.user.role !== "MANAGER") {
+      toast.error("Hanya Manager yang dapat menyetujui SPL")
+      router.push("/dashboard/hr")
+      return
+    }
     fetchPendingSpls()
-  }, [])
+  }, [session, router])
 
   const handleApprove = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menyetujui pengajuan SPL ini?")) {

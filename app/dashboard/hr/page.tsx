@@ -180,6 +180,8 @@ export default function HRViewPage() {
         'Nama Proyek': spl.projectName || '-',
         'Alasan Lembur': spl.reason,
         'Status': getStatusText(spl.status),
+        'Disetujui Oleh GA': spl.supervisor?.role === "GA" ? spl.supervisor.name : '-',
+        'Disetujui Oleh Kepala Dept': spl.supervisor?.role === "DEPARTMENT_HEAD" ? spl.supervisor.name : '-',
         'Disetujui Oleh': spl.approver?.name || '-',
         'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         'Alasan Penolakan': spl.rejectionReason || '-',
@@ -193,8 +195,8 @@ export default function HRViewPage() {
       const colWidths = [
         { wch: 5 },   { wch: 20 },  { wch: 10 },  { wch: 25 },  { wch: 15 },
         { wch: 12 },  { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },
-        { wch: 40 },  { wch: 12 },  { wch: 20 },  { wch: 18 },  { wch: 30 },
-        { wch: 18 },  { wch: 12 }
+        { wch: 40 },  { wch: 12 },  { wch: 20 },  { wch: 20 },  { wch: 20 },
+        { wch: 18 },  { wch: 30 },  { wch: 18 },  { wch: 12 }
       ]
       ws['!cols'] = colWidths
 
@@ -232,6 +234,8 @@ export default function HRViewPage() {
         spl.projectName || '-',
         spl.reason,
         getStatusText(spl.status),
+        spl.supervisor?.role === "GA" ? spl.supervisor.name : '-',
+        spl.supervisor?.role === "DEPARTMENT_HEAD" ? spl.supervisor.name : '-',
         spl.approver?.name || '-',
         spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
         spl.rejectionReason || '-',
@@ -242,7 +246,7 @@ export default function HRViewPage() {
       const headers = [
         'No', 'Nama Karyawan', 'PIN', 'Email', 'Departemen', 'Tanggal Lembur',
         'Waktu Mulai', 'Waktu Selesai', 'Total Jam', 'Nama Proyek', 'Alasan Lembur',
-        'Status', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan', 'Tanda Tangan'
+        'Status', 'Disetujui Oleh GA', 'Disetujui Oleh Kepala Dept', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan', 'Tanda Tangan'
       ]
 
       const csvContent = [headers, ...tableData]

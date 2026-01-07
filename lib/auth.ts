@@ -47,6 +47,8 @@ export const authOptions: NextAuthOptions = {
             pin: user.pin,
             position: user.position,
             supervisorId: user.supervisorId,
+            regularStartTime: user.regularStartTime,
+            regularEndTime: user.regularEndTime,
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -71,6 +73,8 @@ export const authOptions: NextAuthOptions = {
         token.pin = user.pin
         token.position = user.position
         token.supervisorId = user.supervisorId
+        token.regularStartTime = user.regularStartTime
+        token.regularEndTime = user.regularEndTime
       }
       return token
     },
@@ -83,6 +87,8 @@ export const authOptions: NextAuthOptions = {
         session.user.pin = token.pin as string
         session.user.position = token.position as string | null
         session.user.supervisorId = token.supervisorId as string | null
+        session.user.regularStartTime = token.regularStartTime as string | null
+        session.user.regularEndTime = token.regularEndTime as string | null
       }
       return session
     },

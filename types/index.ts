@@ -40,6 +40,8 @@ export interface User {
   departmentName?: string | null
   department?: Department | null
   position?: string | null
+  regularStartTime?: string | null
+  regularEndTime?: string | null
   supervisorId?: string | null
   supervisor?: User | null
   subordinates?: User[]
@@ -118,6 +120,8 @@ declare module "next-auth" {
     pin?: string
     position?: string | null
     supervisorId?: string | null
+    regularStartTime?: string | null
+    regularEndTime?: string | null
   }
 
   interface Session {
@@ -129,6 +133,8 @@ declare module "next-auth" {
       pin?: string
       position?: string | null
       supervisorId?: string | null
+      regularStartTime?: string | null
+      regularEndTime?: string | null
     }
   }
 }
@@ -142,6 +148,8 @@ declare module "next-auth/jwt" {
     pin?: string
     position?: string | null
     supervisorId?: string | null
+    regularStartTime?: string | null
+    regularEndTime?: string | null
   }
 }
 

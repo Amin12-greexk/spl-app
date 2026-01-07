@@ -41,6 +41,13 @@ export default function AdminDashboard() {
       color: "from-orange-500 to-orange-600",
     },
     {
+      title: "Jam Reguler",
+      description: "Atur jam kerja reguler per user",
+      href: "/dashboard/admin/regular-hours",
+      icon: "JR",
+      color: "from-emerald-500 to-emerald-600",
+    },
+    {
       title: "Input SPL Manual",
       description: "Buat SPL untuk user yang lupa/terlewat",
       href: "/dashboard/admin/spl-manual",

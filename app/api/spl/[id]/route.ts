@@ -90,9 +90,9 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     const userRole = session?.user?.role as Role;
 
-    if (!session || !["HR", "MANAGER"].includes(userRole)) {
+    if (!session || !["MANAGER"].includes(userRole)) {
       return NextResponse.json(
-        { error: "Hanya HR/Manager yang bisa mengubah status SPL" },
+        { error: "Hanya Manager yang bisa mengubah status SPL" },
         { status: 403 }
       );
     }
