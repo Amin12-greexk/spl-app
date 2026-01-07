@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
 
@@ -37,6 +37,126 @@ export default function NotificationProvider({ children }: NotificationProviderP
   const [isLoading, setIsLoading] = useState(false)
   const [firebaseAvailable, setFirebaseAvailable] = useState(false)
   const [notificationCount, setNotificationCount] = useState(0)
+
+  const incrementNotificationCount = useCallback(() => {
+    setNotificationCount((prev) => prev + 1)
+  }, [])
+
+  const clearNotificationCount = useCallback(() => {
+    if (!session) return
+
+    const lastViewedKey = `notif_last_viewed_${session.user.id}`
+    localStorage.setItem(lastViewedKey, new Date().toISOString())
+    setNotificationCount(0)
+  }, [session])
+
+  const refreshNotificationCount = useCallback(async () => {
+    if (!session) return
+
+    try {
+      const lastViewedKey = `notif_last_viewed_${session.user.id}`
+      const lastViewedStr = localStorage.getItem(lastViewedKey)
+      const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
+
+      const fetchManualCount = async () => {
+        const response = await fetch("/api/spl/telat-input")
+        if (!response.ok) return 0
+        const data = await response.json()
+        const newManualEntries = data.filter((spl: any) => {
+          const createdDate = new Date(spl.createdAt || spl.date)
+          return createdDate > lastViewedTime
+        })
+        return newManualEntries.length
+      }
+
+      if (
+        session.user.role === "STAFF" ||
+        session.user.role === "TEKNISI" ||
+        session.user.role === "DRIVER" ||
+        session.user.role === "PRODUCTION_SUPERVISOR"
+      ) {
+        const response = await fetch("/api/spl")
+        if (response.ok) {
+          const data = await response.json()
+          const recentUpdates = data.filter((spl: any) => {
+            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const updateDate = new Date(
+              spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt
+            )
+            const isNewUpdate = updateDate > lastViewedTime
+            const requesterId = spl.requesterId || spl.requester?.id
+            const isOwn = requesterId === session.user.id
+            return isNotPending && isNewUpdate && isOwn
+          })
+          let count = recentUpdates.length
+          count += await fetchManualCount()
+          setNotificationCount(count)
+        }
+      } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
+        let count = 0
+
+        const ownResponse = await fetch("/api/spl")
+        if (ownResponse.ok) {
+          const ownData = await ownResponse.json()
+          const ownUpdates = ownData.filter((spl: any) => {
+            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const updateDate = new Date(spl.approvalDate || spl.updatedAt)
+            const isNewUpdate = updateDate > lastViewedTime
+            const requesterId = spl.requesterId || spl.requester?.id
+            const isOwn = requesterId === session.user.id
+            return isNotPending && isNewUpdate && isOwn
+          })
+          count += ownUpdates.length
+        }
+
+        const teamResponse = await fetch("/api/spl/my-team")
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json()
+          const pendingApprovals = teamData.filter((spl: any) => {
+            const isPendingSupervisor = spl.status === "PENDING_SUPERVISOR"
+            const createdDate = new Date(spl.createdAt)
+            const isNew = createdDate > lastViewedTime
+            return isPendingSupervisor && isNew
+          })
+          count += pendingApprovals.length
+        }
+
+        count += await fetchManualCount()
+        setNotificationCount(count)
+      } else if (session.user.role === "HR") {
+        let count = 0
+
+        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
+        if (ownResponse.ok) {
+          const ownData = await ownResponse.json()
+          const ownUpdates = ownData.filter((spl: any) => {
+            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const updateDate = new Date(spl.approvalDate || spl.updatedAt)
+            const isNewUpdate = updateDate > lastViewedTime
+            const requesterId = spl.requesterId || spl.requester?.id
+            const isOwn = requesterId === session.user.id
+            return isNotPending && isNewUpdate && isOwn
+          })
+          count += ownUpdates.length
+        }
+
+        count += await fetchManualCount()
+        setNotificationCount(count)
+      } else if (session.user.role === "MANAGER") {
+        const response = await fetch("/api/spl?status=PENDING_MANAGER")
+        if (response.ok) {
+          const data = await response.json()
+          const newPendingSPLs = data.filter((spl: any) => {
+            const createdDate = new Date(spl.createdAt)
+            return createdDate > lastViewedTime
+          })
+          setNotificationCount(newPendingSPLs.length)
+        }
+      }
+    } catch (error) {
+      // Error fetching notification count - silent fail
+    }
+  }, [session])
 
   // Check if notifications are supported
   useEffect(() => {
@@ -192,14 +312,14 @@ export default function NotificationProvider({ children }: NotificationProviderP
     }
 
     setupListener()
-  }, [session, isSupported, firebaseAvailable])
+  }, [session, isSupported, firebaseAvailable, incrementNotificationCount, clearNotificationCount])
 
   // Fetch initial notification count
   useEffect(() => {
     if (session) {
       refreshNotificationCount()
     }
-  }, [session])
+  }, [session, refreshNotificationCount])
 
   // Request permission for notifications
   const requestPermission = async (): Promise<boolean> => {
@@ -336,137 +456,6 @@ export default function NotificationProvider({ children }: NotificationProviderP
     }
   }
 
-  // Fetch notification count
-  const refreshNotificationCount = async () => {
-    if (!session) return
-
-    try {
-      // Get last viewed time from localStorage
-      const lastViewedKey = `notif_last_viewed_${session.user.id}`
-      const lastViewedStr = localStorage.getItem(lastViewedKey)
-      const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
-
-      const fetchManualCount = async () => {
-        const response = await fetch("/api/spl/telat-input")
-        if (!response.ok) return 0
-        const data = await response.json()
-        const newManualEntries = data.filter((spl: any) => {
-          const createdDate = new Date(spl.createdAt || spl.date)
-          return createdDate > lastViewedTime
-        })
-        return newManualEntries.length
-      }
-
-      if (session.user.role === "STAFF" || session.user.role === "TEKNISI" || session.user.role === "DRIVER" || session.user.role === "PRODUCTION_SUPERVISOR") {
-        // STAFF/TEKNISI: count updates to their own SPL submissions
-        const response = await fetch("/api/spl")
-        if (response.ok) {
-          const data = await response.json()
-          const recentUpdates = data.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
-            const updateDate = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt)
-            const isNewUpdate = updateDate > lastViewedTime
-            return isNotPending && isNewUpdate
-          })
-          let count = recentUpdates.length
-          count += await fetchManualCount()
-          setNotificationCount(count)
-        }
-      } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
-        // GA/DEPT_HEAD: count both their own SPL updates AND pending supervisor approvals
-        let count = 0
-
-        // Count 1: Their own SPL updates
-        const ownResponse = await fetch("/api/spl")
-        if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
-          const ownUpdates = ownData.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
-            const updateDate = new Date(spl.approvalDate || spl.updatedAt)
-            const isNewUpdate = updateDate > lastViewedTime
-            return isNotPending && isNewUpdate
-          })
-          count += ownUpdates.length
-        }
-
-        // Count 2: Pending supervisor approvals from their team
-        const teamResponse = await fetch("/api/spl/my-team")
-        if (teamResponse.ok) {
-          const teamData = await teamResponse.json()
-          const pendingApprovals = teamData.filter((spl: any) => {
-            const isPendingSupervisor = spl.status === "PENDING_SUPERVISOR"
-            const createdDate = new Date(spl.createdAt)
-            const isNew = createdDate > lastViewedTime
-            return isPendingSupervisor && isNew
-          })
-          count += pendingApprovals.length
-        }
-
-        count += await fetchManualCount()
-        setNotificationCount(count)
-      } else if (session.user.role === "HR") {
-        // HR: count both their own SPL updates AND pending manager approvals (informational)
-        let count = 0
-
-        // Count 1: Their own SPL updates
-        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
-        if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
-          const ownUpdates = ownData.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
-            const updateDate = new Date(spl.approvalDate || spl.updatedAt)
-            const isNewUpdate = updateDate > lastViewedTime
-            return isNotPending && isNewUpdate
-          })
-          count += ownUpdates.length
-        }
-
-        // Count 2: Pending manager approvals (informational view for HR)
-        const pendingResponse = await fetch("/api/spl?status=PENDING_MANAGER")
-        if (pendingResponse.ok) {
-          const pendingData = await pendingResponse.json()
-          const newPendingSPLs = pendingData.filter((spl: any) => {
-            const createdDate = new Date(spl.createdAt)
-            return createdDate > lastViewedTime
-          })
-          count += newPendingSPLs.length
-        }
-
-        count += await fetchManualCount()
-        setNotificationCount(count)
-      } else if (session.user.role === "MANAGER") {
-        // MANAGER: count only pending manager approvals
-        const response = await fetch("/api/spl?status=PENDING_MANAGER")
-        if (response.ok) {
-          const data = await response.json()
-          const newPendingSPLs = data.filter((spl: any) => {
-            const createdDate = new Date(spl.createdAt)
-            return createdDate > lastViewedTime
-          })
-          setNotificationCount(newPendingSPLs.length)
-        }
-      }
-    } catch (error) {
-      // Error fetching notification count - silent fail
-    }
-  }
-
-  // Increment notification count (called when new notification arrives)
-  const incrementNotificationCount = () => {
-    setNotificationCount(prev => prev + 1)
-  }
-
-  // Clear notification count (called when user views notifications)
-  const clearNotificationCount = () => {
-    if (!session) return
-
-    // Save current time as last viewed time in localStorage
-    const lastViewedKey = `notif_last_viewed_${session.user.id}`
-    localStorage.setItem(lastViewedKey, new Date().toISOString())
-
-    // Clear the count
-    setNotificationCount(0)
-  }
 
   return (
     <NotificationContext.Provider

@@ -79,6 +79,8 @@ export async function GET(req: NextRequest) {
             departmentName: true,
             department: { select: { id: true, name: true } },
             position: true,
+            regularStartTime: true,
+            regularEndTime: true,
           },
         },
         supervisor: {
@@ -131,6 +133,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 400 });
     }
 
+    const datePart = body.date.split("T")[0]
+    const requestedDate = new Date(`${datePart}T00:00:00`)
+    if (Number.isNaN(requestedDate.getTime())) {
+      return NextResponse.json({ error: "Tanggal lembur tidak valid" }, { status: 400 })
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (requestedDate < today) {
+      return NextResponse.json(
+        { error: "Tanggal lembur tidak boleh sebelum hari ini" },
+        { status: 400 }
+      )
+    }
+
+    const parseTimeToMinutes = (value: string) => {
+      if (typeof value !== "string") return null
+      const trimmed = value.trim()
+      if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
+      const [hour, minute] = trimmed.split(":").map(Number)
+      if (
+        Number.isNaN(hour) ||
+        Number.isNaN(minute) ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59
+      ) {
+        return null
+      }
+      return hour * 60 + minute
+    }
+
     const userRecord = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -138,6 +173,7 @@ export async function POST(req: NextRequest) {
         departmentId: true,
         departmentName: true,
         department: { select: { name: true } },
+        regularEndTime: true,
       },
     })
 
@@ -172,16 +208,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const [startHour, startMin] = body.startTime.split(":").map(Number);
-    const [endHour, endMin] = body.endTime.split(":").map(Number);
+    const startMinutes = parseTimeToMinutes(body.startTime)
+    const endMinutes = parseTimeToMinutes(body.endTime)
 
-    // Kalkulasi total jam
-    const totalMinutes = endHour * 60 + endMin - (startHour * 60 + startMin);
+    if (startMinutes === null || endMinutes === null) {
+      return NextResponse.json(
+        { error: "Format jam lembur tidak valid (HH:MM)" },
+        { status: 400 }
+      )
+    }
+
+    if (userRecord.regularEndTime) {
+      const regularEndMinutes = parseTimeToMinutes(userRecord.regularEndTime)
+      if (regularEndMinutes === null) {
+        return NextResponse.json(
+          { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+      if (startMinutes <= regularEndMinutes) {
+        return NextResponse.json(
+          { error: "Waktu mulai lembur harus lebih besar dari jam kerja reguler" },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Kalkulasi total jam (handle overnight shifts)
+    let totalMinutes = endMinutes - startMinutes;
+
+    // If negative, it's an overnight shift - add 24 hours (1440 minutes)
+    if (totalMinutes < 0) {
+      totalMinutes += 24 * 60;
+    }
+
     const totalHours = parseFloat((totalMinutes / 60).toFixed(2)); // Ubah ke 2 angka desimal
 
     if (totalHours <= 0) {
       return NextResponse.json(
-        { error: "Waktu selesai harus lebih besar dari waktu mulai" },
+        { error: "Waktu mulai dan selesai tidak boleh sama" },
         { status: 400 }
       );
     }

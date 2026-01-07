@@ -23,6 +23,8 @@ model User {
   departmentId           String?
   department             Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   position               String? // Security, IT Staff, Admin, etc
+  regularStartTime       String? // Jam kerja reguler mulai (HH:MM)
+  regularEndTime         String? // Jam kerja reguler selesai (HH:MM)
   supervisorId           String? // ID atasan langsung
   supervisor             User?              @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subordinates           User[]             @relation("SupervisorRelation")

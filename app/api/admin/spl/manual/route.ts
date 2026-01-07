@@ -25,6 +25,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const datePart = date.split("T")[0]
+    const requestedDate = new Date(`${datePart}T00:00:00`)
+    if (Number.isNaN(requestedDate.getTime())) {
+      return NextResponse.json(
+        { error: "Tanggal lembur tidak valid" },
+        { status: 400 }
+      )
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (requestedDate > today) {
+      return NextResponse.json(
+        { error: "Tanggal lembur manual tidak boleh melebihi hari ini" },
+        { status: 400 }
+      )
+    }
+
     // Get user info
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -41,9 +59,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 })
     }
 
-    // Calculate duration
+    // Calculate duration (handle overnight shifts)
     const start = new Date(`2000-01-01T${startTime}`)
-    const end = new Date(`2000-01-01T${endTime}`)
+    let end = new Date(`2000-01-01T${endTime}`)
+
+    // If end time is earlier than start time, it's an overnight shift - add 1 day
+    if (end <= start) {
+      end = new Date(`2000-01-02T${endTime}`)
+    }
+
     const durationMs = end.getTime() - start.getTime()
     const totalHours = durationMs / (1000 * 60 * 60)
 

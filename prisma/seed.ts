@@ -8,6 +8,21 @@ async function main() {
 
   // Hash password: password123
   const hashedPassword = await bcrypt.hash("password123", 10)
+  const defaultRegularHours = {
+    regularStartTime: "08:00",
+    regularEndTime: "16:30",
+  }
+
+  const applyDefaultRegularHours = async (userId: string) => {
+    await prisma.user.updateMany({
+      where: {
+        id: userId,
+        regularStartTime: null,
+        regularEndTime: null,
+      },
+      data: defaultRegularHours,
+    })
+  }
 
   const departments = [
     { name: "System", supervised: false, approvalMode: "DIRECT" },
@@ -89,8 +104,10 @@ async function main() {
       departmentName: "General Affair",
       departmentId: departmentIdByName.get("General Affair") || null,
       position: "GA Supervisor",
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(ga.id)
   console.log("✅ GA created")
 
   // 4. Create HR
@@ -106,8 +123,10 @@ async function main() {
       departmentName: "HR",
       departmentId: departmentIdByName.get("HR") || null,
       position: "HR Manager",
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(hr.id)
   console.log("✅ HR created")
 
   // 5. Create Production Supervisor
@@ -123,8 +142,10 @@ async function main() {
       departmentName: "Produksi",
       departmentId: departmentIdByName.get("Produksi") || null,
       position: "Pengawas Produksi",
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(productionSupervisor.id)
   console.log("✅ Production Supervisor created")
 
   // 6. Create IT Staff (need to create IT Dept Head first if exists, or direct to manager)
@@ -141,8 +162,10 @@ async function main() {
       departmentId: departmentIdByName.get("IT") || null,
       position: "IT Staff",
       supervisorId: null, // Will be updated if IT Head exists
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(itStaff.id)
   console.log("✅ IT Staff created")
 
   // 7. Create Lab Staff
@@ -159,8 +182,10 @@ async function main() {
       departmentId: departmentIdByName.get("Lab") || null,
       position: "Lab Analyst",
       supervisorId: null, // Will be updated if Lab Head exists
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(labStaff.id)
   console.log("✅ Lab Staff created")
 
   // 8. Create Admin Staff (direct to manager)
@@ -177,8 +202,10 @@ async function main() {
       departmentId: departmentIdByName.get("Admin") || null,
       position: "Admin",
       supervisorId: null,
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(adminStaff.id)
   console.log("Admin Staff created")
 
   // 9. Create Teknisi (supervised by GA)
@@ -195,8 +222,10 @@ async function main() {
       departmentId: departmentIdByName.get("Teknik") || null,
       position: "Teknisi",
       supervisorId: ga.id,
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(teknisi.id)
   console.log("✅ Teknisi created")
 
   // 10. Create Driver (supervised by GA)
@@ -213,8 +242,10 @@ async function main() {
       departmentId: departmentIdByName.get("Driver") || null,
       position: "Driver",
       supervisorId: ga.id,
+      ...defaultRegularHours,
     },
   })
+  await applyDefaultRegularHours(driver.id)
   console.log("✅ Driver created")
 
   // 11. Create Security Staff (supervised by GA)
@@ -228,7 +259,7 @@ async function main() {
   ]
 
   for (const staff of securityStaff) {
-    await prisma.user.upsert({
+    const securityUser = await prisma.user.upsert({
       where: { email: staff.email },
       update: {},
       create: {
@@ -241,8 +272,10 @@ async function main() {
         departmentId: departmentIdByName.get("Security") || null,
         position: "Security Guard",
         supervisorId: ga.id,
+        ...defaultRegularHours,
       },
     })
+    await applyDefaultRegularHours(securityUser.id)
   }
   console.log("✅ Security Staff created (6 users)")
 

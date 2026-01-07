@@ -22,11 +22,7 @@ export default function PengajuanPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Informasi Security:
             </div>
-            <p>
-              Departemen Security tidak memiliki batasan waktu pengajuan karena berbeda-beda shift. Anda dapat mengajukan SPL kapan saja.
-            </p>
           </div>
         ) : (
           <div className="mt-3 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm">

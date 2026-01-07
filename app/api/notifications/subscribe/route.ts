@@ -21,7 +21,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Cek apakah subscription sudah ada
+    // Pastikan endpoint tidak terdaftar untuk user lain (hindari notifikasi tercampur)
+    await prisma.userNotification.deleteMany({
+      where: {
+        endpoint,
+        userId: {
+          not: session.user.id,
+        },
+      },
+    })
+
+    // Cek apakah subscription sudah ada untuk user ini
     const existingSubscription = await prisma.userNotification.findFirst({
       where: {
         userId: session.user.id,

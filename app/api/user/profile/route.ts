@@ -4,6 +4,28 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+const normalizeTimeValue = (value: unknown) => {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+const parseTimeToMinutes = (value: string) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) return null
+  const [hour, minute] = value.split(":").map(Number)
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null
+  }
+  return hour * 60 + minute
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -23,6 +45,8 @@ export async function GET() {
         department: { select: { id: true, name: true } },
         position: true,
         pin: true,
+        regularStartTime: true,
+        regularEndTime: true,
       },
     })
 
@@ -45,7 +69,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, currentPassword, newPassword } = body
+    const { email, currentPassword, newPassword, regularStartTime, regularEndTime } = body
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -103,6 +127,56 @@ export async function PUT(request: NextRequest) {
       updateData.password = hashedPassword
     }
 
+    const hasRegularHoursUpdate =
+      Object.prototype.hasOwnProperty.call(body, "regularStartTime") ||
+      Object.prototype.hasOwnProperty.call(body, "regularEndTime")
+
+    if (hasRegularHoursUpdate) {
+      const isSecurityDepartment =
+        (session.user.department || "").toLowerCase() === "security"
+
+      if (!isSecurityDepartment) {
+        return NextResponse.json(
+          { error: "Hanya user Security yang dapat mengubah jam reguler" },
+          { status: 403 }
+        )
+      }
+
+      const startValue = normalizeTimeValue(regularStartTime)
+      const endValue = normalizeTimeValue(regularEndTime)
+
+      if ((startValue && !endValue) || (!startValue && endValue)) {
+        return NextResponse.json(
+          { error: "Jam mulai dan selesai harus diisi bersamaan" },
+          { status: 400 }
+        )
+      }
+
+      if (startValue && endValue) {
+        const startMinutes = parseTimeToMinutes(startValue)
+        const endMinutes = parseTimeToMinutes(endValue)
+
+        if (startMinutes === null || endMinutes === null) {
+          return NextResponse.json(
+            { error: "Format jam reguler tidak valid (HH:MM)" },
+            { status: 400 }
+          )
+        }
+
+        // Allow overnight shifts for Security (e.g., 22:00-06:00)
+        // Only reject if start and end are exactly the same
+        if (startMinutes === endMinutes) {
+          return NextResponse.json(
+            { error: "Jam selesai tidak boleh sama dengan jam mulai" },
+            { status: 400 }
+          )
+        }
+      }
+
+      updateData.regularStartTime = startValue
+      updateData.regularEndTime = endValue
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: "Tidak ada perubahan" },
@@ -122,6 +196,8 @@ export async function PUT(request: NextRequest) {
         departmentName: true,
         department: { select: { id: true, name: true } },
         position: true,
+        regularStartTime: true,
+        regularEndTime: true,
       },
     })
 

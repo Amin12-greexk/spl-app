@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Swal from "sweetalert2"
 
 interface User {
@@ -67,19 +67,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     supervisorId: "",
   })
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login")
-    } else if (session?.user?.role !== "SUPER_ADMIN") {
-      router.push("/dashboard")
-    } else {
-      fetchUser()
-      fetchSupervisors()
-      fetchDepartments()
-    }
-  }, [session, status, router, params.id])
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch(`/api/admin/users/${params.id}`)
       if (response.ok) {
@@ -109,9 +97,9 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
 
-  const fetchSupervisors = async () => {
+  const fetchSupervisors = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/users")
       if (response.ok) {
@@ -127,9 +115,9 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("Error fetching supervisors:", error)
     }
-  }
+  }, [params.id])
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     setLoadingDepartments(true)
     try {
       const response = await fetch("/api/admin/departments")
@@ -142,7 +130,26 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     } finally {
       setLoadingDepartments(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login")
+    } else if (session?.user?.role !== "SUPER_ADMIN") {
+      router.push("/dashboard")
+    } else {
+      fetchUser()
+      fetchSupervisors()
+      fetchDepartments()
+    }
+  }, [
+    status,
+    session?.user?.role,
+    router,
+    fetchUser,
+    fetchSupervisors,
+    fetchDepartments,
+  ])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

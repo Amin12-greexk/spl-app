@@ -298,7 +298,7 @@ function SplCard({
         {/* Actions for compact card */}
         {showActions && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
-            {(userRole === "HR" || userRole === "MANAGER") &&
+            {userRole === "MANAGER" &&
               (spl.status === "PENDING" || spl.status === "PENDING_MANAGER") && (
                 <>
                   {onApprove && (
@@ -579,7 +579,7 @@ function SplCard({
             </button>
           )}
 
-          {(userRole === "HR" || userRole === "MANAGER") &&
+          {userRole === "MANAGER" &&
             (spl.status === "PENDING" || spl.status === "PENDING_MANAGER") && (
               <>
                 {onApprove && (

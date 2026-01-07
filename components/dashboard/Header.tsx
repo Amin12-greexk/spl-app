@@ -3,6 +3,7 @@
 import { signOut, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useCallback, useRef, memo } from "react"
+import Image from "next/image"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 import { getRoleLabel } from "@/lib/utils"
 
@@ -51,7 +52,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     if (session) {
       refreshNotificationCount()
     }
-  }, [session])
+  }, [session, refreshNotificationCount])
 
   const handleLogout = useCallback(async () => {
     setIsLoggingOut(true)
@@ -125,7 +126,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
               // Filter harus sama dengan logic di NotificationProvider
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-              return isNotPending && isRecent
+              const requesterId = spl.requesterId || spl.requester?.id
+              const isOwn = requesterId === sessionUserId
+              return isNotPending && isRecent && isOwn
             })
             .map((spl: any) => {
               // Format tanggal dengan validasi
@@ -178,7 +181,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
         const manualData = await fetchJson("/api/spl/telat-input")
         if (manualData) {
-          allNotifications.push(...buildManualEntryNotifications(manualData))
+          const ownManual = manualData.filter((spl: any) => {
+            const requesterId = spl.requesterId || spl.requester?.id
+            return !requesterId || requesterId === sessionUserId
+          })
+          allNotifications.push(...buildManualEntryNotifications(ownManual))
         }
 
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -197,7 +204,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
             .filter((spl: any) => {
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-              return isNotPending && isRecent
+              const requesterId = spl.requesterId || spl.requester?.id
+              const isOwn = requesterId === sessionUserId
+              return isNotPending && isRecent && isOwn
             })
             .map((spl: any) => {
               const formatDate = (dateString: string) => {
@@ -262,7 +271,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
         const manualData = await fetchJson("/api/spl/telat-input")
         if (manualData) {
-          allNotifications.push(...buildManualEntryNotifications(manualData))
+          const ownManual = manualData.filter((spl: any) => {
+            const requesterId = spl.requesterId || spl.requester?.id
+            return !requesterId || requesterId === sessionUserId
+          })
+          allNotifications.push(...buildManualEntryNotifications(ownManual))
         }
 
         // Sort and limit
@@ -272,7 +285,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       } else if (sessionUserRole === "HR") {
         // HR punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri (jika mereka submit)
-        // 2. Pending approval MANAGER dari semua staff
+        // 2. (disabled) Pending approval MANAGER dari semua staff
 
         const allNotifications: any[] = []
 
@@ -283,7 +296,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
             .filter((spl: any) => {
               const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-              return isNotPending && isRecent
+              const requesterId = spl.requesterId || spl.requester?.id
+              const isOwn = requesterId === sessionUserId
+              return isNotPending && isRecent && isOwn
             })
             .map((spl: any) => {
               const formatDate = (dateString: string) => {
@@ -313,41 +328,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
           allNotifications.push(...ownUpdates)
         }
 
-        // 2. Fetch pending manager approvals (view only, tidak bisa approve)
-        const data = await fetchJson("/api/spl?status=PENDING_MANAGER")
-        if (data) {
-          const pendingNotifications = data.slice(0, 5).map((spl: any) => {
-              // Format tanggal dengan validasi
-              const formatDate = (dateString: string) => {
-                if (!dateString) return 'tanggal tidak tersedia'
-                try {
-                  const date = new Date(dateString)
-                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
-                  return date.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })
-                } catch {
-                  return 'tanggal tidak valid'
-                }
-              }
-
-              return {
-                id: spl.id,
-                title: "SPL Menunggu Manager",
-                message: `${spl.requester?.name || "Karyawan"} - SPL ${formatDate(spl.date)} menunggu Manager`,
-                status: spl.status,
-                createdAt: spl.createdAt,
-                employeeName: spl.requester?.name,
-              }
-            })
-          allNotifications.push(...pendingNotifications)
-        }
-
         const manualData = await fetchJson("/api/spl/telat-input")
         if (manualData) {
-          allNotifications.push(...buildManualEntryNotifications(manualData))
+          const ownManual = manualData.filter((spl: any) => {
+            const requesterId = spl.requesterId || spl.requester?.id
+            return !requesterId || requesterId === sessionUserId
+          })
+          allNotifications.push(...buildManualEntryNotifications(ownManual))
         }
 
         // Sort and limit
@@ -494,10 +481,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 transition-transform hover:scale-105">
-                  <img
+                  <Image
                     src="/logo.png"
                     alt="Logo"
+                    width={40}
+                    height={40}
                     className="w-full h-full object-contain"
+                    priority
                   />
                 </div>
                 {/* Vertical Divider */}
@@ -637,9 +627,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
                               if (session?.user?.role === "STAFF" || session?.user?.role === "TEKNISI") {
                                 router.push("/dashboard/staff/pengajuan")
                               } else if (session?.user?.role === "HR") {
-                                router.push("/dashboard/hr/persetujuan")
+                                router.push("/dashboard/hr")
                               } else if (session?.user?.role === "MANAGER") {
-                                router.push("/dashboard/manager/persetujuan")
+                                router.push("/dashboard/hr/persetujuan")
                               }
                             }}
                             className="w-full text-center text-xs font-semibold text-green-600 hover:text-green-700 py-2 rounded-lg hover:bg-white transition-colors"
