@@ -508,23 +508,23 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-3">
 
               {/* Notification Icon */}
-              <div className="relative mr-2">
+              <div className="relative mr-1 sm:mr-2">
                 <button
                   onClick={handleNotificationClick}
-                  className={`p-2.5 rounded-full transition-all duration-200 ${
+                  className={`p-2 sm:p-2.5 rounded-full transition-all duration-200 ${
                     showNotificationMenu
                       ? "bg-green-50 text-green-600 ring-2 ring-green-100"
                       : "text-gray-500 hover:bg-gray-100 hover:text-green-600"
                   }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
 
                   {notificationCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 flex h-5 w-5">
+                    <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 flex h-4 w-4 sm:h-5 sm:w-5">
                       <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] font-bold text-white items-center justify-center border-2 border-white shadow-sm motion-safe:animate-pulse-subtle">
+                      <span className="relative inline-flex rounded-full h-4 w-4 sm:h-5 sm:w-5 bg-red-500 text-[9px] sm:text-[10px] font-bold text-white items-center justify-center border-2 border-white shadow-sm motion-safe:animate-pulse-subtle">
                         {notificationCount > 9 ? '9+' : notificationCount}
                       </span>
                     </span>
@@ -538,13 +538,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       setShowNotificationMenu(false)
                     }} />
 
-                    <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden motion-safe:animate-scale-in max-h-[500px] flex flex-col">
+                    <div className="fixed left-1/2 -translate-x-1/2 top-[72px] w-[92vw] max-w-sm bg-white rounded-xl shadow-xl border border-gray-100 z-40 overflow-hidden motion-safe:animate-scale-in max-h-[60vh] flex flex-col sm:absolute sm:left-auto sm:translate-x-0 sm:top-auto sm:right-0 sm:mt-3 sm:w-96 sm:rounded-2xl sm:max-h-[500px]">
                       {/* Header */}
-                      <div className="p-4 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
+                      <div className="p-3 sm:p-4 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-bold text-gray-900">Notifikasi</h3>
                           {notificationCount > 0 && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
                               {notificationCount} Baru
                             </span>
                           )}
@@ -554,19 +554,19 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {/* Notification List */}
                       <div className="overflow-y-auto flex-1">
                         {loadingNotifications ? (
-                          <div className="p-8 text-center">
-                            <div className="spinner h-8 w-8 mx-auto"></div>
-                            <p className="text-sm text-gray-500 mt-3 motion-safe:animate-pulse-subtle">Memuat notifikasi...</p>
+                          <div className="p-6 sm:p-8 text-center">
+                            <div className="spinner h-6 w-6 sm:h-8 sm:w-8 mx-auto"></div>
+                            <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3 motion-safe:animate-pulse-subtle">Memuat notifikasi...</p>
                           </div>
                         ) : notifications.length === 0 ? (
-                          <div className="p-8 text-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="p-6 sm:p-8 text-center">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                               </svg>
                             </div>
-                            <p className="text-sm font-medium text-gray-900">Tidak ada notifikasi</p>
-                            <p className="text-xs text-gray-500 mt-1">Notifikasi akan muncul di sini</p>
+                            <p className="text-xs sm:text-sm font-medium text-gray-900">Tidak ada notifikasi</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Notifikasi akan muncul di sini</p>
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-100">
@@ -574,10 +574,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
                               <button
                                 key={notification.id}
                                 onClick={() => handleNotificationItemClick(notification)}
-                                className="w-full p-4 hover:bg-gray-50 transition-micro text-left group"
+                                className="w-full p-3 sm:p-4 hover:bg-gray-50 transition-micro text-left group"
                               >
-                                <div className="flex items-start gap-3">
-                                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                                <div className="flex items-start gap-2 sm:gap-3">
+                                  <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
                                     notification.status === "APPROVED"
                                       ? "bg-green-100 text-green-600"
                                       : notification.status === "REJECTED"
@@ -585,27 +585,27 @@ export default function Header({ onMenuClick }: HeaderProps) {
                                       : "bg-blue-100 text-blue-600"
                                   }`}>
                                     {notification.status === "APPROVED" ? (
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                       </svg>
                                     ) : notification.status === "REJECTED" ? (
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                       </svg>
                                     ) : (
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                       </svg>
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-gray-900 group-hover:text-green-600 transition-colors">
+                                    <p className="text-xs sm:text-sm font-semibold text-gray-900 group-hover:text-green-600 transition-colors line-clamp-1">
                                       {notification.title}
                                     </p>
-                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                    <p className="text-[11px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1 line-clamp-2">
                                       {notification.message}
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-1.5">
+                                    <p className="text-[10px] sm:text-xs text-gray-400 mt-1 sm:mt-1.5">
                                       {getRelativeTime(notification.createdAt)}
                                     </p>
                                   </div>
@@ -618,7 +618,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
                       {/* Footer */}
                       {notifications.length > 0 && (
-                        <div className="p-3 border-t border-gray-100 bg-gray-50">
+                        <div className="p-2 sm:p-3 border-t border-gray-100 bg-gray-50">
                           <button
                             onClick={() => {
                               setShowNotificationMenu(false)
@@ -632,7 +632,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                                 router.push("/dashboard/hr/persetujuan")
                               }
                             }}
-                            className="w-full text-center text-xs font-semibold text-green-600 hover:text-green-700 py-2 rounded-lg hover:bg-white transition-colors"
+                            className="w-full text-center text-[11px] sm:text-xs font-semibold text-green-600 hover:text-green-700 py-2 rounded-lg hover:bg-white transition-colors"
                           >
                             Lihat Semua Notifikasi
                           </button>
