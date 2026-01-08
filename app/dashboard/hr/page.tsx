@@ -289,6 +289,59 @@ export default function HRViewPage() {
     return lines
   }
 
+  const fitTextToWidth = (text: string, maxWidth: number, font: any, size: number) => {
+    const normalized = text.replace(/\s+/g, " ").trim()
+    if (!normalized) return "-"
+    if (font.widthOfTextAtSize(normalized, size) <= maxWidth) return normalized
+    const ellipsis = "..."
+    const ellipsisWidth = font.widthOfTextAtSize(ellipsis, size)
+    let trimmed = normalized
+    while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed, size) + ellipsisWidth > maxWidth) {
+      trimmed = trimmed.slice(0, -1)
+    }
+    return trimmed.length > 0 ? `${trimmed}${ellipsis}` : ellipsis
+  }
+
+  const wrapTextByWidth = (
+    text: string,
+    maxWidth: number,
+    font: any,
+    size: number,
+    maxLines = 2
+  ) => {
+    const normalized = text.replace(/\s+/g, " ").trim()
+    if (!normalized) return ["-"]
+    const words = normalized.split(" ")
+    const lines: string[] = []
+    let current = ""
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word
+      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+        current = candidate
+      } else {
+        if (current) lines.push(current)
+        current = word
+      }
+      if (lines.length === maxLines) break
+    }
+
+    if (lines.length < maxLines && current) {
+      lines.push(current)
+    }
+
+    if (lines.length > maxLines) {
+      lines.length = maxLines
+    }
+
+    if (lines.length === maxLines) {
+      const lastIndex = maxLines - 1
+      lines[lastIndex] = fitTextToWidth(lines[lastIndex], maxWidth, font, size)
+    }
+
+    return lines
+  }
+
   // --- REVISED PDF GENERATION (FIXED OVERLAP & ALIGNMENT) ---
   const generateRekapPdf = async () => {
     if (filteredSpls.length === 0) {
@@ -304,9 +357,20 @@ export default function HRViewPage() {
       const pageWidth = 595.28 // A4 width
       const pageHeight = 841.89 // A4 height
       const margin = 30
-      
-      const colWidths = [25, 100, 40, 60, 45, 45, 120, 100]
-      const headers = ["No", "Nama", "PIN", "Tanggal", "Mulai", "Selesai", "Keterangan", "Tanda Tangan"]
+
+      const colWidths = [25, 90, 40, 60, 45, 45, 100, 65, 65]
+      const headers = [
+        "No",
+        "Nama",
+        "PIN",
+        "Tanggal",
+        "Mulai",
+        "Selesai",
+        "Keterangan",
+        "TTD Pemohon",
+        "TTD Atasan",
+      ]
+      const tableWidth = colWidths.reduce((sum, width) => sum + width, 0)
       
       // FIXED: Reduced rowsPerPage from 10 to 8 to prevent overlap with footer
       const rowsPerPage = 8 
@@ -317,6 +381,17 @@ export default function HRViewPage() {
         splsPerPage.push(filteredSpls.slice(i, i + rowsPerPage))
       }
 
+      let logoImage: any = null
+      try {
+        const logoResponse = await fetch("/logo.png")
+        if (logoResponse.ok) {
+          const logoBytes = await logoResponse.arrayBuffer()
+          logoImage = await pdfDoc.embedPng(logoBytes)
+        }
+      } catch (error) {
+        logoImage = null
+      }
+
       for (let pageIndex = 0; pageIndex < splsPerPage.length; pageIndex++) {
         const page = pdfDoc.addPage([pageWidth, pageHeight])
         const pageSPLs = splsPerPage[pageIndex]
@@ -324,12 +399,23 @@ export default function HRViewPage() {
 
         // --- HEADER ---
         const logoSize = 40
-        page.drawRectangle({
-            x: margin, y: y - logoSize, width: logoSize, height: logoSize,
-            color: rgb(0.1, 0.6, 0.3), opacity: 0.2
-        })
-        page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
-        page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+        if (logoImage) {
+          const scale = Math.min(
+            logoSize / logoImage.width,
+            logoSize / logoImage.height
+          )
+          const dims = logoImage.scale(scale)
+          const logoX = margin + (logoSize - dims.width) / 2
+          const logoY = y - logoSize + (logoSize - dims.height) / 2
+          page.drawImage(logoImage, { x: logoX, y: logoY, width: dims.width, height: dims.height })
+        } else {
+          page.drawRectangle({
+              x: margin, y: y - logoSize, width: logoSize, height: logoSize,
+              color: rgb(0.1, 0.6, 0.3), opacity: 0.2
+          })
+          page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+          page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+        }
 
         page.drawText("REKAP ABSEN MANUAL STAFF PT TUNAS ESTA INDONESIA", {
           x: margin + logoSize + 15,
@@ -345,7 +431,7 @@ export default function HRViewPage() {
 
         page.drawRectangle({
           x: tableX, y: y - 25,
-          width: pageWidth - (margin * 2), height: 25,
+          width: tableWidth, height: 25,
           color: rgb(0.9, 0.9, 0.9)
         })
 
@@ -390,15 +476,16 @@ export default function HRViewPage() {
 
                 for(let i=0; i<6; i++) {
                     const isCenter = i !== 1
-                    const text = rowData[i]
+                    const rawText = rowData[i]
                     const textSize = 9
-                    const textWidth = font.widthOfTextAtSize(text, textSize)
+                    const displayText = fitTextToWidth(rawText, colWidths[i] - 10, font, textSize)
+                    const textWidth = font.widthOfTextAtSize(displayText, textSize)
                     let textX = currentX + 5
                     if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
 
-                    page.drawText(text, {
+                    page.drawText(displayText, {
                         x: textX, y: rowY + (rowHeight / 2) - 4,
-                        size: textSize, font: font, maxWidth: colWidths[i] - 10
+                        size: textSize, font: font
                     })
                     currentX += colWidths[i]
                     page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
@@ -416,42 +503,113 @@ export default function HRViewPage() {
                 currentX += colWidths[ketIndex]
                 page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
 
-                // Tanda Tangan Image
-                const ttdIndex = 7
-                const ttdWidth = colWidths[ttdIndex]
-                if (spl.signature) {
+                const signatureCells = [
+                    {
+                        name: spl.requester.name,
+                        signature: spl.signature || null,
+                    },
+                    {
+                        name:
+                            spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                                ? spl.supervisor?.name || "-"
+                                : "-",
+                        signature:
+                            spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                                ? spl.supervisorSignature || null
+                                : null,
+                    },
+                ]
+
+                const drawSignatureImage = async (
+                    dataUrl: string,
+                    boxX: number,
+                    boxY: number,
+                    boxWidth: number,
+                    boxHeight: number
+                ) => {
                     try {
-                        const signatureBytes = dataUrlToBytes(spl.signature)
-                        if (signatureBytes) {
-                            let signatureImage
-                            if (spl.signature.includes('image/png')) signatureImage = await pdfDoc.embedPng(signatureBytes)
-                            else signatureImage = await pdfDoc.embedJpg(signatureBytes)
-
-                            const padding = 10
-                            const maxWidth = ttdWidth - (padding * 2)
-                            const maxHeight = rowHeight - (padding * 2)
-                            const scale = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height)
-                            const dims = signatureImage.scale(scale)
-
-                            const imgX = currentX + (ttdWidth - dims.width) / 2
-                            const imgY = rowY + (rowHeight - dims.height) / 2
-                            page.drawImage(signatureImage, { x: imgX, y: imgY, width: dims.width, height: dims.height })
+                        const signatureBytes = dataUrlToBytes(dataUrl)
+                        if (!signatureBytes) return false
+                        let signatureImage
+                        if (dataUrl.includes("image/png")) {
+                            signatureImage = await pdfDoc.embedPng(signatureBytes)
+                        } else {
+                            signatureImage = await pdfDoc.embedJpg(signatureBytes)
                         }
+
+                        const scale = Math.min(
+                            boxWidth / signatureImage.width,
+                            boxHeight / signatureImage.height
+                        )
+                        const dims = signatureImage.scale(scale)
+                        const imgX = boxX + (boxWidth - dims.width) / 2
+                        const imgY = boxY + (boxHeight - dims.height) / 2
+                        page.drawImage(signatureImage, {
+                            x: imgX,
+                            y: imgY,
+                            width: dims.width,
+                            height: dims.height,
+                        })
+                        return true
                     } catch (e) {
                         console.error("Signature error", e)
+                        return false
                     }
-                } else {
-                    page.drawText("-", { x: currentX + (ttdWidth/2) - 2, y: rowY + (rowHeight/2) - 4, size: 9, font })
                 }
-                currentX += ttdWidth
-                page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+                for (let sigIndex = 0; sigIndex < signatureCells.length; sigIndex++) {
+                    const cellWidth = colWidths[7 + sigIndex]
+                    const cell = signatureCells[sigIndex]
+                    const nameText = cell.name || "-"
+                    const nameSize = 7
+                    const namePadding = 4
+                    const nameMaxWidth = cellWidth - namePadding * 2
+                    const nameLines = wrapTextByWidth(nameText, nameMaxWidth, bold, nameSize, 2)
+                    const nameLineHeight = 8
+                    const nameBlockHeight = nameLines.length * nameLineHeight
+                    const nameBaseY = rowY + namePadding
+
+                    nameLines.forEach((line, lineIndex) => {
+                      const lineWidth = bold.widthOfTextAtSize(line, nameSize)
+                      const lineX = currentX + Math.max(2, (cellWidth - lineWidth) / 2)
+                      const lineY = nameBaseY + (nameLines.length - 1 - lineIndex) * nameLineHeight
+                      page.drawText(line, { x: lineX, y: lineY, size: nameSize, font: bold })
+                    })
+
+                    const padding = 4
+                    const gap = 2
+                    const signatureBoxX = currentX + padding
+                    const signatureBoxY = rowY + nameBlockHeight + padding + gap
+                    const signatureBoxWidth = cellWidth - padding * 2
+                    const signatureBoxHeight = rowHeight - nameBlockHeight - padding * 2 - gap
+
+                    if (cell.signature) {
+                        await drawSignatureImage(
+                            cell.signature,
+                            signatureBoxX,
+                            signatureBoxY,
+                            signatureBoxWidth,
+                            signatureBoxHeight
+                        )
+                    } else {
+                        page.drawText("-", {
+                            x: signatureBoxX + signatureBoxWidth / 2 - 2,
+                            y: signatureBoxY + signatureBoxHeight / 2 - 4,
+                            size: 8,
+                            font,
+                        })
+                    }
+
+                    currentX += cellWidth
+                    page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+                }
             } else {
                 for(let i=0; i < colWidths.length; i++) {
                      currentX += colWidths[i]
                      page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
                 }
             }
-            page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + 535, y: rowY }, thickness: 0.5 })
+            page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + tableWidth, y: rowY }, thickness: 0.5 })
         }
 
         // --- FOOTER TANDA TANGAN (POSISI DIATUR AGAR TIDAK NABRAK) ---
