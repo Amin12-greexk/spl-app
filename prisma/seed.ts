@@ -29,7 +29,7 @@ async function main() {
     { name: "Management", supervised: false, approvalMode: "DIRECT" },
     { name: "General Affair", supervised: false, approvalMode: "DIRECT" },
     { name: "HR", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
-    { name: "Produksi", supervised: false, approvalMode: "DIRECT" },
+    { name: "Produksi", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
     { name: "IT", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
     { name: "Lab", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
     { name: "Admin", supervised: false, approvalMode: "DIRECT" },
@@ -147,8 +147,26 @@ async function main() {
   })
   await applyDefaultRegularHours(productionSupervisor.id)
   console.log("✅ Production Supervisor created")
+  // 6. Create Production Department Head
+  const productionHead = await prisma.user.upsert({
+    where: { email: "aam@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "aam@tunasestaindonesia.com",
+      name: "AAM KHUSNUN NIAM",
+      password: hashedPassword,
+      pin: "220",
+      role: "DEPARTMENT_HEAD",
+      departmentName: "Produksi",
+      departmentId: departmentIdByName.get("Produksi") || null,
+      position: "Kepala Departemen Produksi",
+      ...defaultRegularHours,
+    },
+  })
+  await applyDefaultRegularHours(productionHead.id)
+  console.log("Production Department Head created")
 
-  // 6. Create IT Staff (need to create IT Dept Head first if exists, or direct to manager)
+  // 7. Create IT Staff (need to create IT Dept Head first if exists, or direct to manager)
   const itStaff = await prisma.user.upsert({
     where: { email: "amin@tunasestaindonesia.com" },
     update: {},
@@ -168,7 +186,7 @@ async function main() {
   await applyDefaultRegularHours(itStaff.id)
   console.log("✅ IT Staff created")
 
-  // 7. Create Lab Staff
+  // 8. Create Lab Staff
   const labStaff = await prisma.user.upsert({
     where: { email: "hajar@tunasestaindonesia.com" },
     update: {},
@@ -188,7 +206,7 @@ async function main() {
   await applyDefaultRegularHours(labStaff.id)
   console.log("✅ Lab Staff created")
 
-  // 8. Create Admin Staff (direct to manager)
+  // 9. Create Admin Staff (direct to manager)
   const adminStaff = await prisma.user.upsert({
     where: { email: "adinda.rahma.habibah@tunasestaindonesia.com" },
     update: {},
@@ -208,7 +226,7 @@ async function main() {
   await applyDefaultRegularHours(adminStaff.id)
   console.log("Admin Staff created")
 
-  // 9. Create Teknisi (supervised by GA)
+  // 10. Create Teknisi (supervised by GA)
   const teknisi = await prisma.user.upsert({
     where: { email: "pandu@tunasestaindonesia.com" },
     update: {},
@@ -228,7 +246,7 @@ async function main() {
   await applyDefaultRegularHours(teknisi.id)
   console.log("✅ Teknisi created")
 
-  // 10. Create Driver (supervised by GA)
+  // 11. Create Driver (supervised by GA)
   const driver = await prisma.user.upsert({
     where: { email: "rico@tunasestaindonesia.com" },
     update: {},
@@ -248,7 +266,7 @@ async function main() {
   await applyDefaultRegularHours(driver.id)
   console.log("✅ Driver created")
 
-  // 11. Create Security Staff (supervised by GA)
+  // 12. Create Security Staff (supervised by GA)
   const securityStaff = [
     { email: "fina@tunasestaindonesia.com", name: "FINA OKTAVIANI", pin: "111" },
     { email: "teguh@tunasestaindonesia.com", name: "TEGUH WIYONO", pin: "198" },
@@ -290,12 +308,13 @@ async function main() {
   console.log("3. GA                : nizar@tunasestaindonesia.com")
   console.log("4. HR                : hayyu@tunasestaindonesia.com")
   console.log("5. Production Spv    : ganes@tunasestaindonesia.com")
-  console.log("6. IT Staff          : amin@tunasestaindonesia.com")
-  console.log("7. Lab Staff         : hajar@tunasestaindonesia.com")
-  console.log("8. Admin Staff       : adinda.rahma.habibah@tunasestaindonesia.com")
-  console.log("9. Teknisi           : pandu@tunasestaindonesia.com")
-  console.log("10. Driver           : rico@tunasestaindonesia.com")
-  console.log("11-16. Security      : fina, teguh, wahyu, bibit, david, joko")
+  console.log("6. Production Head   : aam@tunasestaindonesia.com")
+  console.log("7. IT Staff          : amin@tunasestaindonesia.com")
+  console.log("8. Lab Staff         : hajar@tunasestaindonesia.com")
+  console.log("9. Admin Staff       : adinda.rahma.habibah@tunasestaindonesia.com")
+  console.log("10. Teknisi           : pandu@tunasestaindonesia.com")
+  console.log("11. Driver           : rico@tunasestaindonesia.com")
+  console.log("12-17. Security      : fina, teguh, wahyu, bibit, david, joko")
   console.log("━".repeat(60))
   console.log("\n🔑 Credentials:")
   console.log("━".repeat(60))
@@ -333,3 +352,6 @@ main()
   .finally(async () => {
     await prisma.$disconnect()
   })
+
+
+

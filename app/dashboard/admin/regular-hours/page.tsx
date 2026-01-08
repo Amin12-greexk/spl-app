@@ -17,6 +17,26 @@ interface RegularHoursUser {
   regularEndTime?: string | null
 }
 
+const SECURITY_SHIFT_PRESETS = [
+  { id: "P1", label: "P1 (07:00-15:00)", start: "07:00", end: "15:00" },
+  { id: "P2", label: "P2 (11:00-19:00)", start: "11:00", end: "19:00" },
+  { id: "M1", label: "M1 (16:00-04:00)", start: "16:00", end: "04:00" },
+  { id: "M2", label: "M2 (23:00-07:00)", start: "23:00", end: "07:00" },
+]
+
+const getSecurityShiftPresetId = (
+  startValue?: string | null,
+  endValue?: string | null
+) => {
+  const start = (startValue || "").trim()
+  const end = (endValue || "").trim()
+  if (!start || !end) return "CUSTOM"
+  const matched = SECURITY_SHIFT_PRESETS.find(
+    (shift) => shift.start === start && shift.end === end
+  )
+  return matched ? matched.id : "CUSTOM"
+}
+
 export default function RegularHoursPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -178,6 +198,12 @@ export default function RegularHoursPage() {
   }
 
   const selectedUser = users.find((user) => user.id === formData.userId)
+  const selectedDepartmentName = (
+    selectedUser?.department?.name ||
+    selectedUser?.departmentName ||
+    ""
+  ).toLowerCase()
+  const isSelectedSecurity = selectedDepartmentName === "security"
 
   if (status === "loading" || session?.user?.role !== "SUPER_ADMIN") {
     return (
@@ -257,6 +283,43 @@ export default function RegularHoursPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {isSelectedSecurity && (
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Shift Security
+                </label>
+                <select
+                  value={getSecurityShiftPresetId(
+                    formData.regularStartTime,
+                    formData.regularEndTime
+                  )}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === "CUSTOM") return
+                    const matched = SECURITY_SHIFT_PRESETS.find(
+                      (shift) => shift.id === value
+                    )
+                    if (!matched) return
+                    setFormData((prev) => ({
+                      ...prev,
+                      regularStartTime: matched.start,
+                      regularEndTime: matched.end,
+                    }))
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="CUSTOM">Manual / Custom</option>
+                  {SECURITY_SHIFT_PRESETS.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Pilih shift untuk mengisi jam reguler otomatis.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Jam Mulai
