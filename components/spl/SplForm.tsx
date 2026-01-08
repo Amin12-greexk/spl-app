@@ -10,6 +10,13 @@ import SignaturePad from "@/components/spl/SignaturePad"
 import TimePicker from "@/components/ui/TimePicker"
 import Swal from "sweetalert2"
 
+const SECURITY_SHIFT_PRESETS = [
+  { id: "P1", label: "P1 (07:00-15:00)", start: "07:00", end: "15:00" },
+  { id: "P2", label: "P2 (11:00-19:00)", start: "11:00", end: "19:00" },
+  { id: "M1", label: "M1 (16:00-04:00)", start: "16:00", end: "04:00" },
+  { id: "M2", label: "M2 (23:00-07:00)", start: "23:00", end: "07:00" },
+]
+
 export default function SplForm() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -129,6 +136,24 @@ export default function SplForm() {
   })()
 
   const canEditRegularHours = isSecurityDepartment && !regularHoursLoading
+
+  const securityShiftPreset = (() => {
+    if (!isSecurityDepartment) return "CUSTOM"
+    const normalizedStart = normalizeTimeValue(regularHours?.start)
+    const normalizedEnd = normalizeTimeValue(regularHours?.end)
+    if (!normalizedStart || !normalizedEnd) return "CUSTOM"
+    const matched = SECURITY_SHIFT_PRESETS.find(
+      (shift) => shift.start === normalizedStart && shift.end === normalizedEnd
+    )
+    return matched ? matched.id : "CUSTOM"
+  })()
+
+  const handleSecurityShiftChange = (value: string) => {
+    if (value === "CUSTOM") return
+    const matched = SECURITY_SHIFT_PRESETS.find((shift) => shift.id === value)
+    if (!matched) return
+    setRegularHours({ start: matched.start, end: matched.end })
+  }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -504,6 +529,29 @@ export default function SplForm() {
                 </button>
                 {showRegularHours && (
                   <div className="p-4 bg-white border-t border-gray-200 motion-safe:animate-slide-down relative z-10">
+                    {isSecurityDepartment && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Shift Security
+                        </label>
+                        <select
+                          value={securityShiftPreset}
+                          onChange={(e) => handleSecurityShiftChange(e.target.value)}
+                          disabled={!canEditRegularHours}
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:opacity-60"
+                        >
+                          <option value="CUSTOM">Manual / Custom</option>
+                          {SECURITY_SHIFT_PRESETS.map((shift) => (
+                            <option key={shift.id} value={shift.id}>
+                              {shift.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Pilih shift untuk mengisi jam reguler otomatis.
+                        </p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
                       <div className="relative z-20">
                         <TimePicker
@@ -532,7 +580,7 @@ export default function SplForm() {
                     </div>
                     {isSecurityDepartment && (
                       <p className="mt-2 text-xs text-blue-600">
-                        <strong>Khusus Security:</strong> Jam reguler dapat diubah langsung di form ini. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 22:00 - 06:00 untuk shift malam).
+                        <strong>Khusus Security:</strong> Pilih shift P1/P2/M1/M2 atau isi manual. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 16:00 - 04:00).
                       </p>
                     )}
                     {!regularHoursLoading && !isSecurityDepartment && (!regularHours?.start || !regularHours?.end) && (

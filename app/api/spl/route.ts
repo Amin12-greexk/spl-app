@@ -173,6 +173,7 @@ export async function POST(req: NextRequest) {
         departmentId: true,
         departmentName: true,
         department: { select: { name: true } },
+        regularStartTime: true,
         regularEndTime: true,
       },
     })
@@ -218,15 +219,33 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (userRecord.regularEndTime) {
+    if (userRecord.regularStartTime && userRecord.regularEndTime) {
+      const regularStartMinutes = parseTimeToMinutes(userRecord.regularStartTime)
       const regularEndMinutes = parseTimeToMinutes(userRecord.regularEndTime)
-      if (regularEndMinutes === null) {
+      if (regularStartMinutes === null || regularEndMinutes === null) {
         return NextResponse.json(
           { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
           { status: 400 }
         )
       }
-      if (startMinutes <= regularEndMinutes) {
+      if (regularStartMinutes === regularEndMinutes) {
+        return NextResponse.json(
+          { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+
+      const isOvernightRegular = regularEndMinutes < regularStartMinutes
+      if (isOvernightRegular) {
+        const isDuringNightPortion = startMinutes >= regularStartMinutes
+        const isDuringMorningPortion = startMinutes <= regularEndMinutes
+        if (isDuringNightPortion || isDuringMorningPortion) {
+          return NextResponse.json(
+            { error: "Waktu lembur tidak boleh berada dalam jam kerja reguler" },
+            { status: 400 }
+          )
+        }
+      } else if (startMinutes <= regularEndMinutes) {
         return NextResponse.json(
           { error: "Waktu mulai lembur harus lebih besar dari jam kerja reguler" },
           { status: 400 }
