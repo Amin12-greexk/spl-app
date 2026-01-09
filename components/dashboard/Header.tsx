@@ -665,7 +665,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {session?.user?.name?.split(" ")[0]}
                     </span>
                     <span className="text-[10px] text-gray-500 font-medium">
-                      {session?.user?.role ? getRoleLabel(session.user.role) : ''}
+                      {session?.user?.role
+                        ? getRoleLabel(session.user.role, session?.user?.department)
+                        : ''}
                     </span>
                   </div>
                   <svg 
@@ -695,7 +697,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
-                            {session?.user?.role ? getRoleLabel(session.user.role) : ''}
+                            {session?.user?.role
+                              ? getRoleLabel(
+                                  session.user.role,
+                                  session?.user?.department
+                                )
+                              : ''}
                           </span>
                           {session?.user?.pin && (
                             <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">

@@ -9,7 +9,10 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Convert role code to user-friendly Indonesian label
  */
-export function getRoleLabel(role: Role | string): string {
+export function getRoleLabel(
+  role: Role | string,
+  departmentName?: string | null
+): string {
   const roleMap: Record<string, string> = {
     "STAFF": "Staff",
     "TEKNISI": "Teknisi",
@@ -19,6 +22,12 @@ export function getRoleLabel(role: Role | string): string {
     "DEPARTMENT_HEAD": "Kepala Departemen",
     "PRODUCTION_SUPERVISOR": "Pengawas Produksi",
     "SUPER_ADMIN": "Super Admin",
+  }
+
+  const normalizedDepartment =
+    typeof departmentName === "string" ? departmentName.trim().toLowerCase() : ""
+  if (role === "STAFF" && normalizedDepartment === "security") {
+    return "Security"
   }
 
   return roleMap[role] || role

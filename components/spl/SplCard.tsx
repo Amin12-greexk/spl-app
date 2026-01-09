@@ -13,7 +13,9 @@ interface SplCardProps {
   showActions?: boolean
   userRole?: string
   compact?: boolean
+  mini?: boolean
   currentUserId?: string
+  onClick?: () => void
 }
 
 function SplCard({
@@ -25,10 +27,42 @@ function SplCard({
   showActions = true,
   userRole,
   compact = false,
+  mini = false,
   currentUserId,
+  onClick,
 }: SplCardProps) {
   const requesterDepartmentName =
     spl.requester?.department?.name || spl.requester?.departmentName || "-"
+
+  const formatRealizationTime = (value?: string | Date | null) => {
+    if (!value) return "-"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "-"
+    return format(date, "HH:mm", { locale: id })
+  }
+
+  const realizationRange = () => {
+    if (spl.actualStartAt && spl.actualEndAt) {
+      return `${formatRealizationTime(spl.actualStartAt)} - ${formatRealizationTime(spl.actualEndAt)}`
+    }
+    if (spl.actualStartAt) {
+      return `${formatRealizationTime(spl.actualStartAt)} - Berjalan`
+    }
+    return null
+  }
+
+  const formatTotalHours = (value?: number | string | null) => {
+    if (value === null || value === undefined) return "-"
+    const numericValue = typeof value === "number" ? value : Number(value)
+    if (!Number.isFinite(numericValue)) return "-"
+    const totalMinutes = Math.round(numericValue * 60)
+    if (totalMinutes <= 0) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
+  }
 
   // Determine detailed status label based on supervisor and role - memoized
   const detailedStatus = useMemo(() => {
@@ -192,6 +226,77 @@ function SplCard({
     ]
   }
 
+  // Mini version - ultra-compact for grid views with many records
+  if (mini) {
+    return (
+      <div
+        onClick={onClick}
+        className="bg-white rounded-lg shadow-sm border border-gray-200 p-2.5 hover:shadow-md hover:border-green-300 transition-all cursor-pointer group"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xs font-bold text-gray-900 truncate group-hover:text-green-600 transition-colors">
+              {spl.requester.name}
+            </h3>
+            <p className="text-[10px] text-gray-500 truncate">
+              {requesterDepartmentName}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-0.5">
+            {manualBadge}
+            {getStatusBadge(spl.status, true)}
+          </div>
+        </div>
+
+        <div className="space-y-1 text-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">📅</span>
+            <span className="font-medium text-gray-900 text-[10px]">
+              {format(new Date(spl.date), "dd/MM/yy")}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">⏰</span>
+            <span className="font-medium text-gray-900 text-[10px]">
+              {spl.startTime} - {spl.endTime}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">⏱️</span>
+            <span className="font-semibold text-green-600 text-[10px]">
+              {formatTotalHours(spl.totalHours)}
+            </span>
+          </div>
+
+          {realizationRange() && (
+            <div className="pt-1 mt-1 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 text-[9px]">Realisasi:</span>
+                <span className="text-gray-900 text-[9px] font-medium">
+                  {realizationRange()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-1 mt-1 border-t border-gray-100">
+            <p className="text-gray-900 text-[10px] line-clamp-2 leading-tight">
+              {spl.reason}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-center">
+          <span className="text-[9px] text-gray-400 group-hover:text-green-600 transition-colors">
+            Klik untuk detail
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   // Compact version for HR view with many records
   if (compact) {
     return (
@@ -228,8 +333,34 @@ function SplCard({
 
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Total Jam:</span>
-            <span className="font-semibold text-green-600">{spl.totalHours} jam</span>
+            <span className="font-semibold text-green-600">
+              {formatTotalHours(spl.totalHours)}
+            </span>
           </div>
+
+          {realizationRange() && (
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100">
+              <p className="text-gray-500 text-xs mb-0.5">Realisasi:</p>
+              <p className="text-gray-900 text-xs">
+                {realizationRange()}
+                {spl.actualTotalHours ? ` (${formatTotalHours(spl.actualTotalHours)})` : ""}
+              </p>
+            </div>
+          )}
+
+          {spl.realizationNote && (
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100">
+              <p className="text-gray-500 text-xs mb-0.5">Catatan Realisasi:</p>
+              <p className="text-gray-900 text-xs line-clamp-2">{spl.realizationNote}</p>
+            </div>
+          )}
+
+          {spl.overrunReason && (
+            <div className="pt-1.5 mt-1.5 border-t border-red-100 bg-red-50 p-2 rounded">
+              <p className="text-red-700 text-xs font-semibold mb-0.5">Melebihi Rencana:</p>
+              <p className="text-red-600 text-xs line-clamp-2">{spl.overrunReason}</p>
+            </div>
+          )}
 
           {spl.projectName && (
             <div className="pt-1.5 mt-1.5 border-t border-gray-100">
@@ -245,11 +376,27 @@ function SplCard({
 
           {spl.proofImage && (
             <div className="pt-1.5 mt-1.5 border-t border-gray-100">
-              <p className="text-gray-500 text-xs mb-1">Foto Bukti:</p>
+              <p className="text-gray-500 text-xs mb-1">Foto Sebelum:</p>
               <div className="relative w-full h-20 bg-gray-100 rounded overflow-hidden">
                 <Image
                   src={spl.proofImage}
                   alt="Foto bukti lembur"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 300px"
+                  className="object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          )}
+
+          {spl.realizationProofImage && (
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100">
+              <p className="text-gray-500 text-xs mb-1">Bukti Realisasi:</p>
+              <div className="relative w-full h-20 bg-gray-100 rounded overflow-hidden">
+                <Image
+                  src={spl.realizationProofImage}
+                  alt="Foto bukti realisasi"
                   fill
                   sizes="(max-width: 768px) 100vw, 300px"
                   className="object-cover"
@@ -453,7 +600,7 @@ function SplCard({
 
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-500">⏱️ Total Jam:</span>
-          <span className="font-medium">{spl.totalHours} jam</span>
+          <span className="font-medium">{formatTotalHours(spl.totalHours)}</span>
         </div>
 
         {spl.projectName && (
@@ -467,6 +614,48 @@ function SplCard({
           <p className="text-sm text-gray-500 mb-1">Alasan:</p>
           <p className="text-sm text-gray-900">{spl.reason}</p>
         </div>
+
+        {(realizationRange() || spl.realizationNote || spl.overrunReason || spl.realizationProofImage) && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500 mb-2">Realisasi:</p>
+            {realizationRange() && (
+              <p className="text-sm text-gray-900">
+                {realizationRange()}
+                {spl.actualTotalHours ? ` (${formatTotalHours(spl.actualTotalHours)})` : ""}
+              </p>
+            )}
+            {spl.realizationNote && (
+              <p className="mt-2 text-sm text-gray-900">
+                <span className="text-gray-500">Catatan:</span> {spl.realizationNote}
+              </p>
+            )}
+            {spl.overrunReason && (
+              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2">
+                <p className="text-sm text-red-700 font-semibold mb-1">
+                  Melebihi Rencana:
+                </p>
+                <p className="text-sm text-red-600">{spl.overrunReason}</p>
+              </div>
+            )}
+            {spl.realizationProofImage && (
+              <div className="mt-3">
+                <p className="text-sm text-gray-500 mb-2">Foto Bukti Realisasi:</p>
+                <div className="bg-gray-50 border rounded-lg p-2">
+                  <div className="relative w-full h-48">
+                    <Image
+                      src={spl.realizationProofImage}
+                      alt="Foto bukti realisasi lembur"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {spl.proofImage && (
           <div className="mt-3 pt-3 border-t border-gray-100">

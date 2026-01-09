@@ -65,6 +65,12 @@ model Spl {
   signature   String? // Tanda tangan pemohon
   projectName String?
   proofImage  String? // Foto bukti pengerjaan lembur
+  actualStartAt DateTime?
+  actualEndAt   DateTime?
+  actualTotalHours Float?
+  realizationNote String?
+  realizationProofImage String?
+  overrunReason String?
 
   // Status: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED, REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
   status String @default("PENDING_SUPERVISOR")

@@ -179,7 +179,9 @@ export default function ProfilePage() {
                 Role
               </label>
               <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-900">{getRoleLabel(profile.role)}</p>
+                <p className="text-gray-900">
+                  {getRoleLabel(profile.role, departmentLabel)}
+                </p>
               </div>
             </div>
             <div>
