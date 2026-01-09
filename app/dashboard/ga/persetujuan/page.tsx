@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import Modal from "@/components/ui/Modal"
+import SplCard from "@/components/spl/SplCard"
+import SplDetailModal from "@/components/spl/SplDetailModal"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
 import { format } from "date-fns"
@@ -23,6 +25,30 @@ export default function GAApprovalPage() {
   const [rejectionReason, setRejectionReason] = useState("")
   const [signatureRef, setSignatureRef] = useState<SignatureCanvas | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [previewTitle, setPreviewTitle] = useState("")
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
+
+  const formatRealizationTime = (value?: string | Date | null) => {
+    if (!value) return "-"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "-"
+    return format(date, "HH:mm", { locale: id })
+  }
+
+  const formatTotalHours = (value?: number | string | null) => {
+    if (value === null || value === undefined) return "-"
+    const numericValue = typeof value === "number" ? value : Number(value)
+    if (!Number.isFinite(numericValue)) return "-"
+    const totalMinutes = Math.round(numericValue * 60)
+    if (totalMinutes <= 0) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
+  }
 
   // Check authorization
   useEffect(() => {
@@ -65,6 +91,27 @@ export default function GAApprovalPage() {
     setSelectedSpl(spl)
     setRejectionReason("")
     setShowRejectModal(true)
+  }
+
+  const handleOpenDetail = (spl: Spl) => {
+    setDetailSpl(spl)
+    setShowDetailModal(true)
+  }
+
+  const handleCloseDetail = () => {
+    setShowDetailModal(false)
+    setDetailSpl(null)
+  }
+
+  const openPreview = (src?: string | null, title = "") => {
+    if (!src) return
+    setPreviewImage(src)
+    setPreviewTitle(title)
+  }
+
+  const closePreview = () => {
+    setPreviewImage(null)
+    setPreviewTitle("")
   }
 
   const submitApproval = async () => {
@@ -179,82 +226,31 @@ export default function GAApprovalPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {spls.map((spl) => (
-            <div key={spl.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{spl.requester.name}</h3>
-                  <p className="text-sm text-gray-500">PIN: {spl.requester.pin || "-"}</p>
-                  <p className="text-xs text-gray-500">
-                    {spl.requester.department?.name || spl.requester.departmentName || "-"}
-                  </p>
-                </div>
-                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
-                  Menunggu
-                </span>
+            <div key={spl.id} className="flex flex-col gap-2">
+              {/* Compact SPL Card - Click to view detail */}
+              <div onClick={() => handleOpenDetail(spl)}>
+                <SplCard
+                  spl={spl}
+                  userRole={session?.user.role}
+                  showActions={false}
+                  mini={true}
+                />
               </div>
 
-              {/* Details */}
-              <div className="space-y-2 mb-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tanggal:</span>
-                  <span className="font-medium text-gray-900">
-                    {format(new Date(spl.date), "dd MMMM yyyy", { locale: id })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Waktu:</span>
-                  <span className="font-medium text-gray-900">
-                    {spl.startTime} - {spl.endTime}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Jam:</span>
-                  <span className="font-semibold text-green-600">{spl.totalHours} jam</span>
-                </div>
-                {spl.projectName && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-gray-600 mb-1">Proyek:</p>
-                    <p className="font-medium text-gray-900">{spl.projectName}</p>
-                  </div>
-                )}
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-gray-600 mb-1">Alasan:</p>
-                  <p className="text-gray-900">{spl.reason}</p>
-                </div>
-                {spl.proofImage && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-gray-600 mb-2">Foto Bukti Pengerjaan:</p>
-                    <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
-                      <Image
-                        src={spl.proofImage}
-                        alt="Foto bukti pengerjaan"
-                        fill
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        className="object-contain cursor-pointer hover:scale-105 transition-transform"
-                        unoptimized
-                        onClick={() => window.open(spl.proofImage!, '_blank')}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Klik foto untuk melihat ukuran penuh</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-100">
+              {/* Action Buttons - Always visible for approval */}
+              <div className="flex gap-2">
                 <Button
                   onClick={() => handleApprove(spl)}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2"
                 >
                   ✓ Setujui
                 </Button>
                 <Button
                   onClick={() => handleReject(spl)}
                   variant="outline"
-                  className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
+                  className="flex-1 border-red-600 text-red-600 hover:bg-red-50 text-xs py-2"
                 >
                   ✗ Tolak
                 </Button>
@@ -262,6 +258,32 @@ export default function GAApprovalPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {previewImage && (
+        <Modal
+          isOpen={Boolean(previewImage)}
+          onClose={closePreview}
+          title={previewTitle || "Preview Foto"}
+        >
+          <div className="space-y-3">
+            <div className="relative w-full h-80 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+              <Image
+                src={previewImage}
+                alt={previewTitle || "Preview foto"}
+                fill
+                sizes="(max-width: 768px) 100vw, 700px"
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={closePreview}>
+                Tutup
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Approve Modal */}
@@ -298,7 +320,7 @@ export default function GAApprovalPage() {
                     sizes="(max-width: 768px) 100vw, 600px"
                     className="object-contain cursor-pointer"
                     unoptimized
-                    onClick={() => window.open(selectedSpl.proofImage!, '_blank')}
+                    onClick={() => openPreview(selectedSpl.proofImage, "Foto bukti pengerjaan")}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1 text-center">Klik untuk melihat ukuran penuh</p>
@@ -408,6 +430,13 @@ export default function GAApprovalPage() {
           </div>
         </Modal>
       )}
+
+      {/* Detail Modal - Untuk melihat informasi lengkap SPL */}
+      <SplDetailModal
+        spl={detailSpl}
+        isOpen={showDetailModal}
+        onClose={handleCloseDetail}
+      />
     </div>
   )
 }

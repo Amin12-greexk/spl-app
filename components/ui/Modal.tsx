@@ -9,6 +9,7 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   footer?: React.ReactNode
+  size?: "small" | "medium" | "large" | "xlarge"
 }
 
 export default function Modal({
@@ -17,6 +18,7 @@ export default function Modal({
   title,
   children,
   footer,
+  size = "medium",
 }: ModalProps) {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -38,6 +40,13 @@ export default function Modal({
 
   if (!isOpen) return null
 
+  const sizeClasses = {
+    small: "sm:max-w-md",
+    medium: "sm:max-w-lg",
+    large: "sm:max-w-2xl",
+    xlarge: "sm:max-w-4xl",
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
@@ -48,7 +57,7 @@ export default function Modal({
         />
 
         {/* Modal */}
-        <div className="relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-md sm:max-w-lg p-4 sm:p-6 z-10 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in">
+        <div className={`relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full ${sizeClasses[size]} p-4 sm:p-6 z-10 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in`}>
           {/* Header */}
           <div className="flex items-center justify-between mb-4 sticky top-0 bg-white pb-3 border-b sm:border-0">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">

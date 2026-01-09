@@ -66,6 +66,12 @@ export interface Spl {
   signature?: string | null
   projectName?: string | null
   proofImage?: string | null
+  actualStartAt?: Date | string | null
+  actualEndAt?: Date | string | null
+  actualTotalHours?: number | null
+  realizationNote?: string | null
+  realizationProofImage?: string | null
+  overrunReason?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
   isManualEntry?: boolean
   requesterSignedAt?: Date | null

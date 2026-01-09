@@ -495,7 +495,7 @@ export default function RegisterForm() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Email harus valid dan belum terdaftar
+                  
                 </li>
               </ul>
             </div>

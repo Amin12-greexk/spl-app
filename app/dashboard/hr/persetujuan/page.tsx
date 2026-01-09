@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
+import SplDetailModal from "@/components/spl/SplDetailModal"
 import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
@@ -18,6 +19,8 @@ export default function PersetujuanPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -126,6 +129,16 @@ export default function PersetujuanPage() {
     }
   }
 
+  const handleOpenDetail = (spl: Spl) => {
+    setDetailSpl(spl)
+    setShowDetailModal(true)
+  }
+
+  const handleCloseDetail = () => {
+    setShowDetailModal(false)
+    setDetailSpl(null)
+  }
+
   // Calculate pagination
   const totalPages = Math.ceil(spls.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -196,14 +209,34 @@ export default function PersetujuanPage() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {currentSpls.map((spl) => (
-              <SplCard
-                key={spl.id}
-                spl={spl}
-                userRole={session?.user?.role}
-                onApprove={handleApprove}
-                onReject={handleRejectClick}
-                compact={true}
-              />
+              <div key={spl.id} className="flex flex-col gap-2">
+                {/* Compact SPL Card - Click to view detail */}
+                <div onClick={() => handleOpenDetail(spl)}>
+                  <SplCard
+                    spl={spl}
+                    userRole={session?.user?.role}
+                    showActions={false}
+                    mini={true}
+                  />
+                </div>
+
+                {/* Action Buttons - Always visible for approval */}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleApprove(spl.id)}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2"
+                  >
+                    ✓ Setujui
+                  </Button>
+                  <Button
+                    onClick={() => handleRejectClick(spl.id)}
+                    variant="outline"
+                    className="flex-1 border-red-600 text-red-600 hover:bg-red-50 text-xs py-2"
+                  >
+                    ✗ Tolak
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -337,6 +370,13 @@ export default function PersetujuanPage() {
           />
         </div>
       </Modal>
+
+      {/* Detail Modal - Untuk melihat informasi lengkap SPL sebelum menyetujui/menolak */}
+      <SplDetailModal
+        spl={detailSpl}
+        isOpen={showDetailModal}
+        onClose={handleCloseDetail}
+      />
     </div>
   )
 }

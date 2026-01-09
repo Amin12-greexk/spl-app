@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
+import SplDetailModal from "@/components/spl/SplDetailModal"
 import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
@@ -22,6 +23,8 @@ export default function HRViewPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(15)
+  const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const fetchSpls = async () => {
     setIsLoading(true)
@@ -38,6 +41,16 @@ export default function HRViewPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleOpenDetail = (spl: Spl) => {
+    setSelectedSpl(spl)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedSpl(null)
   }
 
   useEffect(() => {
@@ -1015,11 +1028,19 @@ export default function HRViewPage() {
               spl={spl}
               userRole="HR"
               showActions={false}
-              compact={true}
+              mini={true}
+              onClick={() => handleOpenDetail(spl)}
             />
           ))}
         </div>
       )}
+
+      {/* Detail Modal */}
+      <SplDetailModal
+        spl={selectedSpl}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </div>
   )
 }

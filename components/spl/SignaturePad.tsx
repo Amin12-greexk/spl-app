@@ -126,7 +126,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-700">Tanda Tangan Staff</p>
+        <p className="text-sm font-medium text-gray-700">Tanda Tangan</p>
         <button
           type="button"
           onClick={clear}

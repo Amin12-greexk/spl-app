@@ -25,7 +25,7 @@ export default function StaffPage() {
         </Link>
       </div>
 
-      <SplList userRole="STAFF" showFilters={true} />
+      <SplList userRole="STAFF" />
     </div>
   )
 }

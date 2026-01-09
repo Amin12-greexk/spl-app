@@ -276,6 +276,7 @@ async function main() {
     { email: "joko@tunasestaindonesia.com", name: "JOKO BUDIONO", pin: "170" },
   ]
 
+  const securityUsers: Array<{ id: string; name: string }> = []
   for (const staff of securityStaff) {
     const securityUser = await prisma.user.upsert({
       where: { email: staff.email },
@@ -294,8 +295,173 @@ async function main() {
       },
     })
     await applyDefaultRegularHours(securityUser.id)
+    securityUsers.push({ id: securityUser.id, name: securityUser.name })
   }
   console.log("✅ Security Staff created (6 users)")
+
+  // Sample SPL cases for testing realization flow
+  const sampleImage =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/woAAgEB/6X6eQAAAABJRU5ErkJggg=="
+  const sampleSignature = sampleImage
+  const now = new Date()
+  const addMinutes = (base: Date, minutes: number) =>
+    new Date(base.getTime() + minutes * 60000)
+  const formatTime = (value: Date) => value.toTimeString().slice(0, 5)
+  const toDateOnly = (value: Date) => {
+    const date = new Date(value)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+  const buildPlan = (startAt: Date, plannedMinutes: number) => {
+    const endAt = addMinutes(startAt, plannedMinutes)
+    return {
+      date: toDateOnly(startAt),
+      startTime: formatTime(startAt),
+      endTime: formatTime(endAt),
+      totalHours: parseFloat((plannedMinutes / 60).toFixed(2)),
+    }
+  }
+  const calcActualHours = (startAt: Date, endAt: Date) => {
+    const diffMs = endAt.getTime() - startAt.getTime()
+    if (diffMs <= 0) return null
+    return parseFloat((diffMs / 3600000).toFixed(2))
+  }
+
+  const sampleSpls: any[] = []
+
+  const pendingGaUser = securityUsers[0]
+  const runningGaUser = securityUsers[1]
+
+  if (pendingGaUser) {
+    const startAt = addMinutes(now, -90)
+    const plan = buildPlan(startAt, 60)
+    sampleSpls.push({
+      requesterId: pendingGaUser.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Menunggu persetujuan GA",
+      signature: sampleSignature,
+      projectName: "Sample GA Pending",
+      proofImage: sampleImage,
+      status: "PENDING_SUPERVISOR",
+      supervisorId: ga.id,
+    })
+  }
+
+  if (runningGaUser) {
+    const startAt = addMinutes(now, -120)
+    const plan = buildPlan(startAt, 60)
+    sampleSpls.push({
+      requesterId: runningGaUser.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Realisasi berjalan (GA supervised)",
+      signature: sampleSignature,
+      proofImage: sampleImage,
+      status: "PENDING_MANAGER",
+      supervisorId: ga.id,
+      supervisorApprovalDate: addMinutes(startAt, -10),
+      supervisorSignature: sampleSignature,
+      actualStartAt: startAt,
+    })
+  }
+
+  {
+    const startAt = addMinutes(now, -30)
+    const plan = buildPlan(startAt, 90)
+    sampleSpls.push({
+      requesterId: adminStaff.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Non-GA pending, bisa mulai",
+      signature: sampleSignature,
+      status: "PENDING_MANAGER",
+    })
+  }
+
+  {
+    const startAt = addMinutes(now, -240)
+    const endAt = addMinutes(now, -90)
+    const plan = buildPlan(startAt, 90)
+    sampleSpls.push({
+      requesterId: driver.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Overrun GA supervised",
+      signature: sampleSignature,
+      proofImage: sampleImage,
+      status: "APPROVED",
+      supervisorId: ga.id,
+      supervisorApprovalDate: addMinutes(startAt, -20),
+      supervisorSignature: sampleSignature,
+      approverId: manager.id,
+      approvalDate: addMinutes(endAt, 5),
+      actualStartAt: startAt,
+      actualEndAt: endAt,
+      actualTotalHours: calcActualHours(startAt, endAt),
+      realizationNote: "SAMPLE: Tertunda hujan, selesai lebih lama.",
+      realizationProofImage: sampleImage,
+      overrunReason: "SAMPLE: Hujan deras menghambat pekerjaan.",
+    })
+  }
+
+  {
+    const startAt = addMinutes(now, -200)
+    const endAt = addMinutes(now, -140)
+    const plan = buildPlan(startAt, 60)
+    sampleSpls.push({
+      requesterId: itStaff.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Ditolak manager tapi realisasi tercatat",
+      signature: sampleSignature,
+      status: "REJECTED_BY_MANAGER",
+      approverId: manager.id,
+      approvalDate: addMinutes(endAt, 5),
+      rejectionReason: "SAMPLE: Tidak sesuai kebutuhan.",
+      actualStartAt: startAt,
+      actualEndAt: endAt,
+      actualTotalHours: calcActualHours(startAt, endAt),
+      realizationNote: "SAMPLE: Pekerjaan sudah dikerjakan sebagian.",
+    })
+  }
+
+  {
+    const startAt = addMinutes(now, -160)
+    const endAt = addMinutes(now, -100)
+    const plan = buildPlan(startAt, 60)
+    sampleSpls.push({
+      requesterId: labStaff.id,
+      date: plan.date,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      totalHours: plan.totalHours,
+      reason: "SAMPLE: Realisasi sesuai rencana",
+      signature: sampleSignature,
+      status: "APPROVED",
+      approverId: manager.id,
+      approvalDate: addMinutes(endAt, 5),
+      actualStartAt: startAt,
+      actualEndAt: endAt,
+      actualTotalHours: calcActualHours(startAt, endAt),
+      realizationNote: "SAMPLE: Selesai sesuai jadwal.",
+    })
+  }
+
+  for (const sample of sampleSpls) {
+    await prisma.spl.create({ data: sample })
+  }
+  console.log("Sample SPL cases created")
 
   // Summary
   console.log("\n" + "=".repeat(60))

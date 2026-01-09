@@ -185,8 +185,24 @@ export async function POST(req: NextRequest) {
     const currentDepartmentName =
       userRecord.department?.name || userRecord.departmentName || null
 
-    // Security tidak memiliki batasan waktu karena berbeda-beda shift
-    const isSecurityDepartment = (currentDepartmentName || "").toLowerCase() === "security"
+    const departmentKey = (currentDepartmentName || "").toLowerCase()
+    const isSecurityDepartment = departmentKey === "security"
+    const isGaSupervisedDepartment = ["security", "teknik", "driver"].includes(
+      departmentKey
+    )
+
+    if (isGaSupervisedDepartment) {
+      if (
+        !body.proofImage ||
+        typeof body.proofImage !== "string" ||
+        body.proofImage.trim().length < 30
+      ) {
+        return NextResponse.json(
+          { error: "Foto bukti wajib diunggah untuk departemen ini" },
+          { status: 400 }
+        )
+      }
+    }
 
     // Validasi waktu pengajuan (tidak berlaku untuk Security)
     if (!isSecurityDepartment) {

@@ -62,7 +62,6 @@ export default function GARiwayatPage() {
 
       <SplList
         userRole={session.user.role}
-        showFilters={true}
         userId={session.user.role === "HR" ? session.user.id : undefined}
       />
     </div>

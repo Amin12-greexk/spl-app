@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
+import SplDetailModal from "@/components/spl/SplDetailModal"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
@@ -21,6 +22,8 @@ export default function GADashboardPage() {
   const [customEndDate, setCustomEndDate] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(15)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
 
   // Check authorization
   useEffect(() => {
@@ -124,6 +127,16 @@ export default function GADashboardPage() {
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value)
     setCurrentPage(1)
+  }
+
+  const handleOpenDetail = (spl: Spl) => {
+    setDetailSpl(spl)
+    setShowDetailModal(true)
+  }
+
+  const handleCloseDetail = () => {
+    setShowDetailModal(false)
+    setDetailSpl(null)
   }
 
   const getStats = () => {
@@ -414,11 +427,19 @@ export default function GADashboardPage() {
               spl={spl}
               userRole={session?.user.role}
               showActions={false}
-              compact={true}
+              mini={true}
+              onClick={() => handleOpenDetail(spl)}
             />
           ))}
         </div>
       )}
+
+      {/* Detail Modal - Untuk melihat informasi lengkap SPL tim */}
+      <SplDetailModal
+        spl={detailSpl}
+        isOpen={showDetailModal}
+        onClose={handleCloseDetail}
+      />
     </div>
   )
 }

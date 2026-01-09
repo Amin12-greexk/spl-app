@@ -1,13 +1,15 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useEffect, useState } from "react"
-import StatsCard from "@/components/dashboard/StatsCard"
+import { ChangeEvent, useCallback, useEffect, useState } from "react"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
+import { getRoleLabel } from "@/lib/utils"
 import { Spl, Role } from "@/types"
 import Swal from "sweetalert2"
 import Link from "next/link" // <-- TAMBAHAN: Import Link
 import TimePicker from "@/components/ui/TimePicker"
+import Modal from "@/components/ui/Modal"
+import Image from "next/image"
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
@@ -15,6 +17,8 @@ const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "PRODUCTION_SUPERVISOR",
   "HR",
 ]
+const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
+const REJECTED_STATUSES = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -25,7 +29,6 @@ export default function DashboardPage() {
     rejected: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [recentSpls, setRecentSpls] = useState<Spl[]>([])
   const [userSpls, setUserSpls] = useState<Spl[]>([])
   const [minOvertime, setMinOvertime] = useState("16:30")
   const [isSavingMin, setIsSavingMin] = useState(false)
@@ -34,13 +37,25 @@ export default function DashboardPage() {
   const [supervisorName, setSupervisorName] = useState<string | null>(null)
   const [supervisorLabel, setSupervisorLabel] = useState<string | null>(null)
   const [hasSupervisor, setHasSupervisor] = useState<boolean | null>(null)
+  const [isStartingId, setIsStartingId] = useState<string | null>(null)
+  const [isFinishing, setIsFinishing] = useState(false)
+  const [showFinishModal, setShowFinishModal] = useState(false)
+  const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
+  const [realizationNote, setRealizationNote] = useState("")
+  const [realizationProofImage, setRealizationProofImage] = useState("")
+  const [realizationProofPreview, setRealizationProofPreview] = useState<string | null>(null)
+  const [overrunReason, setOverrunReason] = useState("")
 
-  useEffect(() => {
-    if (!session) {
-      return
-    }
+  const refreshSpls = useCallback(
+    async (showLoading = false) => {
+      if (!session) {
+        return
+      }
 
-    const fetchData = async () => {
+      if (showLoading) {
+        setIsLoading(true)
+      }
+
       try {
         const response = await fetch("/api/spl")
         if (!response.ok) {
@@ -64,46 +79,6 @@ export default function DashboardPage() {
         })
         setUserSpls(ownSpls)
 
-        // Get current week range (Monday - Saturday)
-        // Reset on Sunday (no activity shown)
-        const now = new Date()
-        const currentDay = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-
-        // Start of week (Monday 00:00:00)
-        const startOfWeek = new Date(now)
-        if (currentDay === 0) {
-          // If Sunday, show no activities (reset day)
-          startOfWeek.setDate(now.getDate() + 1) // Set to next Monday (future)
-        } else {
-          // Otherwise, go back to Monday of this week
-          const daysFromMonday = currentDay - 1 // Monday = 0 days back, Tuesday = 1 day back, etc.
-          startOfWeek.setDate(now.getDate() - daysFromMonday)
-        }
-        startOfWeek.setHours(0, 0, 0, 0)
-
-        // End of week (Saturday 23:59:59)
-        const endOfWeek = new Date(startOfWeek)
-        if (currentDay === 0) {
-          // If Sunday, set end before start (no results)
-          endOfWeek.setDate(startOfWeek.getDate() - 1)
-        } else {
-          // Otherwise, set to Saturday of this week
-          endOfWeek.setDate(startOfWeek.getDate() + 5) // Monday + 5 days = Saturday
-        }
-        endOfWeek.setHours(23, 59, 59, 999)
-
-        // Filter SPL for current week only, per user, and get 3 most recent
-        const recent = ownSpls
-          .filter((spl) => {
-            const splDate = new Date(spl.createdAt)
-            return splDate >= startOfWeek && splDate <= endOfWeek
-          })
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-          .slice(0, 3)
-        setRecentSpls(recent)
       } catch (error: any) {
         await Swal.fire({
           icon: "error",
@@ -111,11 +86,20 @@ export default function DashboardPage() {
           text: error.message || "Terjadi kesalahan",
         })
       } finally {
-        setIsLoading(false)
+        if (showLoading) {
+          setIsLoading(false)
+        }
       }
+    },
+    [session]
+  )
+
+  useEffect(() => {
+    if (!session) {
+      return
     }
 
-    fetchData()
+    refreshSpls(true)
     if (session.user.role !== "MANAGER") {
       const visibleManagerName = (value: unknown) =>
         typeof value === "string" && value.trim().length > 0
@@ -137,7 +121,7 @@ export default function DashboardPage() {
 
       fetchManager()
     }
-  }, [session])
+  }, [session, refreshSpls])
 
   useEffect(() => {
     if (!session || session.user.role === "MANAGER") {
@@ -235,7 +219,7 @@ export default function DashboardPage() {
     historyStartIndex,
     historyStartIndex + historyItemsPerPage
   )
-  const showHistoryTable = userRole !== "MANAGER"
+  const showHistoryTable = true
   const showManagerWidgets = userRole === "MANAGER"
 
   const getLeaderName = (spl: Spl) => {
@@ -266,6 +250,266 @@ export default function DashboardPage() {
       return `${start} - ${end}`
     }
     return "-"
+  }
+
+  const getDepartmentKey = (spl: Spl) => {
+    const departmentName =
+      spl.requester?.department?.name ||
+      spl.requester?.departmentName ||
+      session?.user?.department ||
+      ""
+    return departmentName.toLowerCase()
+  }
+
+  const isGaSupervisedDepartment = (spl: Spl) =>
+    GA_SUPERVISED_DEPARTMENTS.has(getDepartmentKey(spl))
+
+  const formatTimeValue = (value?: Date | string | null) => {
+    if (!value) return "-"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "-"
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getActualRangeLabel = (spl: Spl) => {
+    if (spl.actualStartAt && spl.actualEndAt) {
+      return `${formatTimeValue(spl.actualStartAt)} - ${formatTimeValue(spl.actualEndAt)}`
+    }
+    if (spl.actualStartAt) {
+      return `${formatTimeValue(spl.actualStartAt)} - Berjalan`
+    }
+    return "Belum mulai"
+  }
+
+  const parseTimeToMinutes = (value: string) => {
+    if (typeof value !== "string") return null
+    const trimmed = value.trim()
+    if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
+    const [hour, minute] = trimmed.split(":").map(Number)
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minute) ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      return null
+    }
+    return hour * 60 + minute
+  }
+
+  const getPlannedMinutes = (spl: Spl) => {
+    const startMinutes = parseTimeToMinutes(spl.startTime)
+    const endMinutes = parseTimeToMinutes(spl.endTime)
+    if (startMinutes === null || endMinutes === null) return null
+    let total = endMinutes - startMinutes
+    if (total < 0) {
+      total += 24 * 60
+    }
+    return total > 0 ? total : null
+  }
+
+  const getActualMinutes = (spl: Spl, endAt = new Date()) => {
+    if (!spl.actualStartAt) return null
+    const startAt = new Date(spl.actualStartAt)
+    if (Number.isNaN(startAt.getTime())) return null
+    const diffMs = endAt.getTime() - startAt.getTime()
+    if (diffMs <= 0) return 0
+    return Math.round(diffMs / 60000)
+  }
+
+  const getPlannedStartDate = (spl: Spl) => {
+    const startMinutes = parseTimeToMinutes(spl.startTime)
+    if (startMinutes === null) return null
+    const planned = new Date(spl.date)
+    if (Number.isNaN(planned.getTime())) return null
+    planned.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
+    return planned
+  }
+
+  const isBeforePlannedStart = (spl: Spl) => {
+    const plannedStart = getPlannedStartDate(spl)
+    if (!plannedStart) return false
+    return new Date() < plannedStart
+  }
+
+  const getOverrunMinutes = (spl: Spl, endAt = new Date()) => {
+    const planned = getPlannedMinutes(spl)
+    const actual = getActualMinutes(spl, endAt)
+    if (planned === null || actual === null) return null
+    const diff = actual - planned
+    return diff > 0 ? diff : 0
+  }
+
+  const canStartSpl = (spl: Spl) => {
+    const requesterId = spl.requesterId || spl.requester?.id
+    if (requesterId !== session?.user?.id) return false
+    if (spl.actualStartAt || spl.actualEndAt) return false
+    if (REJECTED_STATUSES.includes(spl.status)) return false
+    if (isBeforePlannedStart(spl)) return false
+    if (
+      isGaSupervisedDepartment(spl) &&
+      ["PENDING_SUPERVISOR", "PENDING"].includes(spl.status)
+    ) {
+      return false
+    }
+    return true
+  }
+
+  const canFinishSpl = (spl: Spl) => {
+    const requesterId = spl.requesterId || spl.requester?.id
+    if (requesterId !== session?.user?.id) return false
+    if (!spl.actualStartAt || spl.actualEndAt) return false
+    return true
+  }
+
+  const isGaStartBlocked = (spl: Spl) => {
+    if (!isGaSupervisedDepartment(spl)) return false
+    if (spl.actualStartAt || spl.actualEndAt) return false
+    if (REJECTED_STATUSES.includes(spl.status)) return false
+    return ["PENDING_SUPERVISOR", "PENDING"].includes(spl.status)
+  }
+
+  const handleStartRealization = async (spl: Spl) => {
+    if (!canStartSpl(spl)) return
+    setIsStartingId(spl.id)
+    try {
+      const response = await fetch(`/api/spl/${spl.id}/realization/start`, {
+        method: "POST",
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal memulai realisasi")
+      }
+      await Swal.fire({
+        icon: "success",
+        title: "Realisasi dimulai",
+        text: `Jam mulai tercatat ${formatTimeValue(new Date())}.`,
+      })
+      await refreshSpls()
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal memulai",
+        text: error.message || "Terjadi kesalahan",
+      })
+    } finally {
+      setIsStartingId(null)
+    }
+  }
+
+  const openFinishModal = (spl: Spl) => {
+    setSelectedSpl(spl)
+    setRealizationNote("")
+    setRealizationProofImage("")
+    setRealizationProofPreview(null)
+    setOverrunReason("")
+    setShowFinishModal(true)
+  }
+
+  const handleFinishProofUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      await Swal.fire({
+        icon: "error",
+        title: "File Tidak Valid",
+        text: "Harap upload file gambar (JPG, PNG, atau JPEG)",
+      })
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      await Swal.fire({
+        icon: "error",
+        title: "Ukuran File Terlalu Besar",
+        text: "Ukuran file maksimal 5MB",
+      })
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setRealizationProofImage(base64String)
+      setRealizationProofPreview(base64String)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveFinishProof = () => {
+    setRealizationProofImage("")
+    setRealizationProofPreview(null)
+  }
+
+  const handleFinishRealization = async () => {
+    if (!selectedSpl) return
+
+    if (!realizationNote.trim()) {
+      await Swal.fire({
+        icon: "error",
+        title: "Catatan wajib diisi",
+        text: "Silakan isi catatan hasil lembur.",
+      })
+      return
+    }
+
+    if (isGaSupervisedDepartment(selectedSpl) && realizationProofImage.length < 30) {
+      await Swal.fire({
+        icon: "error",
+        title: "Foto bukti wajib",
+        text: "Departemen ini mewajibkan foto bukti realisasi.",
+      })
+      return
+    }
+
+    const overrunMinutes = getOverrunMinutes(selectedSpl, new Date())
+    if (overrunMinutes && overrunMinutes > 0 && !overrunReason.trim()) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Alasan melebihi rencana",
+        text: "Isi alasan karena realisasi melebihi jam rencana.",
+      })
+      return
+    }
+
+    setIsFinishing(true)
+    try {
+      const response = await fetch(`/api/spl/${selectedSpl.id}/realization/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          note: realizationNote.trim(),
+          proofImage: realizationProofImage || null,
+          overrunReason: overrunReason.trim() || null,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal menyimpan realisasi")
+      }
+      await Swal.fire({
+        icon: "success",
+        title: "Realisasi tersimpan",
+        text: "Catatan realisasi lembur berhasil disimpan.",
+      })
+      setShowFinishModal(false)
+      setSelectedSpl(null)
+      await refreshSpls()
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal menyimpan",
+        text: error.message || "Terjadi kesalahan",
+      })
+    } finally {
+      setIsFinishing(false)
+    }
   }
 
   if (isLoading) {
@@ -344,20 +588,6 @@ export default function DashboardPage() {
     }
   }
 
-  const getStatsSubtitle = () => {
-    switch (userRole) {
-      case "STAFF":
-      case "TEKNISI":
-        return "Total pengajuan Anda"
-      case "HR":
-        return "Semua pengajuan di sistem"
-      case "MANAGER":
-        return "Pengajuan yang perlu direview"
-      default:
-        return "Total di sistem"
-    }
-  }
-
   const getHeaderIcon = () => {
     switch (userRole) {
       case "HR":
@@ -417,6 +647,9 @@ export default function DashboardPage() {
     }
   }
 
+  const selectedActualMinutes = selectedSpl ? getActualMinutes(selectedSpl, new Date()) : null
+  const selectedOverrunMinutes = selectedSpl ? getOverrunMinutes(selectedSpl, new Date()) : null
+
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
       {/* Enhanced Header Section */}
@@ -463,21 +696,9 @@ export default function DashboardPage() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  {userRole === "STAFF"
-                    ? "Staff"
-                    : userRole === "TEKNISI"
-                    ? "Teknisi"
-                    : userRole === "HR"
-                    ? "Human Resources"
-                    : userRole === "MANAGER"
-                    ? "Manager"
-                    : userRole === "GA"
-                    ? "General Affair"
-                    : userRole === "DEPARTMENT_HEAD"
-                    ? "Kepala Departemen"
-                    : userRole === "PRODUCTION_SUPERVISOR"
-                    ? "Pengawas Produksi"
-                    : userRole}
+                  {userRole
+                    ? getRoleLabel(userRole, session?.user?.department)
+                    : ""}
                 </span>
                 {session?.user?.department && (
                   <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm">
@@ -509,42 +730,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <StatsCard
-          title="Total SPL"
-          value={stats.total}
-          icon="📊"
-          color="blue"
-          subtitle={getStatsSubtitle()}
-        />
-        <StatsCard
-          title="Menunggu"
-          value={stats.pending}
-          icon="⏳"
-          color="yellow"
-          subtitle="Belum diproses"
-        />
-        <StatsCard
-          title="Disetujui"
-          value={stats.approved}
-          icon="✅"
-          color="green"
-          subtitle="SPL approved"
-        />
-        <StatsCard
-          title="Ditolak"
-          value={stats.rejected}
-          icon="❌"
-          color="red"
-          subtitle="SPL rejected"
-        />
-      </div>
-
       {/* Enhanced Two Column Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div
+        className={
+          showManagerWidgets
+            ? "grid grid-cols-1 xl:grid-cols-3 gap-6"
+            : "grid grid-cols-1 gap-6"
+        }
+      >
         {/* Left Column - Actions & Profile */}
-        <div className="xl:col-span-2 space-y-6">
+        <div className={showManagerWidgets ? "xl:col-span-2 space-y-6" : "space-y-6"}>
           {showHistoryTable && (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -587,10 +782,19 @@ export default function DashboardPage() {
                         Jam Reguler
                       </th>
                       <th className="px-4 py-3 text-left font-semibold">
+                        Jam Lembur (Rencana)
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold">
+                        Jam Realisasi
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold">
                         Alasan Lembur
                       </th>
                       <th className="px-4 py-3 text-left font-semibold">
                         Status
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold">
+                        Aksi
                       </th>
                     </tr>
                   </thead>
@@ -599,7 +803,7 @@ export default function DashboardPage() {
                       <tr>
                         <td
                           className="px-4 py-6 text-center text-gray-500"
-                          colSpan={5}
+                          colSpan={8}
                         >
                           Belum ada riwayat lembur
                         </td>
@@ -616,6 +820,12 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-gray-700">
                             {getRegularHoursLabel(spl)}
                           </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {spl.startTime} - {spl.endTime}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {getActualRangeLabel(spl)}
+                          </td>
                           <td
                             className="px-4 py-3 text-gray-700 max-w-xs truncate"
                             title={spl.reason}
@@ -624,6 +834,41 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-3">
                             {getStatusBadge(spl.status)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {canStartSpl(spl) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartRealization(spl)}
+                                  disabled={isStartingId === spl.id}
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
+                                >
+                                  {isStartingId === spl.id ? "Memulai..." : "Mulai"}
+                                </button>
+                              )}
+                              {!canStartSpl(spl) && isGaStartBlocked(spl) && (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-lg cursor-not-allowed"
+                                >
+                                  Menunggu GA
+                                </button>
+                              )}
+                              {canFinishSpl(spl) && (
+                                <button
+                                  type="button"
+                                  onClick={() => openFinishModal(spl)}
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                                >
+                                  Selesai
+                                </button>
+                              )}
+                              {!canStartSpl(spl) && !canFinishSpl(spl) && !isGaStartBlocked(spl) && (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -820,150 +1065,229 @@ export default function DashboardPage() {
           <NotificationToggle />
         </div>
 
-        {/* Right Column - Recent Activity & Profile */}
-        <div className="space-y-6">
-          {/* Account Information */}
-          {showManagerWidgets && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 bg-purple-100">
-                <svg
-                  className="w-6 h-6 text-purple-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Informasi Akun
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-purple-600 to-purple-700">
-                  {session?.user?.name
-                    ?.split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                    .slice(0, 2)}
+        {/* Right Column - Profile */}
+        {showManagerWidgets && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <div className="flex items-center mb-6">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 bg-purple-100">
+                  <svg
+                    className="w-6 h-6 text-purple-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900">
-                    {session?.user?.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {session?.user?.email}
-                  </p>
-                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Informasi Akun
+                </h2>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 font-medium">Role:</span>
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                    Manager
-                  </span>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-purple-600 to-purple-700">
+                    {session?.user?.name
+                      ?.split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">
+                      {session?.user?.name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {session?.user?.email}
+                    </p>
+                  </div>
                 </div>
 
-                {session?.user?.department && (
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 font-medium">
-                      Departemen:
-                    </span>
-                    <span className="text-gray-900 font-medium">
-                      {session.user.department}
+                    <span className="text-gray-600 font-medium">Role:</span>
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                      Manager
                     </span>
                   </div>
-                )}
+
+                  {session?.user?.department && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">
+                        Departemen:
+                      </span>
+                      <span className="text-gray-900 font-medium">
+                        {session.user.department}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          )}
-
-          {/* Recent SPL Activity */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="mb-6">
-              <div className="flex items-center mb-2">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg
-                    className="w-5 h-5 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  Aktivitas Minggu Ini
-                </h3>
+        )}
+      </div>
+      {showFinishModal && selectedSpl && (
+        <Modal
+          isOpen={showFinishModal}
+          onClose={() => {
+            if (isFinishing) return
+            setShowFinishModal(false)
+            setSelectedSpl(null)
+          }}
+          title="Selesai Lembur"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFinishModal(false)
+                  setSelectedSpl(null)
+                }}
+                disabled={isFinishing}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleFinishRealization}
+                disabled={isFinishing}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {isFinishing ? "Menyimpan..." : "Simpan Realisasi"}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-gray-600">Rencana:</span>
+                <span className="font-medium text-gray-900">
+                  {selectedSpl.startTime} - {selectedSpl.endTime}
+                </span>
               </div>
-              <p className="text-xs text-gray-500 ml-11">
-                Senin - Sabtu (Reset setiap Minggu)
-              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-gray-600">Mulai:</span>
+                <span className="font-medium text-gray-900">
+                  {formatTimeValue(selectedSpl.actualStartAt)}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-gray-600">Durasi sementara:</span>
+                <span className="font-medium text-gray-900">
+                  {selectedActualMinutes !== null
+                    ? `${Math.floor(selectedActualMinutes / 60)} jam ${selectedActualMinutes % 60} menit`
+                    : "-"}
+                </span>
+              </div>
+              {selectedOverrunMinutes && selectedOverrunMinutes > 0 && (
+                <div className="mt-2 text-xs text-red-600">
+                  Melebihi rencana {selectedOverrunMinutes} menit.
+                </div>
+              )}
             </div>
 
-            {recentSpls.length > 0 ? (
-              <div className="space-y-3">
-                {recentSpls.map((spl) => (
-                  <div
-                    key={spl.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 text-sm">
-                        {spl.requester.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(spl.createdAt).toLocaleDateString("id-ID")}
-                      </p>
-                    </div>
-                    {getStatusBadge(spl.status)}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Catatan Realisasi <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={realizationNote}
+                onChange={(e) => setRealizationNote(e.target.value)}
+                className="w-full min-h-[100px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Isi hasil pekerjaan lembur..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Foto Bukti Realisasi{" "}
+                {isGaSupervisedDepartment(selectedSpl) ? (
+                  <span className="text-red-500">*</span>
+                ) : (
+                  <span className="text-gray-400">(Opsional)</span>
+                )}
+              </label>
+              {!realizationProofPreview ? (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-micro">
+                  <div className="flex flex-col items-center justify-center py-4 px-4">
+                    <svg
+                      className="w-8 h-8 mb-2 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                    <p className="text-xs text-gray-600 text-center">
+                      <span className="font-semibold text-blue-600">Klik untuk upload</span>
+                      <br />
+                      PNG, JPG (Max 5MB)
+                    </p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFinishProofUpload}
+                  />
+                </label>
+              ) : (
+                <div className="relative">
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    <Image
+                      src={realizationProofPreview}
+                      alt="Preview bukti realisasi"
+                      width={1200}
+                      height={800}
+                      className="w-full h-auto max-h-64 object-contain"
+                      sizes="100vw"
+                      unoptimized
                     />
-                  </svg>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveFinishProof}
+                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-micro"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <p className="text-gray-500 text-sm font-medium">
-                  Belum ada aktivitas minggu ini
-                </p>
-                <p className="text-gray-400 text-xs mt-1">
-                  Aktivitas akan ditampilkan Senin - Sabtu
-                </p>
+              )}
+            </div>
+
+            {selectedOverrunMinutes && selectedOverrunMinutes > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alasan Melebihi Rencana <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={overrunReason}
+                  onChange={(e) => setOverrunReason(e.target.value)}
+                  className="w-full min-h-[80px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Jelaskan alasan realisasi melebihi rencana..."
+                />
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </Modal>
+      )}
     </div>
   )
 }
