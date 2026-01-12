@@ -3,31 +3,56 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils"
+import {
+  buildOvertimeWindowFromTimes,
+  clampRealizationMinutes,
+  JAKARTA_TIME_ZONE,
+  makeWindow,
+  startOfDay,
+} from "@/lib/spl-time"
 
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
-const parseTimeToMinutes = (value: string) => {
-  if (typeof value !== "string") return null
-  const trimmed = value.trim()
-  if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
-  const [hour, minute] = trimmed.split(":").map(Number)
-  if (
-    Number.isNaN(hour) ||
-    Number.isNaN(minute) ||
-    hour < 0 ||
-    hour > 23 ||
-    minute < 0 ||
-    minute > 59
-  ) {
-    return null
-  }
-  return hour * 60 + minute
-}
+const EARLY_FINISH_GRACE_MINUTES = 30
 
 const formatTime = (value: Date) =>
   value.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: JAKARTA_TIME_ZONE,
   })
+
+const resolvePlannedWindow = (spl: {
+  date: Date
+  startTime: string
+  endTime: string
+  plannedStartAt?: Date | null
+  plannedEndAt?: Date | null
+  regularEndAt?: Date | null
+}) => {
+  if (spl.plannedStartAt && spl.plannedEndAt) {
+    const plannedStart = new Date(spl.plannedStartAt)
+    const plannedEnd = new Date(spl.plannedEndAt)
+    if (!Number.isNaN(plannedStart.getTime()) && !Number.isNaN(plannedEnd.getTime())) {
+      return { plannedStart, plannedEnd }
+    }
+  }
+
+  if (spl.regularEndAt) {
+    const plannedWindow = buildOvertimeWindowFromTimes(
+      new Date(spl.regularEndAt),
+      spl.startTime,
+      spl.endTime
+    )
+    if (plannedWindow) {
+      return { plannedStart: plannedWindow.start, plannedEnd: plannedWindow.end }
+    }
+  }
+
+  const baseDay = startOfDay(new Date(spl.date))
+  const fallbackWindow = makeWindow(baseDay, spl.startTime, spl.endTime)
+  if (!fallbackWindow) return null
+  return { plannedStart: fallbackWindow.start, plannedEnd: fallbackWindow.end }
+}
 
 export async function POST(
   req: NextRequest,
@@ -47,6 +72,7 @@ export async function POST(
       typeof body.proofImage === "string" ? body.proofImage.trim() : ""
     const overrunValue =
       typeof body.overrunReason === "string" ? body.overrunReason.trim() : ""
+    const confirmEarlyFinish = body.confirmEarlyFinish === true
 
     if (!noteValue) {
       return NextResponse.json(
@@ -110,6 +136,22 @@ export async function POST(
       )
     }
 
+    const plannedWindow = resolvePlannedWindow(spl)
+    if (!plannedWindow) {
+      return NextResponse.json(
+        { error: "Waktu lembur tidak valid" },
+        { status: 400 }
+      )
+    }
+
+    const { plannedStart, plannedEnd } = plannedWindow
+    if (plannedEnd <= plannedStart) {
+      return NextResponse.json(
+        { error: "Waktu lembur tidak valid" },
+        { status: 400 }
+      )
+    }
+
     const startAt = new Date(spl.actualStartAt)
     const endAt = new Date()
     const diffMs = endAt.getTime() - startAt.getTime()
@@ -120,57 +162,82 @@ export async function POST(
       )
     }
 
-    const actualMinutes = Math.round(diffMs / 60000)
-    if (actualMinutes <= 0) {
+    const rawMinutes = Math.floor(diffMs / 60000)
+    if (diffMs <= EARLY_FINISH_GRACE_MINUTES * 60 * 1000 && !confirmEarlyFinish) {
       return NextResponse.json(
-        { error: "Durasi realisasi tidak valid" },
-        { status: 400 }
+        {
+          error: "Durasi realisasi masih <= 30 menit. Konfirmasi untuk mengakhiri tanpa dihitung.",
+          code: "CONFIRM_EARLY_FINISH_REQUIRED",
+          minutes: rawMinutes,
+        },
+        { status: 409 }
       )
     }
 
-    const plannedStartMinutes = parseTimeToMinutes(spl.startTime)
-    const plannedEndMinutes = parseTimeToMinutes(spl.endTime)
-    let plannedMinutes: number | null = null
-    if (plannedStartMinutes !== null && plannedEndMinutes !== null) {
-      plannedMinutes = plannedEndMinutes - plannedStartMinutes
-      if (plannedMinutes < 0) {
-        plannedMinutes += 24 * 60
-      }
-      if (plannedMinutes <= 0) {
-        plannedMinutes = null
-      }
-    }
+    let updatedSpl
+    let hasOverrun = false
+    const nextStatus = spl.status === "APPROVED" ? spl.status : "DONE"
+    if (diffMs <= EARLY_FINISH_GRACE_MINUTES * 60 * 1000 && confirmEarlyFinish) {
+      updatedSpl = await prisma.spl.update({
+        where: { id: spl.id },
+        data: {
+          actualEndAt: endAt,
+          actualTotalHours: 0,
+          realizedMinutes: 0,
+          realizationCounted: false,
+          realizationCancelReason: "EARLY_FINISH_WITHIN_30M",
+          realizationNote: noteValue,
+          realizationProofImage: proofValue || null,
+          overrunReason: null,
+          plannedStartAt: spl.plannedStartAt ?? plannedStart,
+          plannedEndAt: spl.plannedEndAt ?? plannedEnd,
+          status: nextStatus,
+        },
+      })
+    } else {
+      hasOverrun = endAt > plannedEnd
 
-    const hasOverrun =
-      plannedMinutes !== null && actualMinutes > plannedMinutes
+      if (hasOverrun && !overrunValue) {
+        return NextResponse.json(
+          { error: "Alasan melebihi rencana wajib diisi" },
+          { status: 400 }
+        )
+      }
 
-    if (hasOverrun && !overrunValue) {
-      return NextResponse.json(
-        { error: "Alasan melebihi rencana wajib diisi" },
-        { status: 400 }
+      const realizedMinutes = clampRealizationMinutes(
+        plannedStart,
+        plannedEnd,
+        startAt,
+        endAt
       )
+      const actualTotalHours = parseFloat(
+        (realizedMinutes / 60).toFixed(2)
+      )
+
+      updatedSpl = await prisma.spl.update({
+        where: { id: spl.id },
+        data: {
+          actualEndAt: endAt,
+          actualTotalHours,
+          realizedMinutes,
+          realizationCounted: realizedMinutes > 0,
+          realizationCancelReason: null,
+          realizationNote: noteValue,
+          realizationProofImage: proofValue || null,
+          overrunReason: hasOverrun ? overrunValue : null,
+          plannedStartAt: spl.plannedStartAt ?? plannedStart,
+          plannedEndAt: spl.plannedEndAt ?? plannedEnd,
+          status: nextStatus,
+        },
+      })
     }
-
-    const actualTotalHours = parseFloat(
-      (actualMinutes / 60).toFixed(2)
-    )
-
-    const updatedSpl = await prisma.spl.update({
-      where: { id: spl.id },
-      data: {
-        actualEndAt: endAt,
-        actualTotalHours,
-        realizationNote: noteValue,
-        realizationProofImage: proofValue || null,
-        overrunReason: hasOverrun ? overrunValue : null,
-      },
-    })
 
     try {
       const formattedDate = new Date(spl.date).toLocaleDateString("id-ID", {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: JAKARTA_TIME_ZONE,
       })
       const actualRange = `${formatTime(startAt)} - ${formatTime(endAt)}`
       const plannedRange = `${spl.startTime} - ${spl.endTime}`

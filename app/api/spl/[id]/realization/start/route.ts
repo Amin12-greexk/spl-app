@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  buildOvertimeWindowFromTimes,
+  makeWindow,
+  startOfDay,
+} from "@/lib/spl-time"
 
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 const REJECTED_STATUSES = new Set([
@@ -11,31 +16,37 @@ const REJECTED_STATUSES = new Set([
 ])
 const GA_BLOCKED_STATUSES = new Set(["PENDING_SUPERVISOR", "PENDING"])
 
-const parseTimeToMinutes = (value: string) => {
-  if (typeof value !== "string") return null
-  const trimmed = value.trim()
-  if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
-  const [hour, minute] = trimmed.split(":").map(Number)
-  if (
-    Number.isNaN(hour) ||
-    Number.isNaN(minute) ||
-    hour < 0 ||
-    hour > 23 ||
-    minute < 0 ||
-    minute > 59
-  ) {
-    return null
+const resolvePlannedWindow = (spl: {
+  date: Date
+  startTime: string
+  endTime: string
+  plannedStartAt?: Date | null
+  plannedEndAt?: Date | null
+  regularEndAt?: Date | null
+}) => {
+  if (spl.plannedStartAt && spl.plannedEndAt) {
+    const plannedStart = new Date(spl.plannedStartAt)
+    const plannedEnd = new Date(spl.plannedEndAt)
+    if (!Number.isNaN(plannedStart.getTime()) && !Number.isNaN(plannedEnd.getTime())) {
+      return { plannedStart, plannedEnd }
+    }
   }
-  return hour * 60 + minute
-}
 
-const getPlannedStartDate = (dateValue: Date, startTime: string) => {
-  const startMinutes = parseTimeToMinutes(startTime)
-  if (startMinutes === null) return null
-  const planned = new Date(dateValue)
-  if (Number.isNaN(planned.getTime())) return null
-  planned.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
-  return planned
+  if (spl.regularEndAt) {
+    const plannedWindow = buildOvertimeWindowFromTimes(
+      new Date(spl.regularEndAt),
+      spl.startTime,
+      spl.endTime
+    )
+    if (plannedWindow) {
+      return { plannedStart: plannedWindow.start, plannedEnd: plannedWindow.end }
+    }
+  }
+
+  const baseDay = startOfDay(new Date(spl.date))
+  const fallbackWindow = makeWindow(baseDay, spl.startTime, spl.endTime)
+  if (!fallbackWindow) return null
+  return { plannedStart: fallbackWindow.start, plannedEnd: fallbackWindow.end }
 }
 
 export async function POST(
@@ -110,18 +121,25 @@ export async function POST(
       )
     }
 
-    const plannedStart = getPlannedStartDate(spl.date, spl.startTime)
-    if (!plannedStart) {
+    const plannedWindow = resolvePlannedWindow(spl)
+    if (!plannedWindow) {
       return NextResponse.json(
-        { error: "Waktu mulai lembur tidak valid" },
+        { error: "Waktu lembur tidak valid" },
         { status: 400 }
       )
     }
 
+    const { plannedStart, plannedEnd } = plannedWindow
     const now = new Date()
     if (now < plannedStart) {
       return NextResponse.json(
         { error: "Realisasi belum bisa dimulai sebelum jadwal lembur" },
+        { status: 400 }
+      )
+    }
+    if (now >= plannedEnd) {
+      return NextResponse.json(
+        { error: "Jadwal lembur sudah berakhir" },
         { status: 400 }
       )
     }
@@ -130,6 +148,7 @@ export async function POST(
       where: { id: spl.id },
       data: {
         actualStartAt: now,
+        status: spl.status === "APPROVED" ? spl.status : "IN_PROGRESS",
       },
     })
 

@@ -24,7 +24,9 @@
       "Bash(mkdir:*)",
       "Bash(npm run db:clear:*)",
       "Bash(npx prisma format)",
-      "Bash(npm run db:seed:*)"
+      "Bash(npm run db:seed:*)",
+      "Bash(tr:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

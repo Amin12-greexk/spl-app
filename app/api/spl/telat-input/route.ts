@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils"
+import { JAKARTA_TIME_ZONE } from "@/lib/spl-time"
 
 export async function GET(req: NextRequest) {
   try {
@@ -145,6 +146,7 @@ export async function PATCH(req: NextRequest) {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: JAKARTA_TIME_ZONE,
       })
       const notificationTitle = "SPL Manual Ditandatangani"
       const notificationBody = `${updatedSpl.requester.name} menandatangani SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}).`

@@ -19,6 +19,7 @@ const DIRECT_TO_MANAGER_ROLES: Role[] = [
 ]
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 const REJECTED_STATUSES = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
+const EARLY_FINISH_GRACE_MINUTES = 30
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   const [realizationProofPreview, setRealizationProofPreview] = useState<string | null>(null)
   const [overrunReason, setOverrunReason] = useState("")
 
+  const userRole = session?.user?.role as Role
+
   const refreshSpls = useCallback(
     async (showLoading = false) => {
       if (!session) {
@@ -68,7 +71,13 @@ export default function DashboardPage() {
           (spl) => (spl.requesterId || spl.requester?.id) === requesterId
         )
 
-        const pendingStatuses = ["PENDING", "PENDING_SUPERVISOR", "PENDING_MANAGER"]
+        const pendingStatuses = [
+          "PENDING",
+          "PENDING_SUPERVISOR",
+          "PENDING_MANAGER",
+          "IN_PROGRESS",
+          "DONE",
+        ]
         const rejectedStatuses = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
 
         setStats({
@@ -204,7 +213,6 @@ export default function DashboardPage() {
     loadMin()
   }, [])
 
-  const userRole = session?.user?.role as Role
   const historyItemsPerPage = 10
   const sortedHistory = [...userSpls].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -242,6 +250,11 @@ export default function DashboardPage() {
   }
 
   const getRegularHoursLabel = (spl: Spl) => {
+    const snapshotStart = spl.regularStartAt ? formatTimeValue(spl.regularStartAt) : ""
+    const snapshotEnd = spl.regularEndAt ? formatTimeValue(spl.regularEndAt) : ""
+    if (snapshotStart && snapshotEnd) {
+      return `${snapshotStart} - ${snapshotEnd}`
+    }
     const start =
       spl.requester?.regularStartTime || session?.user?.regularStartTime || ""
     const end =
@@ -264,7 +277,7 @@ export default function DashboardPage() {
   const isGaSupervisedDepartment = (spl: Spl) =>
     GA_SUPERVISED_DEPARTMENTS.has(getDepartmentKey(spl))
 
-  const formatTimeValue = (value?: Date | string | null) => {
+  function formatTimeValue(value?: Date | string | null) {
     if (!value) return "-"
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return "-"
@@ -302,15 +315,35 @@ export default function DashboardPage() {
     return hour * 60 + minute
   }
 
-  const getPlannedMinutes = (spl: Spl) => {
+  const getPlannedWindow = (spl: Spl) => {
+    if (spl.plannedStartAt && spl.plannedEndAt) {
+      const plannedStart = new Date(spl.plannedStartAt)
+      const plannedEnd = new Date(spl.plannedEndAt)
+      if (!Number.isNaN(plannedStart.getTime()) && !Number.isNaN(plannedEnd.getTime())) {
+        return { plannedStart, plannedEnd }
+      }
+    }
+
     const startMinutes = parseTimeToMinutes(spl.startTime)
     const endMinutes = parseTimeToMinutes(spl.endTime)
     if (startMinutes === null || endMinutes === null) return null
-    let total = endMinutes - startMinutes
-    if (total < 0) {
-      total += 24 * 60
+    if (startMinutes === endMinutes) return null
+
+    const baseDaySource = spl.regularEndAt ? new Date(spl.regularEndAt) : new Date(spl.date)
+    const baseDay = new Date(baseDaySource)
+    baseDay.setHours(0, 0, 0, 0)
+    if (Number.isNaN(baseDay.getTime())) {
+      return null
     }
-    return total > 0 ? total : null
+
+    const plannedStart = new Date(baseDay)
+    const plannedEnd = new Date(baseDay)
+    plannedStart.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
+    plannedEnd.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0)
+    if (plannedEnd <= plannedStart) {
+      plannedEnd.setDate(plannedEnd.getDate() + 1)
+    }
+    return { plannedStart, plannedEnd }
   }
 
   const getActualMinutes = (spl: Spl, endAt = new Date()) => {
@@ -319,30 +352,31 @@ export default function DashboardPage() {
     if (Number.isNaN(startAt.getTime())) return null
     const diffMs = endAt.getTime() - startAt.getTime()
     if (diffMs <= 0) return 0
-    return Math.round(diffMs / 60000)
+    return Math.floor(diffMs / 60000)
   }
 
-  const getPlannedStartDate = (spl: Spl) => {
-    const startMinutes = parseTimeToMinutes(spl.startTime)
-    if (startMinutes === null) return null
-    const planned = new Date(spl.date)
-    if (Number.isNaN(planned.getTime())) return null
-    planned.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
-    return planned
+  const isEarlyFinish = (spl: Spl) => {
+    if (!spl.actualStartAt || spl.actualEndAt) return false
+    const elapsed = getActualMinutes(spl, new Date())
+    if (elapsed === null) return false
+    return elapsed <= EARLY_FINISH_GRACE_MINUTES
   }
 
-  const isBeforePlannedStart = (spl: Spl) => {
-    const plannedStart = getPlannedStartDate(spl)
-    if (!plannedStart) return false
-    return new Date() < plannedStart
+  const isOutsidePlannedWindow = (spl: Spl) => {
+    const window = getPlannedWindow(spl)
+    if (!window) return false
+    const now = new Date()
+    return now < window.plannedStart || now >= window.plannedEnd
   }
 
   const getOverrunMinutes = (spl: Spl, endAt = new Date()) => {
-    const planned = getPlannedMinutes(spl)
-    const actual = getActualMinutes(spl, endAt)
-    if (planned === null || actual === null) return null
-    const diff = actual - planned
-    return diff > 0 ? diff : 0
+    const window = getPlannedWindow(spl)
+    if (!window) return null
+    const plannedEnd = window.plannedEnd
+    if (Number.isNaN(plannedEnd.getTime())) return null
+    if (endAt <= plannedEnd) return 0
+    const diffMs = endAt.getTime() - plannedEnd.getTime()
+    return diffMs > 0 ? Math.floor(diffMs / 60000) : 0
   }
 
   const canStartSpl = (spl: Spl) => {
@@ -350,7 +384,7 @@ export default function DashboardPage() {
     if (requesterId !== session?.user?.id) return false
     if (spl.actualStartAt || spl.actualEndAt) return false
     if (REJECTED_STATUSES.includes(spl.status)) return false
-    if (isBeforePlannedStart(spl)) return false
+    if (isOutsidePlannedWindow(spl)) return false
     if (
       isGaSupervisedDepartment(spl) &&
       ["PENDING_SUPERVISOR", "PENDING"].includes(spl.status)
@@ -480,18 +514,48 @@ export default function DashboardPage() {
 
     setIsFinishing(true)
     try {
-      const response = await fetch(`/api/spl/${selectedSpl.id}/realization/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          note: realizationNote.trim(),
-          proofImage: realizationProofImage || null,
-          overrunReason: overrunReason.trim() || null,
-        }),
-      })
-      const data = await response.json()
+      const basePayload = {
+        note: realizationNote.trim(),
+        proofImage: realizationProofImage || null,
+        overrunReason: overrunReason.trim() || null,
+      }
+
+      const submitFinish = async (confirmEarlyFinish = false) => {
+        const response = await fetch(`/api/spl/${selectedSpl.id}/realization/finish`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...basePayload,
+            confirmEarlyFinish,
+          }),
+        })
+        const data = await response.json()
+        return { response, data }
+      }
+
+      const { response, data } = await submitFinish(false)
       if (!response.ok) {
-        throw new Error(data.error || "Gagal menyimpan realisasi")
+        if (data?.code === "CONFIRM_EARLY_FINISH_REQUIRED") {
+          const confirmResult = await Swal.fire({
+            icon: "warning",
+            title: "Durasi lembur masih singkat",
+            text: "Jika diselesaikan sekarang, lembur tidak akan dihitung. Lanjutkan?",
+            showCancelButton: true,
+            confirmButtonText: "Ya, akhiri",
+            cancelButtonText: "Batal",
+          })
+
+          if (!confirmResult.isConfirmed) {
+            return
+          }
+
+          const confirmResponse = await submitFinish(true)
+          if (!confirmResponse.response.ok) {
+            throw new Error(confirmResponse.data?.error || "Gagal menyimpan realisasi")
+          }
+        } else {
+          throw new Error(data.error || "Gagal menyimpan realisasi")
+        }
       }
       await Swal.fire({
         icon: "success",
@@ -512,20 +576,6 @@ export default function DashboardPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
-          <div className="text-center">
-            <p className="text-gray-700 font-medium">Memuat dashboard...</p>
-            <p className="text-gray-500 text-sm mt-1">Mohon tunggu sebentar</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const getGreeting = () => {
     const hour = new Date().getHours()
     if (hour < 12) return "Selamat pagi"
@@ -533,7 +583,7 @@ export default function DashboardPage() {
     return "Selamat sore"
   }
 
-  const getStatusBadge = (status: string) => {
+  function getStatusBadge(status: string) {
     const config = {
       PENDING: {
         bg: "bg-yellow-100",
@@ -554,6 +604,16 @@ export default function DashboardPage() {
         bg: "bg-green-100",
         text: "text-green-800",
         label: "Disetujui",
+      },
+      IN_PROGRESS: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "Berjalan",
+      },
+      DONE: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Selesai",
       },
       REJECTED: { bg: "bg-red-100", text: "text-red-800", label: "Ditolak" },
       REJECTED_BY_SUPERVISOR: {
@@ -649,6 +709,21 @@ export default function DashboardPage() {
 
   const selectedActualMinutes = selectedSpl ? getActualMinutes(selectedSpl, new Date()) : null
   const selectedOverrunMinutes = selectedSpl ? getOverrunMinutes(selectedSpl, new Date()) : null
+  const selectedEarlyFinish = selectedSpl ? isEarlyFinish(selectedSpl) : false
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
+          <div className="text-center">
+            <p className="text-gray-700 font-medium">Memuat dashboard...</p>
+            <p className="text-gray-500 text-sm mt-1">Mohon tunggu sebentar</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
@@ -856,16 +931,30 @@ export default function DashboardPage() {
                                   Menunggu GA
                                 </button>
                               )}
+                              {!canStartSpl(spl) &&
+                                isOutsidePlannedWindow(spl) &&
+                                !isGaStartBlocked(spl) &&
+                                !canFinishSpl(spl) && (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-lg cursor-not-allowed"
+                                  >
+                                    Di luar jadwal
+                                  </button>
+                                )}
                               {canFinishSpl(spl) && (
                                 <button
                                   type="button"
                                   onClick={() => openFinishModal(spl)}
                                   className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                                 >
-                                  Selesai
+                                  {isEarlyFinish(spl) ? "Selesai (Konfirmasi)" : "Selesai"}
                                 </button>
                               )}
-                              {!canStartSpl(spl) && !canFinishSpl(spl) && !isGaStartBlocked(spl) && (
+                              {!canStartSpl(spl) &&
+                                !canFinishSpl(spl) &&
+                                !isGaStartBlocked(spl) && (
                                 <span className="text-xs text-gray-400">-</span>
                               )}
                             </div>
@@ -1189,6 +1278,11 @@ export default function DashboardPage() {
                     : "-"}
                 </span>
               </div>
+              {selectedEarlyFinish && (
+                <div className="mt-2 text-xs text-amber-600">
+                  Durasi masih {'<='} 30 menit. Jika diselesaikan sekarang, lembur tidak dihitung.
+                </div>
+              )}
               {selectedOverrunMinutes && selectedOverrunMinutes > 0 && (
                 <div className="mt-2 text-xs text-red-600">
                   Melebihi rencana {selectedOverrunMinutes} menit.

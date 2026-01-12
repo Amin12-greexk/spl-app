@@ -79,14 +79,19 @@ export default function NotificationProvider({ children }: NotificationProviderP
         if (response.ok) {
           const data = await response.json()
           const recentUpdates = data.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isDecisionStatus = [
+              "APPROVED",
+              "REJECTED",
+              "REJECTED_BY_SUPERVISOR",
+              "REJECTED_BY_MANAGER",
+            ].includes(spl.status)
             const updateDate = new Date(
               spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt
             )
             const isNewUpdate = updateDate > lastViewedTime
             const requesterId = spl.requesterId || spl.requester?.id
             const isOwn = requesterId === session.user.id
-            return isNotPending && isNewUpdate && isOwn
+            return isDecisionStatus && isNewUpdate && isOwn
           })
           let count = recentUpdates.length
           count += await fetchManualCount()
@@ -99,12 +104,17 @@ export default function NotificationProvider({ children }: NotificationProviderP
         if (ownResponse.ok) {
           const ownData = await ownResponse.json()
           const ownUpdates = ownData.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isDecisionStatus = [
+              "APPROVED",
+              "REJECTED",
+              "REJECTED_BY_SUPERVISOR",
+              "REJECTED_BY_MANAGER",
+            ].includes(spl.status)
             const updateDate = new Date(spl.approvalDate || spl.updatedAt)
             const isNewUpdate = updateDate > lastViewedTime
             const requesterId = spl.requesterId || spl.requester?.id
             const isOwn = requesterId === session.user.id
-            return isNotPending && isNewUpdate && isOwn
+            return isDecisionStatus && isNewUpdate && isOwn
           })
           count += ownUpdates.length
         }
@@ -130,12 +140,17 @@ export default function NotificationProvider({ children }: NotificationProviderP
         if (ownResponse.ok) {
           const ownData = await ownResponse.json()
           const ownUpdates = ownData.filter((spl: any) => {
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isDecisionStatus = [
+              "APPROVED",
+              "REJECTED",
+              "REJECTED_BY_SUPERVISOR",
+              "REJECTED_BY_MANAGER",
+            ].includes(spl.status)
             const updateDate = new Date(spl.approvalDate || spl.updatedAt)
             const isNewUpdate = updateDate > lastViewedTime
             const requesterId = spl.requesterId || spl.requester?.id
             const isOwn = requesterId === session.user.id
-            return isNotPending && isNewUpdate && isOwn
+            return isDecisionStatus && isNewUpdate && isOwn
           })
           count += ownUpdates.length
         }
@@ -143,7 +158,9 @@ export default function NotificationProvider({ children }: NotificationProviderP
         count += await fetchManualCount()
         setNotificationCount(count)
       } else if (session.user.role === "MANAGER") {
-        const response = await fetch("/api/spl?status=PENDING_MANAGER")
+        const response = await fetch(
+          "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+        )
         if (response.ok) {
           const data = await response.json()
           const newPendingSPLs = data.filter((spl: any) => {

@@ -34,6 +34,7 @@ model User {
   splApprovals           Spl[]              @relation("approver")
   splSupervisorApprovals Spl[]              @relation("supervisor")
   notifications          UserNotification[]
+  securityShiftAssignments SecurityShiftAssignment[]
 
   @@index([role], map: "users_role_idx")
   @@index([supervisorId], map: "users_supervisorId_idx")
@@ -71,6 +72,13 @@ model Spl {
   realizationNote String?
   realizationProofImage String?
   overrunReason String?
+  regularStartAt DateTime?
+  regularEndAt   DateTime?
+  plannedStartAt DateTime?
+  plannedEndAt   DateTime?
+  realizedMinutes Int?
+  realizationCounted Boolean?
+  realizationCancelReason String?
 
   // Status: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED, REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
   status String @default("PENDING_SUPERVISOR")
@@ -101,6 +109,21 @@ model Spl {
   @@index([supervisorId, createdAt], map: "spls_supervisorId_createdAt_idx")
   @@index([isManualEntry, requesterSignedAt], map: "spls_manual_unsigned_idx")
   @@map("spls")
+}
+
+model SecurityShiftAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  workDate  DateTime
+  shiftCode String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, workDate], map: "security_shift_user_date_unique")
+  @@index([workDate], map: "security_shift_workDate_idx")
+  @@index([shiftCode], map: "security_shift_code_idx")
+  @@map("security_shift_assignments")
 }
 
 model UserNotification {

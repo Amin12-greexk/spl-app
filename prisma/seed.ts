@@ -110,6 +110,25 @@ async function main() {
   await applyDefaultRegularHours(ga.id)
   console.log("✅ GA created")
 
+  // 3b. Create GA Test
+  const gaTest = await prisma.user.upsert({
+    where: { email: "gatest@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "gatest@tunasestaindonesia.com",
+      name: "GA TEST",
+      password: hashedPassword,
+      pin: "223",
+      role: "GA",
+      departmentName: "General Affair",
+      departmentId: departmentIdByName.get("General Affair") || null,
+      position: "GA Test",
+      ...defaultRegularHours,
+    },
+  })
+  await applyDefaultRegularHours(gaTest.id)
+  console.log("GA Test created")
+
   // 4. Create HR
   const hr = await prisma.user.upsert({
     where: { email: "hayyu@tunasestaindonesia.com" },
@@ -299,6 +318,26 @@ async function main() {
   }
   console.log("✅ Security Staff created (6 users)")
 
+  // 13. Create Security Test (supervised by GA Test)
+  const securityTest = await prisma.user.upsert({
+    where: { email: "securitytest@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "securitytest@tunasestaindonesia.com",
+      name: "SECURITY TEST",
+      password: hashedPassword,
+      pin: "224",
+      role: "STAFF",
+      departmentName: "Security",
+      departmentId: departmentIdByName.get("Security") || null,
+      position: "Security Guard",
+      supervisorId: gaTest.id,
+      ...defaultRegularHours,
+    },
+  })
+  await applyDefaultRegularHours(securityTest.id)
+  console.log("Security Test created")
+
   // Sample SPL cases for testing realization flow
   const sampleImage =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/woAAgEB/6X6eQAAAABJRU5ErkJggg=="
@@ -481,6 +520,8 @@ async function main() {
   console.log("10. Teknisi           : pandu@tunasestaindonesia.com")
   console.log("11. Driver           : rico@tunasestaindonesia.com")
   console.log("12-17. Security      : fina, teguh, wahyu, bibit, david, joko")
+  console.log("18. GA Test          : gatest@tunasestaindonesia.com")
+  console.log("19. Security Test    : securitytest@tunasestaindonesia.com")
   console.log("━".repeat(60))
   console.log("\n🔑 Credentials:")
   console.log("━".repeat(60))
@@ -491,6 +532,7 @@ async function main() {
   console.log("━".repeat(60))
   console.log("Manager (Tiyas)      : No supervisor")
   console.log("GA (Nizar)           : No supervisor")
+  console.log("GA Test (GA TEST)    : No supervisor")
   console.log("HR (Hayyu)           : No supervisor")
   console.log("Production Spv       : No supervisor (langsung ke Manager)")
   console.log("├─ Security (6)      : Supervised by GA (Nizar)")
@@ -499,6 +541,7 @@ async function main() {
   console.log("IT Staff             : No supervisor (langsung ke Manager)")
   console.log("Lab Staff            : No supervisor (langsung ke Manager)")
   console.log("Admin Staff          : No supervisor (langsung ke Manager)")
+  console.log("Security Test        : Supervised by GA Test")
   console.log("━".repeat(60))
   console.log("\n💡 Next Steps:")
   console.log("━".repeat(60))

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UpdateSplStatusInput, Role, SplStatus } from "@/types"; // Impor semua tipe yang dibutuhkan
 import { sendNotificationToUser } from "@/lib/notification-utils"; // Impor fungsi pengirim notifikasi
+import { JAKARTA_TIME_ZONE } from "@/lib/spl-time";
 
 /**
  * GET /api/spl/[id]
@@ -144,10 +145,11 @@ export async function PATCH(
     try {
       // Format tanggal SPL
       const splDate = new Date(spl.date);
-      const formattedDate = splDate.toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+      const formattedDate = splDate.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: JAKARTA_TIME_ZONE,
       });
 
       const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";

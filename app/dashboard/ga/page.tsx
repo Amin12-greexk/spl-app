@@ -143,7 +143,11 @@ export default function GADashboardPage() {
     return {
       total: spls.length,
       pendingSupervisor: spls.filter(spl => spl.status === "PENDING_SUPERVISOR").length,
-      pendingManager: spls.filter(spl => spl.status === "PENDING_MANAGER").length,
+      pendingManager: spls.filter(spl =>
+        spl.status === "PENDING_MANAGER" ||
+        spl.status === "IN_PROGRESS" ||
+        spl.status === "DONE"
+      ).length,
       approved: spls.filter(spl => spl.status === "APPROVED").length,
       rejected: spls.filter(spl =>
         spl.status === "REJECTED_BY_SUPERVISOR" || spl.status === "REJECTED_BY_MANAGER"
@@ -254,7 +258,16 @@ export default function GADashboardPage() {
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">Filter Status:</label>
           <div className="flex flex-wrap gap-2">
-            {["ALL", "PENDING_SUPERVISOR", "PENDING_MANAGER", "APPROVED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].map((status) => (
+            {[
+              "ALL",
+              "PENDING_SUPERVISOR",
+              "PENDING_MANAGER",
+              "IN_PROGRESS",
+              "DONE",
+              "APPROVED",
+              "REJECTED_BY_SUPERVISOR",
+              "REJECTED_BY_MANAGER",
+            ].map((status) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
@@ -267,6 +280,8 @@ export default function GADashboardPage() {
                 {status === "ALL" ? "Semua" :
                  status === "PENDING_SUPERVISOR" ? "Menunggu Anda" :
                  status === "PENDING_MANAGER" ? "Di Manager" :
+                 status === "IN_PROGRESS" ? "Berjalan" :
+                 status === "DONE" ? "Selesai" :
                  status === "APPROVED" ? "Disetujui" :
                  status === "REJECTED_BY_SUPERVISOR" ? "Ditolak (Anda)" : "Ditolak (Manager)"}
               </button>

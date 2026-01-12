@@ -94,6 +94,16 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
         text: "text-green-800",
         label: "Disetujui",
       },
+      IN_PROGRESS: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "Sedang Berjalan",
+      },
+      DONE: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Selesai",
+      },
       REJECTED: {
         bg: "bg-red-100",
         text: "text-red-800",

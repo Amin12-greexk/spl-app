@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToUser } from "@/lib/notification-utils"
+import { JAKARTA_TIME_ZONE } from "@/lib/spl-time"
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: JAKARTA_TIME_ZONE,
       })
 
       await sendNotificationToUser(

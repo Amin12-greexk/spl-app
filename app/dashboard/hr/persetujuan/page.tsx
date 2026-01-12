@@ -29,7 +29,9 @@ export default function PersetujuanPage() {
   const fetchPendingSpls = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/spl?status=PENDING_MANAGER")
+      const response = await fetch(
+        "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+      )
       if (!response.ok) {
         throw new Error("Gagal mengambil data SPL")
       }
