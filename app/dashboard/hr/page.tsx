@@ -63,7 +63,23 @@ export default function HRViewPage() {
 
     // Filter by status
     if (filterStatus !== "ALL") {
-      filtered = filtered.filter(spl => spl.status === filterStatus)
+      if (filterStatus === "PENDING") {
+        filtered = filtered.filter(spl =>
+          spl.status === "PENDING" ||
+          spl.status === "PENDING_SUPERVISOR" ||
+          spl.status === "PENDING_MANAGER" ||
+          spl.status === "IN_PROGRESS" ||
+          spl.status === "DONE"
+        )
+      } else if (filterStatus === "REJECTED") {
+        filtered = filtered.filter(spl =>
+          spl.status === "REJECTED" ||
+          spl.status === "REJECTED_BY_SUPERVISOR" ||
+          spl.status === "REJECTED_BY_MANAGER"
+        )
+      } else {
+        filtered = filtered.filter(spl => spl.status === filterStatus)
+      }
     }
 
     // Filter by search query (nama atau PIN)
@@ -153,6 +169,8 @@ export default function HRViewPage() {
       'PENDING_SUPERVISOR': 'Menunggu Supervisor',
       'PENDING_MANAGER': 'Menunggu Manager',
       'APPROVED': 'Disetujui',
+      'IN_PROGRESS': 'Berjalan',
+      'DONE': 'Selesai',
       'REJECTED': 'Ditolak',
       'REJECTED_BY_SUPERVISOR': 'Ditolak Supervisor',
       'REJECTED_BY_MANAGER': 'Ditolak Manager',
@@ -166,7 +184,9 @@ export default function HRViewPage() {
       pending: filteredSpls.filter(spl =>
         spl.status === "PENDING" ||
         spl.status === "PENDING_SUPERVISOR" ||
-        spl.status === "PENDING_MANAGER"
+        spl.status === "PENDING_MANAGER" ||
+        spl.status === "IN_PROGRESS" ||
+        spl.status === "DONE"
       ).length,
       approved: filteredSpls.filter(spl => spl.status === "APPROVED").length,
       rejected: filteredSpls.filter(spl =>

@@ -23,6 +23,8 @@ export type SplStatus =
   | "PENDING_SUPERVISOR"
   | "PENDING_MANAGER"
   | "APPROVED"
+  | "IN_PROGRESS"
+  | "DONE"
   | "REJECTED_BY_SUPERVISOR"
   | "REJECTED_BY_MANAGER"
   | "PENDING"  // Legacy
@@ -72,6 +74,13 @@ export interface Spl {
   realizationNote?: string | null
   realizationProofImage?: string | null
   overrunReason?: string | null
+  regularStartAt?: Date | string | null
+  regularEndAt?: Date | string | null
+  plannedStartAt?: Date | string | null
+  plannedEndAt?: Date | string | null
+  realizedMinutes?: number | null
+  realizationCounted?: boolean | null
+  realizationCancelReason?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
   isManualEntry?: boolean
   requesterSignedAt?: Date | null

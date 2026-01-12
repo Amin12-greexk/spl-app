@@ -99,6 +99,20 @@ function SplCard({
           shortLabel: "Disetujui",
           description: `Disetujui oleh ${approver}`,
         }
+      case "IN_PROGRESS":
+        return {
+          icon: "⏳",
+          label: "Sedang Berjalan",
+          shortLabel: "Berjalan",
+          description: "Realisasi lembur sedang berjalan",
+        }
+      case "DONE":
+        return {
+          icon: "✅",
+          label: "Selesai",
+          shortLabel: "Selesai",
+          description: "Realisasi lembur telah selesai",
+        }
       case "REJECTED_BY_SUPERVISOR":
         return {
           icon: "❌",
@@ -146,6 +160,18 @@ function SplCard({
         ring: "ring-blue-100",
       },
       APPROVED: {
+        bg: "bg-green-50",
+        text: "text-green-700",
+        border: "border-green-200",
+        ring: "ring-green-100",
+      },
+      IN_PROGRESS: {
+        bg: "bg-yellow-50",
+        text: "text-yellow-700",
+        border: "border-yellow-200",
+        ring: "ring-yellow-100",
+      },
+      DONE: {
         bg: "bg-green-50",
         text: "text-green-700",
         border: "border-green-200",
@@ -215,14 +241,22 @@ function SplCard({
       return [
         { label: "Staff", done: true, current: false },
         { label: supervisorLabel, done: !!spl.supervisorApprovalDate, current: spl.status === "PENDING_SUPERVISOR" },
-        { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+        {
+          label: "Manager",
+          done: spl.status === "APPROVED",
+          current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
+        },
       ]
     }
 
     // For GA/Dept Head (direct to manager)
     return [
       { label: "Pemohon", done: true, current: false },
-      { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+      {
+        label: "Manager",
+        done: spl.status === "APPROVED",
+        current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
+      },
     ]
   }
 
@@ -446,7 +480,7 @@ function SplCard({
         {showActions && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
             {userRole === "MANAGER" &&
-              (spl.status === "PENDING" || spl.status === "PENDING_MANAGER") && (
+              ["PENDING", "PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status) && (
                 <>
                   {onApprove && (
                     <button
@@ -769,7 +803,7 @@ function SplCard({
           )}
 
           {userRole === "MANAGER" &&
-            (spl.status === "PENDING" || spl.status === "PENDING_MANAGER") && (
+            ["PENDING", "PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status) && (
               <>
                 {onApprove && (
                   <button

@@ -48,6 +48,13 @@ export default function AdminDashboard() {
       color: "from-emerald-500 to-emerald-600",
     },
     {
+      title: "Shift Security",
+      description: "Atur shift security per tanggal",
+      href: "/dashboard/admin/security-shifts",
+      icon: "SS",
+      color: "from-indigo-500 to-indigo-600",
+    },
+    {
       title: "Input SPL Manual",
       description: "Buat SPL untuk user yang lupa/terlewat",
       href: "/dashboard/admin/spl-manual",

@@ -4,6 +4,16 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
 import { sendNotificationToUser } from "@/lib/notification-utils"
+import {
+  buildOvertimeWindowFromTimes,
+  JAKARTA_TIME_ZONE,
+  makeWindow,
+  parseDateOnly,
+  parseTimeToMinutes,
+  SECURITY_SHIFT_DEFINITIONS,
+  SecurityShiftCode,
+  startOfDay,
+} from "@/lib/spl-time"
 
 // POST - Create manual SPL for user (by Super Admin)
 export async function POST(req: NextRequest) {
@@ -25,17 +35,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const datePart = date.split("T")[0]
-    const requestedDate = new Date(`${datePart}T00:00:00`)
-    if (Number.isNaN(requestedDate.getTime())) {
+    const requestedDate = parseDateOnly(date)
+    if (!requestedDate) {
       return NextResponse.json(
         { error: "Tanggal lembur tidak valid" },
         { status: 400 }
       )
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = startOfDay(new Date())
     if (requestedDate > today) {
       return NextResponse.json(
         { error: "Tanggal lembur manual tidak boleh melebihi hari ini" },
@@ -52,6 +60,8 @@ export async function POST(req: NextRequest) {
         departmentId: true,
         departmentName: true,
         department: { select: { name: true } },
+        regularStartTime: true,
+        regularEndTime: true,
       },
     })
 
@@ -59,17 +69,206 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 })
     }
 
-    // Calculate duration (handle overnight shifts)
-    const start = new Date(`2000-01-01T${startTime}`)
-    let end = new Date(`2000-01-01T${endTime}`)
-
-    // If end time is earlier than start time, it's an overnight shift - add 1 day
-    if (end <= start) {
-      end = new Date(`2000-01-02T${endTime}`)
+    const startMinutes = parseTimeToMinutes(startTime)
+    const endMinutes = parseTimeToMinutes(endTime)
+    if (startMinutes === null || endMinutes === null) {
+      return NextResponse.json(
+        { error: "Format jam lembur tidak valid (HH:MM)" },
+        { status: 400 }
+      )
+    }
+    if (startMinutes === endMinutes) {
+      return NextResponse.json(
+        { error: "Jam lembur akhir harus > jam lembur mulai" },
+        { status: 400 }
+      )
     }
 
-    const durationMs = end.getTime() - start.getTime()
-    const totalHours = durationMs / (1000 * 60 * 60)
+    const departmentName =
+      user.department?.name || user.departmentName || ""
+    const departmentKey = departmentName.toLowerCase()
+    const isSecurityDepartment = departmentKey === "security"
+
+    let regularStartAt: Date | null = null
+    let regularEndAt: Date | null = null
+
+    if (isSecurityDepartment) {
+      const shiftAssignment = await prisma.securityShiftAssignment.findUnique({
+        where: {
+          userId_workDate: {
+            userId: user.id,
+            workDate: requestedDate,
+          },
+        },
+        select: { shiftCode: true },
+      })
+
+      if (shiftAssignment?.shiftCode) {
+        const shiftDefinition =
+          SECURITY_SHIFT_DEFINITIONS[
+            shiftAssignment.shiftCode as SecurityShiftCode
+          ]
+        if (!shiftDefinition) {
+          return NextResponse.json(
+            { error: "Shift security tidak valid" },
+            { status: 400 }
+          )
+        }
+        const regularWindow = makeWindow(
+          requestedDate,
+          shiftDefinition.start,
+          shiftDefinition.end
+        )
+        if (!regularWindow) {
+          return NextResponse.json(
+            { error: "Jam reguler security tidak valid" },
+            { status: 400 }
+          )
+        }
+        regularStartAt = regularWindow.start
+        regularEndAt = regularWindow.end
+      } else if (user.regularStartTime && user.regularEndTime) {
+        const regularStartMinutes = parseTimeToMinutes(
+          user.regularStartTime
+        )
+        const regularEndMinutes = parseTimeToMinutes(user.regularEndTime)
+        if (regularStartMinutes === null || regularEndMinutes === null) {
+          return NextResponse.json(
+            { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+            { status: 400 }
+          )
+        }
+        if (regularStartMinutes === regularEndMinutes) {
+          return NextResponse.json(
+            { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+            { status: 400 }
+          )
+        }
+        const regularWindow = makeWindow(
+          requestedDate,
+          user.regularStartTime,
+          user.regularEndTime
+        )
+        if (!regularWindow) {
+          return NextResponse.json(
+            { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+            { status: 400 }
+          )
+        }
+        regularStartAt = regularWindow.start
+        regularEndAt = regularWindow.end
+      } else {
+        return NextResponse.json(
+          { error: "Shift security belum diatur untuk tanggal ini" },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (!user.regularStartTime || !user.regularEndTime) {
+        return NextResponse.json(
+          { error: "Jam reguler user belum diatur. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+      const regularStartMinutes = parseTimeToMinutes(user.regularStartTime)
+      const regularEndMinutes = parseTimeToMinutes(user.regularEndTime)
+      if (regularStartMinutes === null || regularEndMinutes === null) {
+        return NextResponse.json(
+          { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+      if (regularStartMinutes === regularEndMinutes) {
+        return NextResponse.json(
+          { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+      const regularWindow = makeWindow(
+        requestedDate,
+        user.regularStartTime,
+        user.regularEndTime
+      )
+      if (!regularWindow) {
+        return NextResponse.json(
+          { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
+          { status: 400 }
+        )
+      }
+      regularStartAt = regularWindow.start
+      regularEndAt = regularWindow.end
+    }
+
+    if (!regularStartAt || !regularEndAt) {
+      return NextResponse.json(
+        { error: "Jam reguler tidak valid. Hubungi Super Admin." },
+        { status: 400 }
+      )
+    }
+
+    const plannedWindow = buildOvertimeWindowFromTimes(
+      regularEndAt,
+      startTime,
+      endTime
+    )
+    if (!plannedWindow) {
+      return NextResponse.json(
+        { error: "Waktu lembur tidak valid" },
+        { status: 400 }
+      )
+    }
+
+    const { start: plannedStartAt, end: plannedEndAt } = plannedWindow
+    if (plannedEndAt <= plannedStartAt) {
+      return NextResponse.json(
+        { error: "Jam lembur akhir harus > jam lembur mulai" },
+        { status: 400 }
+      )
+    }
+    if (plannedStartAt < regularEndAt) {
+      return NextResponse.json(
+        { error: "Jam lembur mulai harus >= jam reguler selesai" },
+        { status: 400 }
+      )
+    }
+
+    const overlap = await prisma.spl.findFirst({
+      where: {
+        requesterId: user.id,
+        actualEndAt: null,
+        status: {
+          notIn: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
+        },
+        plannedStartAt: { not: null },
+        plannedEndAt: { not: null },
+        AND: [
+          { plannedStartAt: { lt: plannedEndAt } },
+          { plannedEndAt: { gt: plannedStartAt } },
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (overlap) {
+      return NextResponse.json(
+        { error: "Ada pengajuan lembur lain yang overlap" },
+        { status: 400 }
+      )
+    }
+
+    const totalMinutes = Math.max(
+      0,
+      Math.floor((plannedEndAt.getTime() - plannedStartAt.getTime()) / 60000)
+    )
+
+    if (totalMinutes <= 0) {
+      return NextResponse.json(
+        { error: "Waktu mulai dan selesai tidak valid" },
+        { status: 400 }
+      )
+    }
+
+    const totalHours = parseFloat((totalMinutes / 60).toFixed(2))
 
     // Determine initial status based on department approval rules
     let status = "PENDING_MANAGER"
@@ -91,7 +290,7 @@ export async function POST(req: NextRequest) {
     const spl = await prisma.spl.create({
       data: {
         requesterId: userId,
-        date: new Date(date),
+        date: requestedDate,
         startTime,
         endTime,
         totalHours,
@@ -99,6 +298,10 @@ export async function POST(req: NextRequest) {
         projectName: projectName || null,
         status,
         supervisorId,
+        regularStartAt,
+        regularEndAt,
+        plannedStartAt,
+        plannedEndAt,
         isManualEntry: true, // Mark as manual entry
         manualEntryBy: session.user.id, // Track who created it
         requesterSignedAt: null, // User hasn't signed yet
@@ -126,11 +329,12 @@ export async function POST(req: NextRequest) {
     })
 
     try {
-      const splDate = new Date(date)
+      const splDate = requestedDate
       const formattedDate = splDate.toLocaleDateString("id-ID", {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: JAKARTA_TIME_ZONE,
       })
       const notificationTitle = "SPL Telat Input Baru"
       const notificationBody = `SPL ${formattedDate} (${startTime}-${endTime}) telah dibuat oleh Super Admin. Silakan tanda tangan di menu Telat Input.`

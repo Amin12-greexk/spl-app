@@ -51,7 +51,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
 
     const countManagerPending = async () => {
-      const response = await fetch("/api/spl?status=PENDING_MANAGER")
+      const response = await fetch(
+        "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+      )
       if (!response.ok) return 0
       const data = await response.json()
       return data.filter((spl: any) => {
@@ -287,6 +289,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     {
       name: "Jam Reguler",
       href: "/dashboard/admin/regular-hours",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      roles: ["SUPER_ADMIN"],
+      badge: null,
+    },
+    {
+      name: "Shift Security",
+      href: "/dashboard/admin/security-shifts",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

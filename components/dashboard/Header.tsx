@@ -343,7 +343,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
       } else if (sessionUserRole === "MANAGER") {
         // MANAGER hanya lihat pending approvals
-        const data = await fetchJson("/api/spl?status=PENDING_MANAGER")
+        const data = await fetchJson(
+          "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+        )
         if (!data) {
           setNotifications([])
           return

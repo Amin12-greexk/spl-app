@@ -302,7 +302,7 @@ export default function SplForm() {
         // Overtime is invalid if it's within the regular shift window
         // Regular shift spans from regularStartMinutes to 23:59, then 00:00 to regularEndMinutes
         const isDuringNightPortion = startMinutes >= regularStartMinutes // e.g., >= 22:00
-        const isDuringMorningPortion = startMinutes <= regularEndMinutes // e.g., <= 06:00
+        const isDuringMorningPortion = startMinutes < regularEndMinutes // e.g., < 06:00
 
         if (isDuringNightPortion || isDuringMorningPortion) {
           await Swal.fire({
@@ -314,7 +314,7 @@ export default function SplForm() {
         }
       } else {
         // For normal shift (e.g., 08:00-17:00)
-        if (startMinutes <= regularEndMinutes) {
+        if (startMinutes < regularEndMinutes) {
           await Swal.fire({
             icon: "warning",
             title: "Waktu lembur terlalu awal",

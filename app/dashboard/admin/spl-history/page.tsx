@@ -125,6 +125,8 @@ export default function SplHistoryPage() {
       PENDING_SUPERVISOR: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Supervisor" },
       PENDING_MANAGER: { bg: "bg-blue-100", text: "text-blue-800", label: "Pending Manager" },
       APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "Approved" },
+      IN_PROGRESS: { bg: "bg-yellow-100", text: "text-yellow-800", label: "In Progress" },
+      DONE: { bg: "bg-green-100", text: "text-green-800", label: "Done" },
       REJECTED_BY_SUPERVISOR: { bg: "bg-red-100", text: "text-red-800", label: "Rejected (Supervisor)" },
       REJECTED_BY_MANAGER: { bg: "bg-red-100", text: "text-red-800", label: "Rejected (Manager)" },
     }
@@ -197,6 +199,8 @@ export default function SplHistoryPage() {
             <option value="PENDING_SUPERVISOR">Pending Supervisor</option>
             <option value="PENDING_MANAGER">Pending Manager</option>
             <option value="APPROVED">Approved</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="DONE">Done</option>
             <option value="REJECTED_BY_SUPERVISOR">Rejected (Supervisor)</option>
             <option value="REJECTED_BY_MANAGER">Rejected (Manager)</option>
           </select>

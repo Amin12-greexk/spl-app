@@ -76,6 +76,18 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
           label: "Disetujui",
           description: `Disetujui oleh ${approver}`,
         }
+      case "IN_PROGRESS":
+        return {
+          icon: "⏳",
+          label: "Sedang Berjalan",
+          description: "Realisasi lembur sedang berjalan",
+        }
+      case "DONE":
+        return {
+          icon: "✅",
+          label: "Selesai",
+          description: "Realisasi lembur telah selesai",
+        }
       case "REJECTED_BY_SUPERVISOR":
         return {
           icon: "❌",
@@ -121,6 +133,16 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
         text: "text-green-700",
         border: "border-green-200",
       },
+      IN_PROGRESS: {
+        bg: "bg-yellow-50",
+        text: "text-yellow-700",
+        border: "border-yellow-200",
+      },
+      DONE: {
+        bg: "bg-green-50",
+        text: "text-green-700",
+        border: "border-green-200",
+      },
       REJECTED: {
         bg: "bg-red-50",
         text: "text-red-700",
@@ -162,13 +184,21 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
       return [
         { label: "Staff", done: true, current: false },
         { label: supervisorLabel, done: !!spl.supervisorApprovalDate, current: spl.status === "PENDING_SUPERVISOR" },
-        { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+        {
+          label: "Manager",
+          done: spl.status === "APPROVED",
+          current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
+        },
       ]
     }
 
     return [
       { label: "Pemohon", done: true, current: false },
-      { label: "Manager", done: spl.status === "APPROVED", current: spl.status === "PENDING_MANAGER" },
+      {
+        label: "Manager",
+        done: spl.status === "APPROVED",
+        current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
+      },
     ]
   }
 
