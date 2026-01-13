@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
 import SplDetailModal from "@/components/spl/SplDetailModal"
