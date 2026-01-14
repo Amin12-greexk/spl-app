@@ -3,6 +3,7 @@ import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import Image from "next/image"
 import { memo, useMemo } from "react"
+import { buildOvertimeWindowFromTimes, makeWindow, startOfDay } from "@/lib/spl-time"
 
 interface SplCardProps {
   spl: Spl
@@ -16,6 +17,7 @@ interface SplCardProps {
   mini?: boolean
   currentUserId?: string
   onClick?: () => void
+  showExpiredBadge?: boolean
 }
 
 function SplCard({
@@ -30,6 +32,7 @@ function SplCard({
   mini = false,
   currentUserId,
   onClick,
+  showExpiredBadge = false,
 }: SplCardProps) {
   const requesterDepartmentName =
     spl.requester?.department?.name || spl.requester?.departmentName || "-"
@@ -49,6 +52,39 @@ function SplCard({
       return `${formatRealizationTime(spl.actualStartAt)} - Berjalan`
     }
     return null
+  }
+
+  const getPlannedWindow = () => {
+    if (spl.plannedStartAt && spl.plannedEndAt) {
+      const plannedStart = new Date(spl.plannedStartAt)
+      const plannedEnd = new Date(spl.plannedEndAt)
+      if (!Number.isNaN(plannedStart.getTime()) && !Number.isNaN(plannedEnd.getTime())) {
+        return { plannedStart, plannedEnd }
+      }
+    }
+
+    if (spl.regularEndAt) {
+      const plannedWindow = buildOvertimeWindowFromTimes(
+        new Date(spl.regularEndAt),
+        spl.startTime,
+        spl.endTime
+      )
+      if (plannedWindow) {
+        return { plannedStart: plannedWindow.start, plannedEnd: plannedWindow.end }
+      }
+    }
+
+    const baseDay = startOfDay(new Date(spl.date))
+    const fallbackWindow = makeWindow(baseDay, spl.startTime, spl.endTime)
+    if (!fallbackWindow) return null
+    return { plannedStart: fallbackWindow.start, plannedEnd: fallbackWindow.end }
+  }
+
+  const isOvertimeExpired = () => {
+    if (spl.actualStartAt || spl.actualEndAt) return false
+    const window = getPlannedWindow()
+    if (!window) return false
+    return new Date() >= window.plannedEnd
   }
 
   const formatTotalHours = (value?: number | string | null) => {
@@ -229,6 +265,11 @@ function SplCard({
       Telat Input
     </span>
   ) : null
+  const expiredBadge = showExpiredBadge && isOvertimeExpired() ? (
+    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-amber-50 text-amber-700 border-amber-200">
+      Kadaluarsa
+    </span>
+  ) : null
 
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
@@ -278,6 +319,7 @@ function SplCard({
           </div>
           <div className="flex flex-col items-end gap-0.5">
             {manualBadge}
+            {expiredBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -346,6 +388,7 @@ function SplCard({
           </div>
           <div className="flex flex-col items-end gap-1">
             {manualBadge}
+            {expiredBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -553,6 +596,7 @@ function SplCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           {manualBadge}
+          {expiredBadge}
           {getStatusBadge(spl.status, false)}
         </div>
       </div>

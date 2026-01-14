@@ -18,6 +18,22 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const userRole = session?.user?.role as Role
   const userPosition = session?.user?.position || ""
   const isHeadHR = userRole === "HR" && userPosition.toLowerCase().includes("head")
+  const normalizedDepartment = (
+    session?.user?.department ||
+    (session?.user as { departmentName?: string })?.departmentName ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase()
+  const isProductionHead =
+    userRole === "DEPARTMENT_HEAD" &&
+    (normalizedDepartment === "produksi" || normalizedDepartment === "production")
+  const productionHeadHiddenRoutes = new Set([
+    "/dashboard/telat-input",
+    "/dashboard/ga/pengajuan",
+    "/dashboard/ga/riwayat",
+  ])
   const [manualPendingCount, setManualPendingCount] = useState(0)
   const [teamPendingCount, setTeamPendingCount] = useState(0)
   const [managerPendingCount, setManagerPendingCount] = useState(0)
@@ -155,7 +171,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      roles: ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR", "SUPER_ADMIN"],
+      roles: ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"],
       badge: manualPendingCount > 0 ? manualPendingCount : null,
       badgeKey: "manual",
     },
@@ -346,6 +362,10 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const filteredNavItems = navItems.filter((item) => {
     // Check basic role permission
     if (!item.roles.includes(userRole)) return false
+
+    if (isProductionHead && productionHeadHiddenRoutes.has(item.href)) {
+      return false
+    }
 
     // Check custom condition if exists
     if (item.customCondition) {

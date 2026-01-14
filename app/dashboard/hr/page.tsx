@@ -1049,6 +1049,7 @@ export default function HRViewPage() {
               userRole="HR"
               showActions={false}
               mini={true}
+              showExpiredBadge
               onClick={() => handleOpenDetail(spl)}
             />
           ))}

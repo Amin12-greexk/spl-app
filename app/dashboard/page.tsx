@@ -48,6 +48,17 @@ export default function DashboardPage() {
   const [overrunReason, setOverrunReason] = useState("")
 
   const userRole = session?.user?.role as Role
+  const normalizedDepartment = (
+    session?.user?.department ||
+    (session?.user as { departmentName?: string })?.departmentName ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase()
+  const isProductionHead =
+    userRole === "DEPARTMENT_HEAD" &&
+    (normalizedDepartment === "produksi" || normalizedDepartment === "production")
 
   const refreshSpls = useCallback(
     async (showLoading = false) => {
@@ -227,7 +238,7 @@ export default function DashboardPage() {
     historyStartIndex,
     historyStartIndex + historyItemsPerPage
   )
-  const showHistoryTable = true
+  const showHistoryTable = userRole !== "SUPER_ADMIN" && !isProductionHead
   const showManagerWidgets = userRole === "MANAGER"
 
   const getLeaderName = (spl: Spl) => {
@@ -293,6 +304,9 @@ export default function DashboardPage() {
     }
     if (spl.actualStartAt) {
       return `${formatTimeValue(spl.actualStartAt)} - Berjalan`
+    }
+    if (isOvertimeExpired(spl)) {
+      return "Surat kadaluarsa"
     }
     return "Belum mulai"
   }
@@ -367,6 +381,13 @@ export default function DashboardPage() {
     if (!window) return false
     const now = new Date()
     return now < window.plannedStart || now >= window.plannedEnd
+  }
+
+  const isOvertimeExpired = (spl: Spl) => {
+    if (spl.actualStartAt) return false
+    const window = getPlannedWindow(spl)
+    if (!window) return false
+    return new Date() >= window.plannedEnd
   }
 
   const getOverrunMinutes = (spl: Spl, endAt = new Date()) => {
@@ -940,7 +961,7 @@ export default function DashboardPage() {
                                     disabled
                                     className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-lg cursor-not-allowed"
                                   >
-                                    Di luar jadwal
+                                    {isOvertimeExpired(spl) ? "Kadaluarsa" : "Di luar jadwal"}
                                   </button>
                                 )}
                               {canFinishSpl(spl) && (
