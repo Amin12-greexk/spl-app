@@ -226,9 +226,14 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
             )}
           </div>
           <div className="flex flex-col items-end gap-2">
-            {spl.isManualEntry && (
+            {(spl.source === "MANUAL" || spl.isManualEntry) && (
               <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-red-50 text-red-700 border-red-200">
                 Telat Input
+              </span>
+            )}
+            {spl.source === "LEGACY" && (
+              <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-blue-50 text-blue-700 border-blue-200">
+                Data Lama
               </span>
             )}
             {getStatusBadge()}

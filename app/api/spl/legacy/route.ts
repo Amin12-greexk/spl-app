@@ -16,9 +16,8 @@ export async function GET(req: NextRequest) {
     const spls = await prisma.spl.findMany({
       where: {
         requesterId: session.user.id,
-        isManualEntry: true,
+        source: "LEGACY",
         requesterSignedAt: null,
-        source: "MANUAL",
       },
       include: {
         requester: {
@@ -47,9 +46,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(spls)
   } catch (error) {
-    console.error("Error fetching telat input SPLs:", error)
+    console.error("Error fetching legacy SPLs:", error)
     return NextResponse.json(
-      { error: "Terjadi kesalahan saat mengambil SPL telat input" },
+      { error: "Terjadi kesalahan saat mengambil SPL data lama" },
       { status: 500 }
     )
   }
@@ -102,9 +101,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    if (!spl.isManualEntry || spl.source !== "MANUAL") {
+    if (spl.source !== "LEGACY") {
       return NextResponse.json(
-        { error: "SPL ini bukan input manual" },
+        { error: "SPL ini bukan data lama" },
         { status: 400 }
       )
     }
@@ -149,8 +148,8 @@ export async function PATCH(req: NextRequest) {
         year: "numeric",
         timeZone: JAKARTA_TIME_ZONE,
       })
-      const notificationTitle = "SPL Manual Ditandatangani"
-      const notificationBody = `${updatedSpl.requester.name} menandatangani SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}).`
+      const notificationTitle = "Data Lama Ditandatangani"
+      const notificationBody = `${updatedSpl.requester.name} menandatangani SPL data lama ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}).`
       if (updatedSpl.supervisorId) {
         await sendNotificationToUser(
           updatedSpl.supervisorId,
@@ -166,9 +165,8 @@ export async function PATCH(req: NextRequest) {
           { splId: updatedSpl.id, click_action: "/dashboard/hr/persetujuan" }
         )
       }
-
     } catch (notificationError) {
-      console.error("Gagal mengirim notifikasi telat input:", notificationError)
+      console.error("Gagal mengirim notifikasi data lama:", notificationError)
     }
 
     return NextResponse.json({
@@ -176,7 +174,7 @@ export async function PATCH(req: NextRequest) {
       spl: updatedSpl,
     })
   } catch (error) {
-    console.error("Error signing telat input SPL:", error)
+    console.error("Error signing legacy SPL:", error)
     return NextResponse.json(
       { error: "Terjadi kesalahan saat menyimpan tanda tangan" },
       { status: 500 }

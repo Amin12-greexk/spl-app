@@ -88,6 +88,13 @@ export async function POST(
       )
     }
 
+    if (spl.source === "LEGACY") {
+      return NextResponse.json(
+        { error: "Data lama tidak dapat memulai realisasi" },
+        { status: 400 }
+      )
+    }
+
     if (REJECTED_STATUSES.has(spl.status)) {
       return NextResponse.json(
         { error: "SPL ini sudah ditolak" },

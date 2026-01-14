@@ -110,6 +110,13 @@ export async function POST(
       )
     }
 
+    if (spl.source === "LEGACY") {
+      return NextResponse.json(
+        { error: "Data lama tidak dapat menyelesaikan realisasi" },
+        { status: 400 }
+      )
+    }
+
     if (!spl.actualStartAt) {
       return NextResponse.json(
         { error: "Realisasi belum dimulai" },

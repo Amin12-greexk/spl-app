@@ -8,6 +8,7 @@
 export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD" | "PRODUCTION_SUPERVISOR" | "TEKNISI" | "DRIVER" | "SUPER_ADMIN"
 
 export type DepartmentApprovalMode = "DIRECT" | "GA" | "DEPARTMENT_HEAD"
+export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
@@ -82,6 +83,7 @@ export interface Spl {
   realizationCounted?: boolean | null
   realizationCancelReason?: string | null
   status: SplStatus // <-- Menggunakan tipe SplStatus yang kita definisikan di atas
+  source?: SplSource
   isManualEntry?: boolean
   requesterSignedAt?: Date | null
 

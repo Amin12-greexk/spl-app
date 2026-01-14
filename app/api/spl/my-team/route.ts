@@ -28,10 +28,12 @@ export async function GET(req: NextRequest) {
         ],
         AND: [
           {
-            OR: [
-              { isManualEntry: false },
-              { requesterSignedAt: { not: null } },
-            ],
+            NOT: {
+              OR: [
+                { isManualEntry: true, requesterSignedAt: null },
+                { source: "LEGACY", requesterSignedAt: null },
+              ],
+            },
           },
         ],
       },
