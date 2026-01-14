@@ -82,6 +82,7 @@ model Spl {
 
   // Status: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED, REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
   status String @default("PENDING_SUPERVISOR")
+  source String @default("SYSTEM") // SYSTEM | MANUAL | LEGACY
 
   // Approval Level 1: Supervisor (GA/Department Head)
   supervisorId              String?

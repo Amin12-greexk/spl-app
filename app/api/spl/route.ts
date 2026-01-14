@@ -67,7 +67,12 @@ export async function GET(req: NextRequest) {
     const hideUnsignedManual = userRole !== "SUPER_ADMIN";
 
     if (hideUnsignedManual) {
-      where.NOT = { isManualEntry: true, requesterSignedAt: null };
+      where.NOT = {
+        OR: [
+          { isManualEntry: true, requesterSignedAt: null },
+          { source: "LEGACY", requesterSignedAt: null },
+        ],
+      };
     }
 
     if (selfOnlyRoles.includes(userRole)) {
@@ -476,6 +481,7 @@ export async function POST(req: NextRequest) {
         plannedEndAt,
         status: initialStatus,
         supervisorId,
+        source: "SYSTEM",
       },
       include: {
         requester: {

@@ -49,9 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "SPL tidak ditemukan" }, { status: 404 })
     }
 
-    if (spl.isManualEntry && !spl.requesterSignedAt) {
+    if ((spl.isManualEntry || spl.source === "LEGACY") && !spl.requesterSignedAt) {
       return NextResponse.json(
-        { error: "SPL manual belum ditandatangani oleh pemohon" },
+        { error: "SPL belum ditandatangani oleh pemohon" },
         { status: 400 }
       )
     }

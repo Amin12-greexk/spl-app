@@ -260,9 +260,15 @@ function SplCard({
     )
   }
 
-  const manualBadge = spl.isManualEntry ? (
+  const isManualSource = spl.source === "MANUAL" || spl.isManualEntry
+  const manualBadge = isManualSource ? (
     <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-red-50 text-red-700 border-red-200">
       Telat Input
+    </span>
+  ) : null
+  const legacyBadge = spl.source === "LEGACY" ? (
+    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-blue-50 text-blue-700 border-blue-200">
+      Data Lama
     </span>
   ) : null
   const expiredBadge = showExpiredBadge && isOvertimeExpired() ? (
@@ -319,6 +325,7 @@ function SplCard({
           </div>
           <div className="flex flex-col items-end gap-0.5">
             {manualBadge}
+            {legacyBadge}
             {expiredBadge}
             {getStatusBadge(spl.status, true)}
           </div>
@@ -388,6 +395,7 @@ function SplCard({
           </div>
           <div className="flex flex-col items-end gap-1">
             {manualBadge}
+            {legacyBadge}
             {expiredBadge}
             {getStatusBadge(spl.status, true)}
           </div>
@@ -596,6 +604,7 @@ function SplCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           {manualBadge}
+          {legacyBadge}
           {expiredBadge}
           {getStatusBadge(spl.status, false)}
         </div>

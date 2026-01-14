@@ -198,29 +198,43 @@ export default function HRViewPage() {
     }
   }
 
+  const getSupervisorApprovalLabels = (spl: Spl) => {
+    if (spl.supervisor?.role === "GA") {
+      return { ga: spl.supervisor.name, deptHead: "-" }
+    }
+    if (spl.supervisor?.role === "DEPARTMENT_HEAD") {
+      return { ga: "-", deptHead: spl.supervisor.name }
+    }
+    return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
+  }
+
   const exportToExcel = () => {
     try {
-      const exportData = filteredSpls.map((spl, index) => ({
-        No: index + 1,
-        'Nama Karyawan': spl.requester.name,
-        'PIN': spl.requester.pin || '-',
-        'Email': spl.requester.email,
-        'Departemen': spl.requester.department?.name || spl.requester.departmentName || '-',
-        'Tanggal Lembur': format(new Date(spl.date), "dd/MM/yyyy"),
-        'Waktu Mulai': spl.startTime,
-        'Waktu Selesai': spl.endTime,
-        'Total Jam': spl.totalHours,
-        'Nama Proyek': spl.projectName || '-',
-        'Alasan Lembur': spl.reason,
-        'Status': getStatusText(spl.status),
-        'Disetujui Oleh GA': spl.supervisor?.role === "GA" ? spl.supervisor.name : '-',
-        'Disetujui Oleh Kepala Dept': spl.supervisor?.role === "DEPARTMENT_HEAD" ? spl.supervisor.name : '-',
-        'Disetujui Oleh': spl.approver?.name || '-',
-        'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
-        'Alasan Penolakan': spl.rejectionReason || '-',
-        'Tanggal Pengajuan': format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
-        'Tanda Tangan': spl.signature ? 'Ada' : 'Tidak'
-      }))
+      const exportData = filteredSpls.map((spl, index) => {
+        const supervisorLabels = getSupervisorApprovalLabels(spl)
+
+        return {
+          No: index + 1,
+          'Nama Karyawan': spl.requester.name,
+          'PIN': spl.requester.pin || '-',
+          'Email': spl.requester.email,
+          'Departemen': spl.requester.department?.name || spl.requester.departmentName || '-',
+          'Tanggal Lembur': format(new Date(spl.date), "dd/MM/yyyy"),
+          'Waktu Mulai': spl.startTime,
+          'Waktu Selesai': spl.endTime,
+          'Total Jam': spl.totalHours,
+          'Nama Proyek': spl.projectName || '-',
+          'Alasan Lembur': spl.reason,
+          'Status': getStatusText(spl.status),
+          'Disetujui Oleh GA': supervisorLabels.ga,
+          'Disetujui Oleh Kepala Dept': supervisorLabels.deptHead,
+          'Disetujui Oleh': spl.approver?.name || '-',
+          'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
+          'Alasan Penolakan': spl.rejectionReason || '-',
+          'Tanggal Pengajuan': format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+          'Tanda Tangan': spl.signature ? 'Ada' : 'Tidak'
+        }
+      })
 
       const ws = XLSX.utils.json_to_sheet(exportData)
       const wb = XLSX.utils.book_new()
@@ -254,27 +268,31 @@ export default function HRViewPage() {
 
   const copyTableData = () => {
     try {
-      const tableData = filteredSpls.map((spl, index) => [
-        index + 1,
-        spl.requester.name,
-        spl.requester.pin || '-',
-        spl.requester.email,
-        spl.requester.department?.name || spl.requester.departmentName || '-',
-        format(new Date(spl.date), "dd/MM/yyyy"),
-        spl.startTime,
-        spl.endTime,
-        spl.totalHours,
-        spl.projectName || '-',
-        spl.reason,
-        getStatusText(spl.status),
-        spl.supervisor?.role === "GA" ? spl.supervisor.name : '-',
-        spl.supervisor?.role === "DEPARTMENT_HEAD" ? spl.supervisor.name : '-',
-        spl.approver?.name || '-',
-        spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
-        spl.rejectionReason || '-',
-        format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
-        spl.signature ? 'Ada' : 'Tidak'
-      ])
+      const tableData = filteredSpls.map((spl, index) => {
+        const supervisorLabels = getSupervisorApprovalLabels(spl)
+
+        return [
+          index + 1,
+          spl.requester.name,
+          spl.requester.pin || '-',
+          spl.requester.email,
+          spl.requester.department?.name || spl.requester.departmentName || '-',
+          format(new Date(spl.date), "dd/MM/yyyy"),
+          spl.startTime,
+          spl.endTime,
+          spl.totalHours,
+          spl.projectName || '-',
+          spl.reason,
+          getStatusText(spl.status),
+          supervisorLabels.ga,
+          supervisorLabels.deptHead,
+          spl.approver?.name || '-',
+          spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
+          spl.rejectionReason || '-',
+          format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+          spl.signature ? 'Ada' : 'Tidak'
+        ]
+      })
 
       const headers = [
         'No', 'Nama Karyawan', 'PIN', 'Email', 'Departemen', 'Tanggal Lembur',

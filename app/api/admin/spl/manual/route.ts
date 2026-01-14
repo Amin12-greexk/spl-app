@@ -305,6 +305,7 @@ export async function POST(req: NextRequest) {
         isManualEntry: true, // Mark as manual entry
         manualEntryBy: session.user.id, // Track who created it
         requesterSignedAt: null, // User hasn't signed yet
+        source: "MANUAL",
       },
       include: {
         requester: {
