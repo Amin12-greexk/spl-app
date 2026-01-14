@@ -236,6 +236,7 @@ export default function GAApprovalPage() {
                   userRole={session?.user.role}
                   showActions={false}
                   mini={true}
+                  showExpiredBadge
                 />
               </div>
 

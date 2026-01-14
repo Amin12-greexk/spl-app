@@ -219,6 +219,7 @@ export default function PersetujuanPage() {
                     userRole={session?.user?.role}
                     showActions={false}
                     mini={true}
+                    showExpiredBadge
                   />
                 </div>
 

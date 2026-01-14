@@ -29,6 +29,12 @@ export function getRoleLabel(
   if (role === "STAFF" && normalizedDepartment === "security") {
     return "Security"
   }
+  if (
+    role === "DEPARTMENT_HEAD" &&
+    (normalizedDepartment === "produksi" || normalizedDepartment === "production")
+  ) {
+    return "Supervisor Produksi"
+  }
 
   return roleMap[role] || role
 }

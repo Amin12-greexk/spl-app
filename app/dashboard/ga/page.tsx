@@ -443,6 +443,7 @@ export default function GADashboardPage() {
               userRole={session?.user.role}
               showActions={false}
               mini={true}
+              showExpiredBadge
               onClick={() => handleOpenDetail(spl)}
             />
           ))}
