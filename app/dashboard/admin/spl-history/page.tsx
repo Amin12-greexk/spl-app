@@ -3,6 +3,8 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import Modal from "@/components/ui/Modal"
+import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
 
 interface Spl {
@@ -45,6 +47,15 @@ export default function SplHistoryPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("ALL")
+  const [editingSpl, setEditingSpl] = useState<Spl | null>(null)
+  const [editForm, setEditForm] = useState({
+    date: "",
+    startTime: "",
+    endTime: "",
+    reason: "",
+    projectName: "",
+  })
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -67,6 +78,59 @@ export default function SplHistoryPage() {
       console.error("Error fetching SPLs:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const formatDateInput = (value: Date) =>
+    new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })
+
+  const openEdit = (spl: Spl) => {
+    setEditingSpl(spl)
+    setEditForm({
+      date: formatDateInput(spl.date),
+      startTime: spl.startTime,
+      endTime: spl.endTime,
+      reason: spl.reason,
+      projectName: spl.projectName || "",
+    })
+  }
+
+  const closeEdit = () => {
+    if (isSaving) return
+    setEditingSpl(null)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingSpl) return
+    if (!editForm.date || !editForm.startTime || !editForm.endTime || !editForm.reason.trim()) {
+      await Swal.fire("Gagal", "Tanggal, jam, dan alasan wajib diisi.", "error")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/admin/spl/${editingSpl.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: editForm.date,
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+          reason: editForm.reason,
+          projectName: editForm.projectName || null,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal memperbarui SPL")
+      }
+      await Swal.fire("Berhasil!", "SPL berhasil diperbarui", "success")
+      setEditingSpl(null)
+      await fetchSpls()
+    } catch (error: any) {
+      await Swal.fire("Gagal!", error.message || "Terjadi kesalahan", "error")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -259,12 +323,20 @@ export default function SplHistoryPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => handleDelete(spl.id, spl.requester.name, spl.date)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium"
-                    >
-                      Hapus
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => openEdit(spl)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(spl.id, spl.requester.name, spl.date)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Hapus
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -278,6 +350,98 @@ export default function SplHistoryPage() {
           Tidak ada SPL ditemukan
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(editingSpl)}
+        onClose={closeEdit}
+        title="Edit Data SPL"
+        size="large"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={closeEdit}
+              disabled={isSaving}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleEditSave} disabled={isSaving}>
+              {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tanggal Lembur
+            </label>
+            <input
+              type="date"
+              value={editForm.date}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, date: e.target.value }))
+              }
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Jam Mulai
+              </label>
+              <input
+                type="time"
+                value={editForm.startTime}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, startTime: e.target.value }))
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Jam Selesai
+              </label>
+              <input
+                type="time"
+                value={editForm.endTime}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, endTime: e.target.value }))
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Alasan Lembur
+            </label>
+            <textarea
+              value={editForm.reason}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, reason: e.target.value }))
+              }
+              className="w-full min-h-[120px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Isi alasan lembur..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nama Proyek (Opsional)
+            </label>
+            <input
+              type="text"
+              value={editForm.projectName}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, projectName: e.target.value }))
+              }
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Nama proyek..."
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

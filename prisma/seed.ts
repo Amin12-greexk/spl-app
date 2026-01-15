@@ -148,6 +148,25 @@ async function main() {
   await applyDefaultRegularHours(hr.id)
   console.log("✅ HR created")
 
+  // 4b. Create HR Zahila
+  const hrZahila = await prisma.user.upsert({
+    where: { email: "zahlila@tunasestaindonesia.com" },
+    update: {},
+    create: {
+      email: "zahlila@tunasestaindonesia.com",
+      name: "ZAHLILA",
+      password: hashedPassword,
+      pin: "202",
+      role: "HR",
+      departmentName: "HR",
+      departmentId: departmentIdByName.get("HR") || null,
+      position: "HR",
+      ...defaultRegularHours,
+    },
+  })
+  await applyDefaultRegularHours(hrZahila.id)
+  console.log("✅ HR Zahila created")
+
   // 5. Create Production Supervisor
   const productionSupervisor = await prisma.user.upsert({
     where: { email: "ganes@tunasestaindonesia.com" },
