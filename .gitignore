@@ -31,6 +31,10 @@ yarn-error.log*
 ADMIN-CREDENTIALS.md
 *.credentials.md
 
+# docs and exports
+*.md
+*.pdf
+
 # vercel
 .vercel
 
