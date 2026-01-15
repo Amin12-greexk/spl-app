@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { ChangeEvent, useCallback, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
 import { Spl, Role } from "@/types"
@@ -17,12 +18,22 @@ const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "PRODUCTION_SUPERVISOR",
   "HR",
 ]
+const LEGACY_PROMPT_ROLES: Role[] = [
+  "STAFF",
+  "TEKNISI",
+  "DRIVER",
+  "GA",
+  "DEPARTMENT_HEAD",
+  "PRODUCTION_SUPERVISOR",
+  "HR",
+]
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 const REJECTED_STATUSES = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
 const EARLY_FINISH_GRACE_MINUTES = 30
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const router = useRouter()
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -46,6 +57,7 @@ export default function DashboardPage() {
   const [realizationProofImage, setRealizationProofImage] = useState("")
   const [realizationProofPreview, setRealizationProofPreview] = useState<string | null>(null)
   const [overrunReason, setOverrunReason] = useState("")
+  const [hasPromptedLegacy, setHasPromptedLegacy] = useState(false)
 
   const userRole = session?.user?.role as Role
   const normalizedDepartment = (
@@ -142,6 +154,48 @@ export default function DashboardPage() {
       fetchManager()
     }
   }, [session, refreshSpls])
+
+  useEffect(() => {
+    if (!session || hasPromptedLegacy) return
+    const role = session.user.role as Role
+    if (!LEGACY_PROMPT_ROLES.includes(role)) return
+
+    let isActive = true
+
+    const checkLegacy = async () => {
+      try {
+        const response = await fetch("/api/spl/legacy")
+        if (!response.ok) return
+        const data = await response.json()
+        if (!isActive) return
+        if (Array.isArray(data) && data.length > 0) {
+          const result = await Swal.fire({
+            icon: "info",
+            title: "Data Lama Menunggu TTD",
+            text: "Ada data lembur lama sebelum sistem dibuat. Mohon tanda tangan dulu agar bisa diproses.",
+            showCancelButton: true,
+            confirmButtonText: "Buka Data Lama",
+            cancelButtonText: "Nanti",
+          })
+          if (result.isConfirmed) {
+            router.push("/dashboard/data-lama")
+          }
+        }
+      } catch (error) {
+        // ignore legacy prompt errors
+      } finally {
+        if (isActive) {
+          setHasPromptedLegacy(true)
+        }
+      }
+    }
+
+    checkLegacy()
+
+    return () => {
+      isActive = false
+    }
+  }, [session, hasPromptedLegacy, router])
 
   useEffect(() => {
     if (!session || session.user.role === "MANAGER") {
