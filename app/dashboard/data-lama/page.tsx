@@ -146,7 +146,7 @@ export default function DataLamaPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="text-sm text-blue-800">
-            Setelah Anda tanda tangan, data akan diteruskan ke atasan untuk persetujuan.
+            Data lama sebelum sistem dibuat. Wajib TTD dulu sebelum diproses oleh atasan.
           </div>
         </div>
       </div>
@@ -175,9 +175,14 @@ export default function DataLamaPage() {
                     {spl.startTime} - {spl.endTime} - {spl.totalHours} jam
                   </p>
                 </div>
-                <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
-                  Menunggu TTD
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                    Data Lama
+                  </span>
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                    Menunggu TTD
+                  </span>
+                </div>
               </div>
 
               {spl.projectName && (
