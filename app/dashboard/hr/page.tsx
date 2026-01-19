@@ -9,8 +9,16 @@ import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale" // Import locale Indonesia
+import { parseTimeToMinutes } from "@/lib/spl-time"
 import * as XLSX from 'xlsx'
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+
+interface AttendanceRecord {
+  pin?: string | null
+  scan_date: string
+}
+
+type ExportRow = Record<string, string | number>
 
 export default function HRViewPage() {
   const [spls, setSpls] = useState<Spl[]>([])
@@ -179,22 +187,41 @@ export default function HRViewPage() {
   }
 
   const getStats = () => {
+    const pendingStatuses = new Set([
+      "PENDING",
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+      "IN_PROGRESS",
+      "DONE",
+    ])
+    const rejectedStatuses = new Set([
+      "REJECTED",
+      "REJECTED_BY_SUPERVISOR",
+      "REJECTED_BY_MANAGER",
+    ])
+    const sumHours = (items: Spl[]) =>
+      items.reduce((sum, spl) => {
+        const hours = Number(spl.totalHours)
+        return sum + (Number.isFinite(hours) ? hours : 0)
+      }, 0)
+
+    const pendingItems = filteredSpls.filter((spl) =>
+      pendingStatuses.has(spl.status)
+    )
+    const approvedItems = filteredSpls.filter(
+      (spl) => spl.status === "APPROVED"
+    )
+    const rejectedItems = filteredSpls.filter((spl) =>
+      rejectedStatuses.has(spl.status)
+    )
+
     return {
       total: filteredSpls.length,
-      pending: filteredSpls.filter(spl =>
-        spl.status === "PENDING" ||
-        spl.status === "PENDING_SUPERVISOR" ||
-        spl.status === "PENDING_MANAGER" ||
-        spl.status === "IN_PROGRESS" ||
-        spl.status === "DONE"
-      ).length,
-      approved: filteredSpls.filter(spl => spl.status === "APPROVED").length,
-      rejected: filteredSpls.filter(spl =>
-        spl.status === "REJECTED" ||
-        spl.status === "REJECTED_BY_SUPERVISOR" ||
-        spl.status === "REJECTED_BY_MANAGER"
-      ).length,
-      totalHours: filteredSpls.reduce((sum, spl) => sum + Number(spl.totalHours), 0).toFixed(1)
+      pending: pendingItems.length,
+      approved: approvedItems.length,
+      rejected: rejectedItems.length,
+      approvedHours: sumHours(approvedItems).toFixed(1),
+      pendingHours: sumHours(pendingItems).toFixed(1),
     }
   }
 
@@ -208,57 +235,246 @@ export default function HRViewPage() {
     return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
   }
 
-  const exportToExcel = () => {
-    try {
-      const exportData = filteredSpls.map((spl, index) => {
-        const supervisorLabels = getSupervisorApprovalLabels(spl)
+  const exportHeaders = [
+    "No",
+    "Nama Karyawan",
+    "PIN",
+    "Email",
+    "Departemen",
+    "Tanggal Lembur",
+    "Waktu Mulai",
+    "Waktu Selesai",
+    "Absensi Masuk",
+    "Absensi Pulang",
+    "Total Jam",
+    "Nama Proyek",
+    "Alasan Lembur",
+    "Status",
+    "Disetujui Oleh GA",
+    "Disetujui Oleh Kepala Dept",
+    "Disetujui Oleh",
+    "Tanggal Persetujuan",
+    "Alasan Penolakan",
+    "Tanggal Pengajuan",
+    "Tanda Tangan",
+  ]
 
-        return {
-          No: index + 1,
-          'Nama Karyawan': spl.requester.name,
-          'PIN': spl.requester.pin || '-',
-          'Email': spl.requester.email,
-          'Departemen': spl.requester.department?.name || spl.requester.departmentName || '-',
-          'Tanggal Lembur': format(new Date(spl.date), "dd/MM/yyyy"),
-          'Waktu Mulai': spl.startTime,
-          'Waktu Selesai': spl.endTime,
-          'Total Jam': spl.totalHours,
-          'Nama Proyek': spl.projectName || '-',
-          'Alasan Lembur': spl.reason,
-          'Status': getStatusText(spl.status),
-          'Disetujui Oleh GA': supervisorLabels.ga,
-          'Disetujui Oleh Kepala Dept': supervisorLabels.deptHead,
-          'Disetujui Oleh': spl.approver?.name || '-',
-          'Tanggal Persetujuan': spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
-          'Alasan Penolakan': spl.rejectionReason || '-',
-          'Tanggal Pengajuan': format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
-          'Tanda Tangan': spl.signature ? 'Ada' : 'Tidak'
+  const exportColWidths = [
+    { wch: 5 },   { wch: 20 },  { wch: 10 },  { wch: 25 },  { wch: 15 },
+    { wch: 12 },  { wch: 10 },  { wch: 10 },  { wch: 12 },  { wch: 12 },
+    { wch: 10 },  { wch: 20 },  { wch: 40 },  { wch: 12 },  { wch: 20 },
+    { wch: 20 },  { wch: 20 },  { wch: 18 },  { wch: 30 },  { wch: 18 },
+    { wch: 12 },
+  ]
+
+  const getDurationMinutes = (startTime: string, endTime: string) => {
+    const startMinutes = parseTimeToMinutes(startTime)
+    const endMinutes = parseTimeToMinutes(endTime)
+    if (startMinutes === null || endMinutes === null) return null
+    const diff = endMinutes - startMinutes
+    return diff >= 0 ? diff : diff + 24 * 60
+  }
+
+  const roundHoursFromMinutes = (minutes: number | null) => {
+    if (minutes === null || !Number.isFinite(minutes)) return null
+    const hours = Math.floor(minutes / 60)
+    const remainder = minutes % 60
+    return remainder >= 30 ? hours + 1 : hours
+  }
+
+  const formatTotalHours = (spl: Spl): number | string => {
+    const minutes = getDurationMinutes(spl.startTime, spl.endTime)
+    const roundedFromTimes = roundHoursFromMinutes(minutes)
+    if (roundedFromTimes !== null) return roundedFromTimes
+
+    const fallback = Number(spl.totalHours)
+    if (!Number.isFinite(fallback)) return "-"
+    const fallbackMinutes = Math.round(fallback * 60)
+    const roundedFromStored = roundHoursFromMinutes(fallbackMinutes)
+    return roundedFromStored ?? "-"
+  }
+
+  const formatScanTime = (value: string) => {
+    const trimmed = (value || "").trim()
+    if (!trimmed) return "-"
+    const parts = trimmed.split(" ")
+    if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
+      return parts[1].slice(0, 5)
+    }
+    const normalized = trimmed.replace(" ", "T")
+    const parsed = new Date(normalized)
+    if (Number.isNaN(parsed.getTime())) return trimmed
+    return format(parsed, "HH:mm")
+  }
+
+  const getAttendanceTimes = (
+    records: AttendanceRecord[],
+    dateKey: string
+  ) => {
+    if (!dateKey || records.length === 0) {
+      return { checkIn: "-", checkOut: "-" }
+    }
+    const dayRecords = records.filter((record) => {
+      const recordDateKey = record.scan_date.split(" ")[0]
+      return recordDateKey === dateKey
+    })
+    if (dayRecords.length === 0) {
+      return { checkIn: "-", checkOut: "-" }
+    }
+    dayRecords.sort((a, b) => a.scan_date.localeCompare(b.scan_date))
+    return {
+      checkIn: formatScanTime(dayRecords[0].scan_date),
+      checkOut: formatScanTime(dayRecords[dayRecords.length - 1].scan_date),
+    }
+  }
+
+  const sortSplsForExport = (items: Spl[]) => {
+    return [...items].sort((a, b) => {
+      const nameCompare = a.requester.name.localeCompare(
+        b.requester.name,
+        "id-ID",
+        { sensitivity: "base" }
+      )
+      if (nameCompare !== 0) return nameCompare
+      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return (a.requester.pin || "").localeCompare(b.requester.pin || "")
+    })
+  }
+
+  const buildExportRows = async (): Promise<ExportRow[]> => {
+    const sortedSpls = sortSplsForExport(filteredSpls)
+    if (sortedSpls.length === 0) return []
+
+    const needsPinLookup = sortedSpls.some(
+      (spl) => !(spl.requester.pin || "").toString().trim()
+    )
+    const nameToPin = new Map<string, string>()
+
+    if (needsPinLookup) {
+      try {
+        const response = await fetch("/api/hr/users")
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data)) {
+            data.forEach((user) => {
+              const name = (user?.name || "").toString().toLowerCase().trim()
+              const pin = (user?.pin || "").toString().trim()
+              if (name && pin && !nameToPin.has(name)) {
+                nameToPin.set(name, pin)
+              }
+            })
+          }
         }
-      })
+      } catch (error) {
+        console.error("Error fetching user pins for attendance:", error)
+      }
+    }
 
-      const ws = XLSX.utils.json_to_sheet(exportData)
+    const resolvePin = (spl: Spl) => {
+      const directPin = (spl.requester.pin || "").toString().trim()
+      if (directPin) return directPin
+      const nameKey = spl.requester.name.toLowerCase().trim()
+      return nameToPin.get(nameKey) || ""
+    }
+
+    const uniquePins = Array.from(
+      new Set(sortedSpls.map(resolvePin).filter(Boolean))
+    )
+    const attendanceByPin = new Map<string, AttendanceRecord[]>()
+
+    if (uniquePins.length > 0) {
+      await Promise.all(
+        uniquePins.map(async (pin) => {
+          try {
+            const response = await fetch(
+              `/api/hr/attendance?pin=${encodeURIComponent(pin)}`
+            )
+            if (!response.ok) {
+              attendanceByPin.set(pin, [])
+              return
+            }
+            const data = await response.json()
+            const records = Array.isArray(data?.data) ? data.data : []
+            attendanceByPin.set(pin, records)
+          } catch (error) {
+            console.error("Error fetching attendance for pin:", pin, error)
+            attendanceByPin.set(pin, [])
+          }
+        })
+      )
+    }
+
+    return sortedSpls.map((spl, index) => {
+      const supervisorLabels = getSupervisorApprovalLabels(spl)
+      const resolvedPin = resolvePin(spl)
+      const dateValue = new Date(spl.date)
+      const dateKey = Number.isNaN(dateValue.getTime())
+        ? ""
+        : format(dateValue, "yyyy-MM-dd")
+      const attendanceRecords = resolvedPin
+        ? attendanceByPin.get(resolvedPin) || []
+        : []
+      const attendanceTimes = getAttendanceTimes(attendanceRecords, dateKey)
+
+      return {
+        No: index + 1,
+        "Nama Karyawan": spl.requester.name,
+        PIN: resolvedPin || "-",
+        Email: spl.requester.email,
+        Departemen:
+          spl.requester.department?.name ||
+          spl.requester.departmentName ||
+          "-",
+        "Tanggal Lembur": Number.isNaN(dateValue.getTime())
+          ? "-"
+          : format(dateValue, "dd/MM/yyyy"),
+        "Waktu Mulai": spl.startTime,
+        "Waktu Selesai": spl.endTime,
+        "Absensi Masuk": attendanceTimes.checkIn,
+        "Absensi Pulang": attendanceTimes.checkOut,
+        "Total Jam": formatTotalHours(spl),
+        "Nama Proyek": spl.projectName || "-",
+        "Alasan Lembur": spl.reason,
+        Status: getStatusText(spl.status),
+        "Disetujui Oleh GA": supervisorLabels.ga,
+        "Disetujui Oleh Kepala Dept": supervisorLabels.deptHead,
+        "Disetujui Oleh": spl.approver?.name || "-",
+        "Tanggal Persetujuan": spl.approvalDate
+          ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm")
+          : "-",
+        "Alasan Penolakan": spl.rejectionReason || "-",
+        "Tanggal Pengajuan": format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+        "Tanda Tangan": spl.signature ? "Ada" : "Tidak",
+      }
+    })
+  }
+
+  const exportToExcel = async () => {
+    try {
+      const exportData = await buildExportRows()
+      if (exportData.length === 0) {
+        toast.error("Tidak ada data untuk diexport")
+        return
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders })
       const wb = XLSX.utils.book_new()
 
-      const colWidths = [
-        { wch: 5 },   { wch: 20 },  { wch: 10 },  { wch: 25 },  { wch: 15 },
-        { wch: 12 },  { wch: 10 },  { wch: 10 },  { wch: 8 },   { wch: 20 },
-        { wch: 40 },  { wch: 12 },  { wch: 20 },  { wch: 20 },  { wch: 20 },
-        { wch: 18 },  { wch: 30 },  { wch: 18 },  { wch: 12 }
-      ]
-      ws['!cols'] = colWidths
+      ws["!cols"] = exportColWidths
 
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
-      
+
       const periodText = dateFilter === "ALL" ? "Semua_Periode" :
                          dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
                          dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
                          dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
                          dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
                          `${customStartDate}_sampai_${customEndDate}`
-      
+
       const fileName = `Data_SPL_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`
       XLSX.writeFile(wb, fileName)
-      
+
       toast.success("Data berhasil diexport ke Excel!")
     } catch (error) {
       console.error("Error exporting to Excel:", error)
@@ -266,45 +482,23 @@ export default function HRViewPage() {
     }
   }
 
-  const copyTableData = () => {
+  const copyTableData = async () => {
     try {
-      const tableData = filteredSpls.map((spl, index) => {
-        const supervisorLabels = getSupervisorApprovalLabels(spl)
+      const exportData = await buildExportRows()
+      if (exportData.length === 0) {
+        toast.error("Tidak ada data untuk disalin")
+        return
+      }
 
-        return [
-          index + 1,
-          spl.requester.name,
-          spl.requester.pin || '-',
-          spl.requester.email,
-          spl.requester.department?.name || spl.requester.departmentName || '-',
-          format(new Date(spl.date), "dd/MM/yyyy"),
-          spl.startTime,
-          spl.endTime,
-          spl.totalHours,
-          spl.projectName || '-',
-          spl.reason,
-          getStatusText(spl.status),
-          supervisorLabels.ga,
-          supervisorLabels.deptHead,
-          spl.approver?.name || '-',
-          spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : '-',
-          spl.rejectionReason || '-',
-          format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
-          spl.signature ? 'Ada' : 'Tidak'
-        ]
-      })
+      const tableData = exportData.map((row) =>
+        exportHeaders.map((header) => String(row[header] ?? ""))
+      )
 
-      const headers = [
-        'No', 'Nama Karyawan', 'PIN', 'Email', 'Departemen', 'Tanggal Lembur',
-        'Waktu Mulai', 'Waktu Selesai', 'Total Jam', 'Nama Proyek', 'Alasan Lembur',
-        'Status', 'Disetujui Oleh GA', 'Disetujui Oleh Kepala Dept', 'Disetujui Oleh', 'Tanggal Persetujuan', 'Alasan Penolakan', 'Tanggal Pengajuan', 'Tanda Tangan'
-      ]
+      const csvContent = [exportHeaders, ...tableData]
+        .map(row => row.map(cell => `"${cell}"`).join("\t"))
+        .join("\n")
 
-      const csvContent = [headers, ...tableData]
-        .map(row => row.map(cell => `"${cell}"`).join('\t'))
-        .join('\n')
-
-      navigator.clipboard.writeText(csvContent)
+      await navigator.clipboard.writeText(csvContent)
       toast.success("Data berhasil disalin ke clipboard!")
     } catch (error) {
       console.error("Error copying data:", error)
@@ -775,7 +969,10 @@ export default function HRViewPage() {
           <div className="mt-4 sm:mt-0 flex items-center space-x-2">
             <div className="bg-white/20 rounded-lg px-4 py-2">
               <span className="text-sm font-medium">
-                {stats.total} SPL • {stats.totalHours} Jam
+                {stats.total} SPL • {stats.approvedHours} Jam ACC Manager
+                {Number(stats.pendingHours) > 0 && (
+                  <span className="ml-1">• {stats.pendingHours} Jam Pending</span>
+                )}
               </span>
             </div>
           </div>
@@ -783,7 +980,7 @@ export default function HRViewPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
@@ -810,8 +1007,14 @@ export default function HRViewPage() {
         </div>
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.totalHours}</div>
-            <div className="text-sm text-gray-600">Total Jam</div>
+            <div className="text-2xl font-bold text-purple-600">{stats.approvedHours}</div>
+            <div className="text-sm text-gray-600">Jam ACC Manager</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">{stats.pendingHours}</div>
+            <div className="text-sm text-gray-600">Jam Pending</div>
           </div>
         </div>
       </div>
@@ -920,8 +1123,11 @@ export default function HRViewPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
             Menampilkan <span className="font-semibold text-gray-900">{filteredSpls.length}</span> dari <span className="font-semibold text-gray-900">{spls.length}</span> data SPL
-            {Number(stats.totalHours) > 0 && (
-              <span className="ml-2">• Total <span className="font-semibold text-green-600">{stats.totalHours} jam</span> lembur</span>
+            {Number(stats.approvedHours) > 0 && (
+              <span className="ml-2">• Total <span className="font-semibold text-green-600">{stats.approvedHours} jam</span> ACC Manager</span>
+            )}
+            {Number(stats.pendingHours) > 0 && (
+              <span className="ml-2">• Pending <span className="font-semibold text-yellow-600">{stats.pendingHours} jam</span></span>
             )}
           </div>
 
