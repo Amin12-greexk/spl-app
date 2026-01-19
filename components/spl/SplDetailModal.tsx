@@ -33,17 +33,21 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     return null
   }
 
+  const roundHoursFromMinutes = (minutes: number) => {
+    if (!Number.isFinite(minutes)) return null
+    const hours = Math.floor(minutes / 60)
+    const remainder = minutes % 60
+    return remainder >= 30 ? hours + 1 : hours
+  }
+
   const formatTotalHours = (value?: number | string | null) => {
     if (value === null || value === undefined) return "-"
     const numericValue = typeof value === "number" ? value : Number(value)
     if (!Number.isFinite(numericValue)) return "-"
     const totalMinutes = Math.round(numericValue * 60)
-    if (totalMinutes <= 0) return "0 menit"
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    if (hours === 0) return `${minutes} menit`
-    if (minutes === 0) return `${hours} jam`
-    return `${hours} jam ${minutes} menit`
+    const roundedHours = roundHoursFromMinutes(totalMinutes)
+    if (roundedHours === null) return "-"
+    return `${roundedHours} jam`
   }
 
   const getDetailedStatus = () => {
