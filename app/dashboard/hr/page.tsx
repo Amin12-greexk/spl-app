@@ -235,6 +235,13 @@ export default function HRViewPage() {
     return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
   }
 
+  const isExportApproved = (spl: Spl) => {
+    if (spl.status !== "APPROVED") return false
+    if (spl.approver?.role !== "MANAGER") return false
+    if (spl.supervisorId && !spl.supervisorApprovalDate) return false
+    return true
+  }
+
   const exportHeaders = [
     "No",
     "Nama Karyawan",
@@ -344,9 +351,10 @@ export default function HRViewPage() {
 
   const buildExportRows = async (): Promise<ExportRow[]> => {
     const sortedSpls = sortSplsForExport(filteredSpls)
-    if (sortedSpls.length === 0) return []
+    const exportableSpls = sortedSpls.filter(isExportApproved)
+    if (exportableSpls.length === 0) return []
 
-    const needsPinLookup = sortedSpls.some(
+    const needsPinLookup = exportableSpls.some(
       (spl) => !(spl.requester.pin || "").toString().trim()
     )
     const nameToPin = new Map<string, string>()
@@ -379,7 +387,7 @@ export default function HRViewPage() {
     }
 
     const uniquePins = Array.from(
-      new Set(sortedSpls.map(resolvePin).filter(Boolean))
+      new Set(exportableSpls.map(resolvePin).filter(Boolean))
     )
     const attendanceByPin = new Map<string, AttendanceRecord[]>()
 
@@ -405,7 +413,7 @@ export default function HRViewPage() {
       )
     }
 
-    return sortedSpls.map((spl, index) => {
+    return exportableSpls.map((spl, index) => {
       const supervisorLabels = getSupervisorApprovalLabels(spl)
       const resolvedPin = resolvePin(spl)
       const dateValue = new Date(spl.date)
