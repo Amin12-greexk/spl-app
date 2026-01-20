@@ -3,8 +3,9 @@
 ## 📋 Overview
 
 Role **PRODUCTION_SUPERVISOR** (Pengawas Produksi) telah ditambahkan ke sistem SPL dengan karakteristik khusus:
-- **Tidak memerlukan supervisor** untuk approval SPL
-- **SPL langsung ke Manager** untuk persetujuan final
+- **Default: tidak memerlukan supervisor** untuk approval SPL
+- **SPL langsung ke Manager** untuk persetujuan final (jika supervisorId kosong)
+- **Jika supervisorId diisi**, SPL akan melewati supervisor terlebih dahulu
 - **Bisa mengajukan lembur** sendiri
 
 ## ✨ Fitur yang Ditambahkan
@@ -44,11 +45,12 @@ Pengawas Produksi bisa mengajukan SPL dengan:
 - Submit
 
 **Status SPL:**
-- Awal: `PENDING_MANAGER` (langsung ke Manager)
+- Awal: `PENDING_MANAGER` (langsung ke Manager, jika supervisorId kosong)
+- Awal: `PENDING_SUPERVISOR` (jika supervisorId diisi)
 - Setelah Manager approve: `APPROVED`
 - Jika ditolak: `REJECTED_BY_MANAGER`
 
-**Note:** Skip level supervisor approval karena Pengawas Produksi tidak punya atasan langsung.
+**Note:** Default skip supervisor approval karena Pengawas Produksi tidak punya atasan langsung (kecuali supervisorId diisi).
 
 ## 🔄 Alur Approval SPL
 
@@ -81,10 +83,10 @@ Pengawas Produksi bisa mengajukan SPL dengan:
 
 | Aspect | STAFF | PRODUCTION_SUPERVISOR |
 |--------|-------|----------------------|
-| **Supervisor** | Ada (wajib) | Tidak ada |
+| **Supervisor** | Ada (wajib) | Tidak ada (default) |
 | **Approval Level 1** | Supervisor/GA/Dept Head | - (Skip) |
 | **Approval Level 2** | Manager | Manager |
-| **Initial Status** | PENDING_SUPERVISOR | PENDING_MANAGER |
+| **Initial Status** | PENDING_SUPERVISOR | PENDING_MANAGER (default) |
 
 ## 📄 File yang Diupdate
 
@@ -107,7 +109,8 @@ Pengawas Produksi bisa mengajukan SPL dengan:
 - File: `app/api/spl/route.ts`
 - Perubahan:
   - Tambah PRODUCTION_SUPERVISOR ke list role yang bisa mengajukan SPL
-  - Set initial status `PENDING_MANAGER` untuk PRODUCTION_SUPERVISOR (skip supervisor)
+  - Set initial status `PENDING_MANAGER` untuk PRODUCTION_SUPERVISOR (skip supervisor, jika supervisorId kosong)
+  - Jika supervisorId diisi, status awal menjadi `PENDING_SUPERVISOR`
 
 ### 5. **Admin Forms** (Sudah Ada)
 - File: `app/dashboard/admin/users/new/page.tsx`
@@ -163,7 +166,7 @@ model User {
   // Values: STAFF, TEKNISI, GA, HR, PRODUCTION_SUPERVISOR,
   //         DEPARTMENT_HEAD, MANAGER, SUPER_ADMIN
 
-  supervisorId: String? // null untuk PRODUCTION_SUPERVISOR
+  supervisorId: String? // null untuk PRODUCTION_SUPERVISOR (default)
 }
 
 model Spl {
@@ -171,7 +174,7 @@ model Spl {
   // Values: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED,
   //         REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
 
-  supervisorId: String? // null untuk SPL dari PRODUCTION_SUPERVISOR
+  supervisorId: String? // null untuk SPL dari PRODUCTION_SUPERVISOR (default)
 }
 ```
 
@@ -179,7 +182,7 @@ model Spl {
 
 1. **Untuk HR/Admin:**
    - Pastikan hanya buat role PRODUCTION_SUPERVISOR untuk user yang memang Pengawas Produksi
-   - Jangan assign supervisor untuk Pengawas Produksi
+   - Jangan assign supervisor jika ingin langsung ke Manager
 
 2. **Untuk Pengawas Produksi:**
    - SPL Anda langsung di-review oleh Manager
@@ -194,7 +197,7 @@ model Spl {
 
 ### SPL Pengawas Produksi masih PENDING_SUPERVISOR?
 **Penyebab:** User masih punya supervisor (supervisorId tidak null)
-**Solusi:**
+**Solusi (jika ingin direct ke Manager):**
 1. Cek via Admin Panel → Edit User
 2. Set Supervisor ke "Tidak Ada"
 3. Save
