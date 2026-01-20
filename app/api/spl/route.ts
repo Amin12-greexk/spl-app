@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
       select: {
         id: true,
         role: true,
+        supervisorId: true,
         departmentId: true,
         departmentName: true,
         department: { select: { name: true } },
@@ -436,8 +437,10 @@ export async function POST(req: NextRequest) {
     let supervisorId: string | null = null
     const routingDepartmentName = currentDepartmentName || null
 
-    // GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, dan HR langsung ke Manager (skip supervisor approval)
-    if (
+    if (userRecord.supervisorId) {
+      initialStatus = "PENDING_SUPERVISOR"
+      supervisorId = userRecord.supervisorId
+    } else if (
       userRecord.role === "GA" ||
       userRecord.role === "DEPARTMENT_HEAD" ||
       userRecord.role === "PRODUCTION_SUPERVISOR" ||

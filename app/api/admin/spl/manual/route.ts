@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       select: {
         id: true,
         role: true,
+        supervisorId: true,
         departmentId: true,
         departmentName: true,
         department: { select: { name: true } },
@@ -275,7 +276,10 @@ export async function POST(req: NextRequest) {
     let supervisorId: string | null = null
     const routingDepartmentName = user.department?.name || user.departmentName || null
 
-    if (user.role === "STAFF" || user.role === "TEKNISI" || user.role === "DRIVER") {
+    if (user.supervisorId) {
+      status = "PENDING_SUPERVISOR"
+      supervisorId = user.supervisorId
+    } else if (user.role === "STAFF" || user.role === "TEKNISI" || user.role === "DRIVER") {
       const supervisor = await getSupervisorForDepartment({
         departmentId: user.departmentId || null,
         departmentName: routingDepartmentName,

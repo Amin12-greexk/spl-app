@@ -24,6 +24,8 @@ export default function CekAbsensiPage() {
   const [attendanceUsers, setAttendanceUsers] = useState<AttendanceUser[]>([])
   const [attendanceUsersLoading, setAttendanceUsersLoading] = useState(false)
   const [attendanceUserQuery, setAttendanceUserQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -85,6 +87,43 @@ export default function CekAbsensiPage() {
       (user.pin || "").toLowerCase().includes(query)
     )
   })
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [attendanceUserQuery])
+
+  const totalPages = Math.ceil(filteredAttendanceUsers.length / itemsPerPage)
+  const safePage = totalPages === 0 ? 1 : Math.min(currentPage, totalPages)
+  const indexOfFirstItem = (safePage - 1) * itemsPerPage
+  const indexOfLastItem = Math.min(
+    indexOfFirstItem + itemsPerPage,
+    filteredAttendanceUsers.length
+  )
+  const currentItems = filteredAttendanceUsers.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  )
+
+  useEffect(() => {
+    if (totalPages === 0 && currentPage !== 1) {
+      setCurrentPage(1)
+    } else if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  const paginationNumbers = (() => {
+    const maxButtons = 5
+    if (totalPages <= 1) return []
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1)
+    }
+    const half = Math.floor(maxButtons / 2)
+    let start = Math.max(1, safePage - half)
+    let end = Math.min(totalPages, start + maxButtons - 1)
+    start = Math.max(1, end - maxButtons + 1)
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+  })()
 
   if (status === "loading" || isLoading) {
     return (
@@ -213,7 +252,7 @@ export default function CekAbsensiPage() {
                   </td>
                 </tr>
               ) : (
-                filteredAttendanceUsers.map((user) => (
+                currentItems.map((user) => (
                   <tr key={user.id} className="hover:bg-green-50 transition-colors">
                     <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -259,6 +298,58 @@ export default function CekAbsensiPage() {
             </tbody>
           </table>
         </div>
+
+        {filteredAttendanceUsers.length > 0 && (
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-xs sm:text-sm text-gray-600">
+              Menampilkan{" "}
+              <span className="font-semibold text-gray-900">
+                {indexOfFirstItem + 1}-{indexOfLastItem}
+              </span>{" "}
+              dari{" "}
+              <span className="font-semibold text-gray-900">
+                {filteredAttendanceUsers.length}
+              </span>{" "}
+              user
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safePage === 1}
+                  className="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sebelumnya
+                </button>
+                {paginationNumbers.map((pageNumber) => (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg border ${
+                      pageNumber === safePage
+                        ? "bg-green-600 text-white border-green-600"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={safePage === totalPages}
+                  className="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Berikutnya
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
