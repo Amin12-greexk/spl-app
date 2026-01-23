@@ -179,7 +179,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator) {
       setIsSupported(true)
-      
+
       // Check current permission status
       if (Notification.permission === "granted") {
         setIsSubscribed(true)
@@ -224,10 +224,10 @@ export default function NotificationProvider({ children }: NotificationProviderP
 
     // Check immediately and after a delay to handle Next.js env loading
     checkFirebase()
-    
+
     // Fallback check after component mount
     const timeoutId = setTimeout(checkFirebase, 1000)
-    
+
     return () => clearTimeout(timeoutId)
   }, [])
 
@@ -254,9 +254,8 @@ export default function NotificationProvider({ children }: NotificationProviderP
             toast.custom(
               (t) => (
                 <div
-                  className={`${
-                    t.visible ? "animate-enter" : "animate-leave"
-                  } max-w-md w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-gray-200 overflow-hidden transition-all duration-300 hover:shadow-2xl`}
+                  className={`${t.visible ? "animate-enter" : "animate-leave"
+                    } max-w-md w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-gray-200 overflow-hidden transition-all duration-300 hover:shadow-2xl`}
                 >
                   <div className="p-4">
                     <div className="flex items-start gap-3">
@@ -353,67 +352,9 @@ export default function NotificationProvider({ children }: NotificationProviderP
     setIsLoading(true)
     try {
       const permission = await Notification.requestPermission()
-      
+
       if (permission === "granted") {
-        if (firebaseAvailable) {
-          try {
-            const { requestNotificationPermission } = await import("@/lib/firebase")
-            const fcmToken = await requestNotificationPermission()
-            
-            if (fcmToken) {
-              const response = await fetch("/api/notifications/subscribe", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  endpoint: fcmToken,
-                  keys: {
-                    p256dh: fcmToken,
-                    auth: fcmToken,
-                  },
-                }),
-              })
-
-              if (response.ok) {
-                setIsSubscribed(true)
-                toast.success("Notifikasi berhasil diaktifkan dengan Firebase!")
-                return true
-              } else {
-                throw new Error("Gagal menyimpan FCM token")
-              }
-            } else {
-              throw new Error("Gagal mendapatkan FCM token")
-            }
-          } catch (firebaseError) {
-            // Firebase error, falling back to mock mode
-          }
-        }
-
-        // Fallback mode (baik karena Firebase tidak tersedia atau error)
-        const mockToken = `fallback-${session.user.id}-${Date.now()}`
-        
-        const response = await fetch("/api/notifications/subscribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            endpoint: mockToken,
-            keys: {
-              p256dh: mockToken,
-              auth: mockToken,
-            },
-          }),
-        })
-
-        if (response.ok) {
-          setIsSubscribed(true)
-          toast.success(`Notifikasi diaktifkan ${firebaseAvailable ? '(Firebase mode)' : '(Fallback mode)'}`)
-          return true
-        } else {
-          throw new Error("Gagal menyimpan token notifikasi")
-        }
+        return await syncToken()
       } else if (permission === "denied") {
         toast.error("Izin notifikasi ditolak. Silakan aktifkan di pengaturan browser.")
         return false
@@ -428,6 +369,90 @@ export default function NotificationProvider({ children }: NotificationProviderP
       setIsLoading(false)
     }
   }
+
+  // Sync token to server (idempotent)
+  const syncToken = useCallback(async (): Promise<boolean> => {
+    if (!session || !isSupported) return false
+
+    try {
+      if (firebaseAvailable) {
+        try {
+          const { requestNotificationPermission } = await import("@/lib/firebase")
+          const fcmToken = await requestNotificationPermission()
+
+          if (fcmToken) {
+            const response = await fetch("/api/notifications/subscribe", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                endpoint: fcmToken,
+                keys: {
+                  p256dh: fcmToken,
+                  auth: fcmToken,
+                },
+              }),
+            })
+
+            if (response.ok) {
+              setIsSubscribed(true)
+              // Only show toast if explicitly requested (via requestPermission)
+              // We detect this by checking if isLoading is true (user triggered)
+              if (isLoading) {
+                toast.success("Notifikasi berhasil diaktifkan dengan Firebase!")
+              }
+              return true
+            } else {
+              throw new Error("Gagal menyimpan FCM token")
+            }
+          } else {
+            throw new Error("Gagal mendapatkan FCM token")
+          }
+        } catch (firebaseError) {
+          // Firebase error, falling back to mock mode
+          console.error("Firebase sync error:", firebaseError)
+        }
+      }
+
+      // Fallback mode
+      const mockToken = `fallback-${session.user.id}-${Date.now()}`
+
+      const response = await fetch("/api/notifications/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          endpoint: mockToken,
+          keys: {
+            p256dh: mockToken,
+            auth: mockToken,
+          },
+        }),
+      })
+
+      if (response.ok) {
+        setIsSubscribed(true)
+        if (isLoading) {
+          toast.success(`Notifikasi diaktifkan ${firebaseAvailable ? '(Firebase mode)' : '(Fallback mode)'}`)
+        }
+        return true
+      } else {
+        throw new Error("Gagal menyimpan token notifikasi")
+      }
+    } catch (error) {
+      console.error("Sync token failed:", error)
+      return false
+    }
+  }, [session, isSupported, firebaseAvailable, isLoading])
+
+  // Automatic sync on mount if permission granted
+  useEffect(() => {
+    if (isSupported && session && Notification.permission === "granted") {
+      syncToken()
+    }
+  }, [isSupported, session, syncToken])
 
   // Test notification
   const testNotification = async (title: string, message: string) => {

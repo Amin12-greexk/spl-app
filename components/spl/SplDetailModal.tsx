@@ -33,21 +33,18 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     return null
   }
 
-  const roundHoursFromMinutes = (minutes: number) => {
-    if (!Number.isFinite(minutes)) return null
-    const hours = Math.floor(minutes / 60)
-    const remainder = minutes % 60
-    return remainder >= 30 ? hours + 1 : hours
-  }
-
   const formatTotalHours = (value?: number | string | null) => {
     if (value === null || value === undefined) return "-"
     const numericValue = typeof value === "number" ? value : Number(value)
     if (!Number.isFinite(numericValue)) return "-"
     const totalMinutes = Math.round(numericValue * 60)
-    const roundedHours = roundHoursFromMinutes(totalMinutes)
-    if (roundedHours === null) return "-"
-    return `${roundedHours} jam`
+    // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
+    if (totalMinutes <= 30) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
   }
 
   const getDetailedStatus = () => {
@@ -258,29 +255,26 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
                 <div key={index} className="flex items-center gap-2 flex-1">
                   <div className="flex flex-col items-center flex-1">
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                        step.done
-                          ? "bg-green-500 border-green-600 text-white shadow-md"
-                          : step.current
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step.done
+                        ? "bg-green-500 border-green-600 text-white shadow-md"
+                        : step.current
                           ? "bg-blue-500 border-blue-600 text-white shadow-md animate-pulse"
                           : "bg-gray-100 border-gray-300 text-gray-400"
-                      }`}
+                        }`}
                     >
                       {step.done ? "✓" : index + 1}
                     </div>
                     <span
-                      className={`text-xs font-semibold mt-1.5 ${
-                        step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
-                      }`}
+                      className={`text-xs font-semibold mt-1.5 ${step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
+                        }`}
                     >
                       {step.label}
                     </span>
                   </div>
                   {index < getApprovalFlow().length - 1 && (
                     <div
-                      className={`h-0.5 flex-1 ${
-                        step.done ? "bg-green-500" : "bg-gray-300"
-                      }`}
+                      className={`h-0.5 flex-1 ${step.done ? "bg-green-500" : "bg-gray-300"
+                        }`}
                     />
                   )}
                 </div>
