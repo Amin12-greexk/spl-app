@@ -8,6 +8,9 @@ import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
 import Image from "next/image"
 
+import { useRef } from "react"
+import { usePageLoadAnimation, useStaggerAnimation, useFocusScale } from "@/hooks/useGSAP"
+
 export default function LoginForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -16,6 +19,37 @@ export default function LoginForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+  })
+
+  // Animations
+  const logoRef = usePageLoadAnimation<HTMLDivElement>({
+    direction: "down",
+    distance: 30,
+    duration: 0.8
+  })
+
+  const cardContainerRef = usePageLoadAnimation<HTMLDivElement>({
+    direction: "up",
+    distance: 30,
+    duration: 0.8,
+    delay: 0.2
+  })
+
+  const formRef = useStaggerAnimation<HTMLFormElement>({
+    stagger: 0.1,
+    delay: 0.4
+  })
+
+  // Interactive Animations
+  const emailInputRef = useFocusScale<HTMLInputElement>(1.02)
+  const passwordInputRef = useFocusScale<HTMLInputElement>(1.02)
+
+  // New ref for Footer
+  const footerRef = usePageLoadAnimation<HTMLDivElement>({
+    direction: "up",
+    distance: 20,
+    duration: 0.8,
+    delay: 0.6
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,8 +86,8 @@ export default function LoginForm() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-md lg:max-w-lg">
         {/* Logo dan Branding */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 mb-4 relative">
+        <div ref={logoRef} className="text-center mb-8">
+          <div className="mx-auto w-20 h-20 mb-4 relative hover:scale-110 transition-transform duration-300">
             <Image
               src="/logo.png"
               alt="Logo PT Tunas Esta Indonesia"
@@ -63,7 +97,7 @@ export default function LoginForm() {
               priority
             />
           </div>
-          
+
           {/* Company Branding */}
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             PT Tunas Esta Indonesia
@@ -74,7 +108,7 @@ export default function LoginForm() {
         </div>
 
         {/* Login Card */}
-        <div className={`bg-white shadow-xl rounded-2xl p-8 border border-green-100 ${hasError ? 'motion-safe:animate-shake' : ''}`}>
+        <div ref={cardContainerRef} className={`bg-white shadow-xl rounded-2xl p-8 border border-green-100 ${hasError ? 'motion-safe:animate-shake' : ''}`}>
           {/* Header */}
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -84,11 +118,12 @@ export default function LoginForm() {
               Silakan masukkan kredensial Anda untuk melanjutkan
             </p>
           </div>
-          
+
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+            <div data-animate>
               <Input
+                ref={emailInputRef}
                 label="Alamat Email"
                 type="email"
                 placeholder="contoh@tunasesta.com"
@@ -100,13 +135,14 @@ export default function LoginForm() {
                 required
               />
             </div>
-            
-            <div>
+
+            <div data-animate>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Kata Sandi
               </label>
               <div className="relative">
                 <input
+                  ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
                   placeholder="*****************"
                   value={formData.password}
@@ -137,25 +173,27 @@ export default function LoginForm() {
             </div>
 
             {/* Login Button */}
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                  Sedang Masuk...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                  Masuk ke Dashboard
-                </div>
-              )}
-            </Button>
+            <div data-animate>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                    Sedang Masuk...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Masuk ke Dashboard
+                  </div>
+                )}
+              </Button>
+            </div>
           </form>
 
           {/* Divider */}
@@ -183,7 +221,7 @@ export default function LoginForm() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8">
+        <div ref={footerRef} className="text-center mt-8">
           <div className="flex items-center justify-center gap-2 mb-1">
             <div className="relative w-6 h-6">
               <Image

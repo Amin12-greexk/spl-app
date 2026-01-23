@@ -11,6 +11,8 @@ import Link from "next/link" // <-- TAMBAHAN: Import Link
 import TimePicker from "@/components/ui/TimePicker"
 import Modal from "@/components/ui/Modal"
 import Image from "next/image"
+import { usePageLoadAnimation, useStaggerAnimation } from "@/hooks/useGSAP"
+import CountUp from "@/components/animations/CountUp"
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
@@ -71,6 +73,20 @@ export default function DashboardPage() {
   const isProductionHead =
     userRole === "DEPARTMENT_HEAD" &&
     (normalizedDepartment === "produksi" || normalizedDepartment === "production")
+
+  // GSAP Animation hooks
+  const headerRef = usePageLoadAnimation<HTMLDivElement>({
+    duration: 0.8,
+    delay: 0.1,
+    direction: "down",
+    distance: 30,
+  })
+  const statsRef = useStaggerAnimation<HTMLDivElement>({
+    stagger: 0.1,
+    duration: 0.5,
+    delay: 0.3,
+    distance: 20,
+  })
 
   const refreshSpls = useCallback(
     async (showLoading = false) => {
@@ -802,9 +818,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
-      {/* Enhanced Header Section */}
+      {/* Enhanced Header Section with GSAP Animation */}
       <div
-        className={`relative bg-gradient-to-br ${getHeaderGradient()} rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden`}
+        ref={headerRef}
+        className={`relative bg-gradient-to-br ${getHeaderGradient()} rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden transform-gpu`}
       >
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
@@ -1030,8 +1047,8 @@ export default function DashboardPage() {
                               {!canStartSpl(spl) &&
                                 !canFinishSpl(spl) &&
                                 !isGaStartBlocked(spl) && (
-                                <span className="text-xs text-gray-400">-</span>
-                              )}
+                                  <span className="text-xs text-gray-400">-</span>
+                                )}
                             </div>
                           </td>
                         </tr>
