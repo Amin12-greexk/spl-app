@@ -235,11 +235,13 @@ export default function HRViewPage() {
     return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
   }
 
-  const isExportApproved = (spl: Spl) => {
-    if (spl.status !== "APPROVED") return false
-    if (spl.approver?.role !== "MANAGER") return false
-    if (spl.supervisorId && !spl.supervisorApprovalDate) return false
-    return true
+  const isExportEligible = (spl: Spl) => {
+    const rejectedStatuses = new Set([
+      "REJECTED",
+      "REJECTED_BY_SUPERVISOR",
+      "REJECTED_BY_MANAGER",
+    ])
+    return !rejectedStatuses.has(spl.status)
   }
 
   const exportHeaders = [
@@ -354,7 +356,7 @@ export default function HRViewPage() {
 
   const buildExportRows = async (): Promise<ExportRow[]> => {
     const sortedSpls = sortSplsForExport(filteredSpls)
-    const exportableSpls = sortedSpls.filter(isExportApproved)
+    const exportableSpls = sortedSpls.filter(isExportEligible)
     if (exportableSpls.length === 0) return []
 
     const needsPinLookup = exportableSpls.some(
