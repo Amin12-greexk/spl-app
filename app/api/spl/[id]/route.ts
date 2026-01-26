@@ -107,7 +107,13 @@ export async function PATCH(
 
     const existingSpl = await prisma.spl.findUnique({
       where: { id: params.id },
-      select: { isManualEntry: true, requesterSignedAt: true, source: true },
+      select: {
+        isManualEntry: true,
+        requesterSignedAt: true,
+        source: true,
+        actualStartAt: true,
+        actualEndAt: true,
+      },
     });
 
     if (!existingSpl) {
@@ -117,6 +123,13 @@ export async function PATCH(
     if ((existingSpl.isManualEntry || existingSpl.source === "LEGACY") && !existingSpl.requesterSignedAt) {
       return NextResponse.json(
         { error: "SPL belum ditandatangani oleh pemohon" },
+        { status: 400 }
+      );
+    }
+
+    if (body.status === "APPROVED" && (!existingSpl.actualStartAt || !existingSpl.actualEndAt)) {
+      return NextResponse.json(
+        { error: "Realisasi belum diinput oleh pemohon" },
         { status: 400 }
       );
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils"
+import { sendNotificationToUser } from "@/lib/notification-utils"
 import { JAKARTA_TIME_ZONE } from "@/lib/spl-time"
 
 export async function POST(req: NextRequest) {
@@ -102,9 +102,7 @@ export async function POST(req: NextRequest) {
 
     // Send notifications
     try {
-      // 1. Notify MANAGER/HR about new SPL to approve
-      // Format tanggal SPL
-      const splDate = new Date(updatedSpl.date);
+      const splDate = new Date(updatedSpl.date)
       const formattedDate = splDate.toLocaleDateString("id-ID", {
         day: "numeric",
         month: "long",
@@ -112,18 +110,10 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       })
 
-      await sendNotificationToRoles(
-        ["HR", "MANAGER"],
-        "SPL Baru Menunggu Persetujuan",
-        `${updatedSpl.requester.name} - SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) telah disetujui supervisor.`,
-        { splId: updatedSpl.id, click_action: "/dashboard/hr/persetujuan" }
-      )
-
-      // 2. Notify requester that supervisor approved
       await sendNotificationToUser(
         updatedSpl.requesterId,
         "SPL Disetujui Supervisor",
-        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${session.user.name} dan diteruskan ke Manager.`,
+        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${session.user.name}. Silakan input realisasi agar diteruskan ke Manager.`,
         { splId: updatedSpl.id, click_action: "/dashboard/staff" }
       )
       console.log("Notifikasi supervisor approval telah dikirim")

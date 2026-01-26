@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // <-- PATH DIPERBAIKI
 import { prisma } from "@/lib/prisma";
 import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBAIKI
-import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils";
+import { sendNotificationToUser } from "@/lib/notification-utils";
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
 import {
   buildOvertimeWindowFromTimes,
@@ -65,14 +65,22 @@ export async function GET(req: NextRequest) {
     ];
     const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"];
     const hideUnsignedManual = userRole !== "SUPER_ADMIN";
+    const hideUnrealizedForManager = ["HR", "MANAGER"].includes(userRole);
+    const notConditions: any[] = [];
 
     if (hideUnsignedManual) {
-      where.NOT = {
-        OR: [
-          { isManualEntry: true, requesterSignedAt: null },
-          { source: "LEGACY", requesterSignedAt: null },
-        ],
-      };
+      notConditions.push(
+        { isManualEntry: true, requesterSignedAt: null },
+        { source: "LEGACY", requesterSignedAt: null }
+      );
+    }
+
+    if (hideUnrealizedForManager) {
+      notConditions.push({ status: "PENDING_MANAGER", actualEndAt: null });
+    }
+
+    if (notConditions.length > 0) {
+      where.NOT = { OR: notConditions };
     }
 
     if (selfOnlyRoles.includes(userRole)) {
@@ -515,13 +523,7 @@ export async function POST(req: NextRequest) {
           { splId: spl.id, click_action: "/dashboard/ga/persetujuan" } // Supervisor notification
         );
       } else {
-        // If no supervisor, notify managers directly
-        await sendNotificationToRoles(
-          ["HR", "MANAGER"],
-          notificationTitle,
-          notificationBody,
-          { splId: spl.id, click_action: "/dashboard/hr/persetujuan" } // Manager notification - FIXED ROUTE
-        );
+        // Jika tanpa supervisor, manager akan diberi notifikasi setelah realisasi diinput.
       }
 
       console.log("Notifikasi telah dikirim");

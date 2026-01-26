@@ -1,7 +1,7 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { ChangeEvent, useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
@@ -29,7 +29,6 @@ const LEGACY_PROMPT_ROLES: Role[] = [
 ]
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 const REJECTED_STATUSES = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
-const EARLY_FINISH_GRACE_MINUTES = 30
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -49,13 +48,12 @@ export default function DashboardPage() {
   const [supervisorName, setSupervisorName] = useState<string | null>(null)
   const [supervisorLabel, setSupervisorLabel] = useState<string | null>(null)
   const [hasSupervisor, setHasSupervisor] = useState<boolean | null>(null)
-  const [isStartingId, setIsStartingId] = useState<string | null>(null)
   const [isFinishing, setIsFinishing] = useState(false)
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
+  const [realizationStartTime, setRealizationStartTime] = useState("")
+  const [realizationEndTime, setRealizationEndTime] = useState("")
   const [realizationNote, setRealizationNote] = useState("")
-  const [realizationProofImage, setRealizationProofImage] = useState("")
-  const [realizationProofPreview, setRealizationProofPreview] = useState<string | null>(null)
   const [overrunReason, setOverrunReason] = useState("")
   const [hasPromptedLegacy, setHasPromptedLegacy] = useState(false)
 
@@ -256,7 +254,7 @@ export default function DashboardPage() {
     }
 
     fetchSupervisorInfo()
-  }, [session?.user?.departmentId, session?.user?.department, session?.user?.role])
+  }, [session, session?.user?.departmentId, session?.user?.department, session?.user?.role])
 
   useEffect(() => {
     setHistoryPage(1)
@@ -362,7 +360,7 @@ export default function DashboardPage() {
     if (isOvertimeExpired(spl)) {
       return "Surat kadaluarsa"
     }
-    return "Belum mulai"
+    return "Belum diinput"
   }
 
   const parseTimeToMinutes = (value: string) => {
@@ -381,6 +379,29 @@ export default function DashboardPage() {
       return null
     }
     return hour * 60 + minute
+  }
+
+  const getManualWindow = (spl: Spl, startTime: string, endTime: string) => {
+    const startMinutes = parseTimeToMinutes(startTime)
+    const endMinutes = parseTimeToMinutes(endTime)
+    if (startMinutes === null || endMinutes === null) return null
+    if (startMinutes === endMinutes) return null
+
+    const baseDaySource = spl.plannedStartAt ? new Date(spl.plannedStartAt) : new Date(spl.date)
+    const baseDay = new Date(baseDaySource)
+    baseDay.setHours(0, 0, 0, 0)
+    if (Number.isNaN(baseDay.getTime())) return null
+
+    const start = new Date(baseDay)
+    start.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
+
+    const end = new Date(baseDay)
+    end.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0)
+    if (end <= start) {
+      end.setDate(end.getDate() + 1)
+    }
+
+    return { start, end }
   }
 
   const getPlannedWindow = (spl: Spl) => {
@@ -414,29 +435,6 @@ export default function DashboardPage() {
     return { plannedStart, plannedEnd }
   }
 
-  const getActualMinutes = (spl: Spl, endAt = new Date()) => {
-    if (!spl.actualStartAt) return null
-    const startAt = new Date(spl.actualStartAt)
-    if (Number.isNaN(startAt.getTime())) return null
-    const diffMs = endAt.getTime() - startAt.getTime()
-    if (diffMs <= 0) return 0
-    return Math.floor(diffMs / 60000)
-  }
-
-  const isEarlyFinish = (spl: Spl) => {
-    if (!spl.actualStartAt || spl.actualEndAt) return false
-    const elapsed = getActualMinutes(spl, new Date())
-    if (elapsed === null) return false
-    return elapsed <= EARLY_FINISH_GRACE_MINUTES
-  }
-
-  const isOutsidePlannedWindow = (spl: Spl) => {
-    const window = getPlannedWindow(spl)
-    if (!window) return false
-    const now = new Date()
-    return now < window.plannedStart || now >= window.plannedEnd
-  }
-
   const isOvertimeExpired = (spl: Spl) => {
     if (spl.actualStartAt) return false
     const window = getPlannedWindow(spl)
@@ -444,201 +442,100 @@ export default function DashboardPage() {
     return new Date() >= window.plannedEnd
   }
 
-  const getOverrunMinutes = (spl: Spl, endAt = new Date()) => {
-    const window = getPlannedWindow(spl)
-    if (!window) return null
-    const plannedEnd = window.plannedEnd
-    if (Number.isNaN(plannedEnd.getTime())) return null
-    if (endAt <= plannedEnd) return 0
-    const diffMs = endAt.getTime() - plannedEnd.getTime()
-    return diffMs > 0 ? Math.floor(diffMs / 60000) : 0
-  }
-
-  const canStartSpl = (spl: Spl) => {
+  const canInputRealization = (spl: Spl) => {
     const requesterId = spl.requesterId || spl.requester?.id
     if (requesterId !== session?.user?.id) return false
-    if (spl.actualStartAt || spl.actualEndAt) return false
+    if (spl.source === "LEGACY") return false
+    if (spl.isManualEntry && !spl.requesterSignedAt) return false
     if (REJECTED_STATUSES.includes(spl.status)) return false
-    if (isOutsidePlannedWindow(spl)) return false
-    if (
-      isGaSupervisedDepartment(spl) &&
-      ["PENDING_SUPERVISOR", "PENDING"].includes(spl.status)
-    ) {
-      return false
-    }
+    if (spl.status !== "PENDING_MANAGER") return false
+    if (spl.actualEndAt) return false
     return true
   }
 
-  const canFinishSpl = (spl: Spl) => {
-    const requesterId = spl.requesterId || spl.requester?.id
-    if (requesterId !== session?.user?.id) return false
-    if (!spl.actualStartAt || spl.actualEndAt) return false
-    return true
-  }
-
-  const isGaStartBlocked = (spl: Spl) => {
-    if (!isGaSupervisedDepartment(spl)) return false
-    if (spl.actualStartAt || spl.actualEndAt) return false
-    if (REJECTED_STATUSES.includes(spl.status)) return false
-    return ["PENDING_SUPERVISOR", "PENDING"].includes(spl.status)
-  }
-
-  const handleStartRealization = async (spl: Spl) => {
-    if (!canStartSpl(spl)) return
-    setIsStartingId(spl.id)
-    try {
-      const response = await fetch(`/api/spl/${spl.id}/realization/start`, {
-        method: "POST",
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || "Gagal memulai realisasi")
-      }
-      await Swal.fire({
-        icon: "success",
-        title: "Realisasi dimulai",
-        text: `Jam mulai tercatat ${formatTimeValue(new Date())}.`,
-      })
-      await refreshSpls()
-    } catch (error: any) {
-      await Swal.fire({
-        icon: "error",
-        title: "Gagal memulai",
-        text: error.message || "Terjadi kesalahan",
-      })
-    } finally {
-      setIsStartingId(null)
-    }
-  }
+  const isGaApprovalBlocked = (spl: Spl) =>
+    isGaSupervisedDepartment(spl) && spl.status === "PENDING_SUPERVISOR"
 
   const openFinishModal = (spl: Spl) => {
     setSelectedSpl(spl)
+    setRealizationStartTime(spl.startTime)
+    setRealizationEndTime(spl.endTime)
     setRealizationNote("")
-    setRealizationProofImage("")
-    setRealizationProofPreview(null)
     setOverrunReason("")
     setShowFinishModal(true)
-  }
-
-  const handleFinishProofUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith("image/")) {
-      await Swal.fire({
-        icon: "error",
-        title: "File Tidak Valid",
-        text: "Harap upload file gambar (JPG, PNG, atau JPEG)",
-      })
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      await Swal.fire({
-        icon: "error",
-        title: "Ukuran File Terlalu Besar",
-        text: "Ukuran file maksimal 5MB",
-      })
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
-      setRealizationProofImage(base64String)
-      setRealizationProofPreview(base64String)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleRemoveFinishProof = () => {
-    setRealizationProofImage("")
-    setRealizationProofPreview(null)
   }
 
   const handleFinishRealization = async () => {
     if (!selectedSpl) return
 
-    if (!realizationNote.trim()) {
+    if (!realizationStartTime || !realizationEndTime) {
       await Swal.fire({
         icon: "error",
-        title: "Catatan wajib diisi",
-        text: "Silakan isi catatan hasil lembur.",
+        title: "Jam realisasi wajib diisi",
+        text: "Isi jam mulai dan jam selesai realisasi.",
       })
       return
     }
 
-    if (isGaSupervisedDepartment(selectedSpl) && realizationProofImage.length < 30) {
+    const manualWindow = getManualWindow(
+      selectedSpl,
+      realizationStartTime,
+      realizationEndTime
+    )
+    if (!manualWindow) {
       await Swal.fire({
         icon: "error",
-        title: "Foto bukti wajib",
-        text: "Departemen ini mewajibkan foto bukti realisasi.",
+        title: "Jam realisasi tidak valid",
+        text: "Periksa kembali format jam realisasi.",
       })
       return
     }
 
-    const overrunMinutes = getOverrunMinutes(selectedSpl, new Date())
-    if (overrunMinutes && overrunMinutes > 0 && !overrunReason.trim()) {
+    const plannedWindow = getPlannedWindow(selectedSpl)
+    const overrunMinutes =
+      plannedWindow && manualWindow.end > plannedWindow.plannedEnd
+        ? Math.floor(
+            (manualWindow.end.getTime() - plannedWindow.plannedEnd.getTime()) /
+              60000
+          )
+        : 0
+    if (!overrunReason.trim()) {
       await Swal.fire({
         icon: "warning",
-        title: "Alasan melebihi rencana",
-        text: "Isi alasan karena realisasi melebihi jam rencana.",
+        title: "Alasan realisasi wajib diisi",
+        text: "Silakan isi alasan realisasi lembur.",
       })
       return
     }
 
     setIsFinishing(true)
     try {
-      const basePayload = {
-        note: realizationNote.trim(),
-        proofImage: realizationProofImage || null,
-        overrunReason: overrunReason.trim() || null,
-      }
-
-      const submitFinish = async (confirmEarlyFinish = false) => {
-        const response = await fetch(`/api/spl/${selectedSpl.id}/realization/finish`, {
+      const response = await fetch(
+        `/api/spl/${selectedSpl.id}/realization/manual`,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...basePayload,
-            confirmEarlyFinish,
+            startTime: realizationStartTime,
+            endTime: realizationEndTime,
+            note: realizationNote.trim(),
+            overrunReason: overrunReason.trim() || null,
           }),
-        })
-        const data = await response.json()
-        return { response, data }
-      }
-
-      const { response, data } = await submitFinish(false)
-      if (!response.ok) {
-        if (data?.code === "CONFIRM_EARLY_FINISH_REQUIRED") {
-          const confirmResult = await Swal.fire({
-            icon: "warning",
-            title: "Durasi lembur masih singkat",
-            text: "Jika diselesaikan sekarang, lembur tidak akan dihitung. Lanjutkan?",
-            showCancelButton: true,
-            confirmButtonText: "Ya, akhiri",
-            cancelButtonText: "Batal",
-          })
-
-          if (!confirmResult.isConfirmed) {
-            return
-          }
-
-          const confirmResponse = await submitFinish(true)
-          if (!confirmResponse.response.ok) {
-            throw new Error(confirmResponse.data?.error || "Gagal menyimpan realisasi")
-          }
-        } else {
-          throw new Error(data.error || "Gagal menyimpan realisasi")
         }
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal menyimpan realisasi")
       }
       await Swal.fire({
         icon: "success",
         title: "Realisasi tersimpan",
-        text: "Catatan realisasi lembur berhasil disimpan.",
+        text: "Realisasi lembur berhasil disimpan dan dikirim ke Manager.",
       })
       setShowFinishModal(false)
       setSelectedSpl(null)
+      setRealizationStartTime("")
+      setRealizationEndTime("")
       await refreshSpls()
     } catch (error: any) {
       await Swal.fire({
@@ -782,9 +679,26 @@ export default function DashboardPage() {
     }
   }
 
-  const selectedActualMinutes = selectedSpl ? getActualMinutes(selectedSpl, new Date()) : null
-  const selectedOverrunMinutes = selectedSpl ? getOverrunMinutes(selectedSpl, new Date()) : null
-  const selectedEarlyFinish = selectedSpl ? isEarlyFinish(selectedSpl) : false
+  const selectedManualWindow =
+    selectedSpl && realizationStartTime && realizationEndTime
+      ? getManualWindow(selectedSpl, realizationStartTime, realizationEndTime)
+      : null
+  const selectedActualMinutes = selectedManualWindow
+    ? Math.floor(
+        (selectedManualWindow.end.getTime() - selectedManualWindow.start.getTime()) /
+          60000
+      )
+    : null
+  const selectedOverrunMinutes = (() => {
+    if (!selectedSpl || !selectedManualWindow) return null
+    const plannedWindow = getPlannedWindow(selectedSpl)
+    if (!plannedWindow) return null
+    if (selectedManualWindow.end <= plannedWindow.plannedEnd) return 0
+    return Math.floor(
+      (selectedManualWindow.end.getTime() - plannedWindow.plannedEnd.getTime()) /
+        60000
+    )
+  })()
 
   if (isLoading) {
     return (
@@ -987,17 +901,16 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              {canStartSpl(spl) && (
+                              {canInputRealization(spl) && (
                                 <button
                                   type="button"
-                                  onClick={() => handleStartRealization(spl)}
-                                  disabled={isStartingId === spl.id}
-                                  className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
+                                  onClick={() => openFinishModal(spl)}
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                                 >
-                                  {isStartingId === spl.id ? "Memulai..." : "Mulai"}
+                                  Input Realisasi
                                 </button>
                               )}
-                              {!canStartSpl(spl) && isGaStartBlocked(spl) && (
+                              {!canInputRealization(spl) && isGaApprovalBlocked(spl) && (
                                 <button
                                   type="button"
                                   disabled
@@ -1006,30 +919,8 @@ export default function DashboardPage() {
                                   Menunggu GA
                                 </button>
                               )}
-                              {!canStartSpl(spl) &&
-                                isOutsidePlannedWindow(spl) &&
-                                !isGaStartBlocked(spl) &&
-                                !canFinishSpl(spl) && (
-                                  <button
-                                    type="button"
-                                    disabled
-                                    className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-lg cursor-not-allowed"
-                                  >
-                                    {isOvertimeExpired(spl) ? "Kadaluarsa" : "Di luar jadwal"}
-                                  </button>
-                                )}
-                              {canFinishSpl(spl) && (
-                                <button
-                                  type="button"
-                                  onClick={() => openFinishModal(spl)}
-                                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                                >
-                                  {isEarlyFinish(spl) ? "Selesai (Konfirmasi)" : "Selesai"}
-                                </button>
-                              )}
-                              {!canStartSpl(spl) &&
-                                !canFinishSpl(spl) &&
-                                !isGaStartBlocked(spl) && (
+                              {!canInputRealization(spl) &&
+                                !isGaApprovalBlocked(spl) && (
                                 <span className="text-xs text-gray-400">-</span>
                               )}
                             </div>
@@ -1305,8 +1196,10 @@ export default function DashboardPage() {
             if (isFinishing) return
             setShowFinishModal(false)
             setSelectedSpl(null)
+            setRealizationStartTime("")
+            setRealizationEndTime("")
           }}
-          title="Selesai Lembur"
+          title="Input Realisasi"
           footer={
             <>
               <button
@@ -1314,6 +1207,8 @@ export default function DashboardPage() {
                 onClick={() => {
                   setShowFinishModal(false)
                   setSelectedSpl(null)
+                  setRealizationStartTime("")
+                  setRealizationEndTime("")
                 }}
                 disabled={isFinishing}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -1340,24 +1235,13 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-gray-600">Mulai:</span>
-                <span className="font-medium text-gray-900">
-                  {formatTimeValue(selectedSpl.actualStartAt)}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-gray-600">Durasi sementara:</span>
+                <span className="text-gray-600">Durasi:</span>
                 <span className="font-medium text-gray-900">
                   {selectedActualMinutes !== null
                     ? `${Math.floor(selectedActualMinutes / 60)} jam ${selectedActualMinutes % 60} menit`
                     : "-"}
                 </span>
               </div>
-              {selectedEarlyFinish && (
-                <div className="mt-2 text-xs text-amber-600">
-                  Durasi masih {'<='} 30 menit. Jika diselesaikan sekarang, lembur tidak dihitung.
-                </div>
-              )}
               {selectedOverrunMinutes && selectedOverrunMinutes > 0 && (
                 <div className="mt-2 text-xs text-red-600">
                   Melebihi rencana {selectedOverrunMinutes} menit.
@@ -1365,9 +1249,26 @@ export default function DashboardPage() {
               )}
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <TimePicker
+                label="Jam Mulai Realisasi"
+                value={realizationStartTime}
+                onChange={(value) => setRealizationStartTime(value)}
+                required
+                showWib
+              />
+              <TimePicker
+                label="Jam Selesai Realisasi"
+                value={realizationEndTime}
+                onChange={(value) => setRealizationEndTime(value)}
+                required
+                showWib
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Catatan Realisasi <span className="text-red-500">*</span>
+                Catatan Realisasi <span className="text-gray-400">(Opsional)</span>
               </label>
               <textarea
                 value={realizationNote}
@@ -1379,81 +1280,15 @@ export default function DashboardPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Foto Bukti Realisasi{" "}
-                {isGaSupervisedDepartment(selectedSpl) ? (
-                  <span className="text-red-500">*</span>
-                ) : (
-                  <span className="text-gray-400">(Opsional)</span>
-                )}
+                Alasan Realisasi <span className="text-red-500">*</span>
               </label>
-              {!realizationProofPreview ? (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-micro">
-                  <div className="flex flex-col items-center justify-center py-4 px-4">
-                    <svg
-                      className="w-8 h-8 mb-2 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
-                    <p className="text-xs text-gray-600 text-center">
-                      <span className="font-semibold text-blue-600">Klik untuk upload</span>
-                      <br />
-                      PNG, JPG (Max 5MB)
-                    </p>
-                  </div>
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleFinishProofUpload}
-                  />
-                </label>
-              ) : (
-                <div className="relative">
-                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                    <Image
-                      src={realizationProofPreview}
-                      alt="Preview bukti realisasi"
-                      width={1200}
-                      height={800}
-                      className="w-full h-auto max-h-64 object-contain"
-                      sizes="100vw"
-                      unoptimized
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveFinishProof}
-                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-micro"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              <textarea
+                value={overrunReason}
+                onChange={(e) => setOverrunReason(e.target.value)}
+                className="w-full min-h-[80px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Jelaskan alasan realisasi lembur..."
+              />
             </div>
-
-            {selectedOverrunMinutes && selectedOverrunMinutes > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Alasan Melebihi Rencana <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={overrunReason}
-                  onChange={(e) => setOverrunReason(e.target.value)}
-                  className="w-full min-h-[80px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Jelaskan alasan realisasi melebihi rencana..."
-                />
-              </div>
-            )}
           </div>
         </Modal>
       )}

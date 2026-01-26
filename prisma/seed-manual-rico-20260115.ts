@@ -10,6 +10,8 @@ import {
 } from "@/lib/spl-time"
 
 const prisma = new PrismaClient()
+const SIGNATURE_PLACEHOLDER =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
 
 async function main() {
   const targetEmail = "rico@tunasestaindonesia.com"
@@ -33,6 +35,24 @@ async function main() {
   const adminId = admin?.id || null
   if (!adminId) {
     console.warn("Super Admin tidak ditemukan, manualEntryBy akan dikosongkan.")
+  }
+
+  const manager =
+    (await prisma.user.findUnique({
+      where: { email: "tiyas@tunasestaindonesia.com" },
+      select: { id: true, name: true },
+    })) ||
+    (await prisma.user.findFirst({
+      where: { role: "MANAGER" },
+      select: { id: true, name: true },
+    })) ||
+    (await prisma.user.findFirst({
+      where: { role: "SUPER_ADMIN" },
+      select: { id: true, name: true },
+    }))
+
+  if (!manager?.id) {
+    throw new Error("Manager tidak ditemukan. Jalankan seed user terlebih dahulu.")
   }
 
   const user = await prisma.user.findUnique({
@@ -64,21 +84,6 @@ async function main() {
   }
   if (startMinutes === endMinutes) {
     throw new Error("Jam lembur akhir harus > jam lembur mulai.")
-  }
-
-  const existing = await prisma.spl.findFirst({
-    where: {
-      requesterId: user.id,
-      date: requestedDate,
-      startTime: payload.startTime,
-      endTime: payload.endTime,
-      source: "MANUAL",
-    },
-    select: { id: true },
-  })
-  if (existing) {
-    console.log("SPL manual sudah ada, skip.")
-    return
   }
 
   const departmentName =
@@ -169,6 +174,43 @@ async function main() {
     throw new Error("Jam lembur akhir harus > jam lembur mulai.")
   }
 
+  const approvedAt = plannedWindow.end
+  const status = "APPROVED"
+  let supervisorId: string | null = null
+  const routingDepartmentName = departmentName || null
+
+  if (user.supervisorId) {
+    supervisorId = user.supervisorId
+  } else if (
+    user.role === "STAFF" ||
+    user.role === "TEKNISI" ||
+    user.role === "DRIVER"
+  ) {
+    const supervisor = await getSupervisorForDepartment({
+      departmentId: user.departmentId || null,
+      departmentName: routingDepartmentName,
+    })
+    if (supervisor) {
+      supervisorId = supervisor.id
+    }
+  }
+
+  const existing = await prisma.spl.findFirst({
+    where: {
+      requesterId: user.id,
+      date: requestedDate,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+    },
+    select: { id: true, source: true },
+  })
+  if (existing) {
+    console.log(
+      `Skip: sudah ada SPL source ${existing.source} untuk tanggal yang sama.`
+    )
+    return
+  }
+
   const overlap = await prisma.spl.findFirst({
     where: {
       requesterId: user.id,
@@ -197,24 +239,6 @@ async function main() {
   )
   const totalHours = Number((totalMinutes / 60).toFixed(2))
 
-  let status = "PENDING_MANAGER"
-  let supervisorId: string | null = null
-  const routingDepartmentName = departmentName || null
-
-  if (user.supervisorId) {
-    status = "PENDING_SUPERVISOR"
-    supervisorId = user.supervisorId
-  } else if (user.role === "STAFF" || user.role === "TEKNISI" || user.role === "DRIVER") {
-    const supervisor = await getSupervisorForDepartment({
-      departmentId: user.departmentId || null,
-      departmentName: routingDepartmentName,
-    })
-    if (supervisor) {
-      status = "PENDING_SUPERVISOR"
-      supervisorId = supervisor.id
-    }
-  }
-
   await prisma.spl.create({
     data: {
       requesterId: user.id,
@@ -225,13 +249,18 @@ async function main() {
       reason: payload.reason,
       status,
       supervisorId,
+      supervisorApprovalDate: supervisorId ? approvedAt : null,
+      supervisorSignature: supervisorId ? SIGNATURE_PLACEHOLDER : null,
+      approverId: manager.id,
+      approvalDate: approvedAt,
       regularStartAt,
       regularEndAt,
       plannedStartAt: plannedWindow.start,
       plannedEndAt: plannedWindow.end,
       isManualEntry: true,
       manualEntryBy: adminId,
-      requesterSignedAt: null,
+      requesterSignedAt: approvedAt,
+      signature: SIGNATURE_PLACEHOLDER,
       source: "MANUAL",
     },
   })
