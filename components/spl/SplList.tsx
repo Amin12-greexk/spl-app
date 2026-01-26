@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { Spl } from "@/types"
 import SplCard from "./SplCard"
 import SplDetailModal from "./SplDetailModal"
 import toast from "react-hot-toast"
+import { useStaggerAnimation } from "@/hooks/useGSAP"
+import gsap from "gsap"
 
 interface SplListProps {
   userRole?: string
@@ -25,6 +27,19 @@ export default function SplList({
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
+
+  // GSAP stagger animation for cards
+  const gridRef = useStaggerAnimation<HTMLDivElement>({
+    stagger: 0.08,
+    duration: 0.4,
+    delay: 0.1,
+    direction: "up",
+    distance: 25,
+  })
+
+  // Track item being deleted for animation
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const fetchSpls = useCallback(async () => {
     setIsLoading(true)
@@ -66,6 +81,21 @@ export default function SplList({
       return
     }
 
+    // Start delete animation
+    setDeletingId(id)
+    const cardElement = cardRefs.current.get(id)
+
+    // Animate card removal with GSAP
+    if (cardElement && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await gsap.to(cardElement, {
+        opacity: 0,
+        scale: 0.8,
+        x: -20,
+        duration: 0.3,
+        ease: "power2.in",
+      })
+    }
+
     try {
       const response = await fetch(`/api/spl/${id}`, {
         method: "DELETE",
@@ -73,6 +103,10 @@ export default function SplList({
 
       if (!response.ok) {
         const data = await response.json()
+        // Reset animation if delete failed
+        if (cardElement) {
+          gsap.to(cardElement, { opacity: 1, scale: 1, x: 0, duration: 0.2 })
+        }
         throw new Error(data.error || "Gagal menghapus SPL")
       }
 
@@ -80,6 +114,8 @@ export default function SplList({
       fetchSpls()
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -181,16 +217,31 @@ export default function SplList({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 lg:gap-6">
+          <div
+            ref={gridRef}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 lg:gap-6"
+          >
             {currentSpls.map((spl) => (
-              <SplCard
+              <div
                 key={spl.id}
-                spl={spl}
-                userRole={userRole}
-                onDelete={userRole === "STAFF" ? handleDelete : undefined}
-                mini={true}
-                onClick={() => handleOpenDetail(spl)}
-              />
+                data-animate
+                className={`transform-gpu ${deletingId === spl.id ? 'pointer-events-none' : ''}`}
+                ref={(el) => {
+                  if (el) {
+                    cardRefs.current.set(spl.id, el)
+                  } else {
+                    cardRefs.current.delete(spl.id)
+                  }
+                }}
+              >
+                <SplCard
+                  spl={spl}
+                  userRole={userRole}
+                  onDelete={userRole === "STAFF" ? handleDelete : undefined}
+                  mini={true}
+                  onClick={() => handleOpenDetail(spl)}
+                />
+              </div>
             ))}
           </div>
 
@@ -251,11 +302,10 @@ export default function SplList({
                           <button
                             key={page}
                             onClick={() => handlePageChange(page)}
-                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                              currentPage === page
-                                ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-                                : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                            }`}
+                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === page
+                              ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                              : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                              }`}
                           >
                             {page}
                           </button>
