@@ -267,10 +267,10 @@ export default function HRViewPage() {
   ]
 
   const exportColWidths = [
-    { wch: 5 },   { wch: 20 },  { wch: 10 },  { wch: 25 },  { wch: 15 },
-    { wch: 12 },  { wch: 10 },  { wch: 10 },  { wch: 12 },  { wch: 12 },
-    { wch: 10 },  { wch: 20 },  { wch: 40 },  { wch: 12 },  { wch: 20 },
-    { wch: 20 },  { wch: 20 },  { wch: 18 },  { wch: 30 },  { wch: 18 },
+    { wch: 5 }, { wch: 20 }, { wch: 10 }, { wch: 25 }, { wch: 15 },
+    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+    { wch: 10 }, { wch: 20 }, { wch: 40 }, { wch: 12 }, { wch: 20 },
+    { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 18 },
     { wch: 12 },
   ]
 
@@ -284,9 +284,12 @@ export default function HRViewPage() {
 
   const roundHoursFromMinutes = (minutes: number | null) => {
     if (minutes === null || !Number.isFinite(minutes)) return null
+    // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
+    if (minutes <= 30) return 0
     const hours = Math.floor(minutes / 60)
     const remainder = minutes % 60
-    return remainder >= 30 ? hours + 1 : hours
+    // Hanya bulatkan ke atas jika sisa LEBIH dari 30 menit
+    return remainder > 30 ? hours + 1 : hours
   }
 
   const formatTotalHours = (spl: Spl): number | string => {
@@ -474,11 +477,11 @@ export default function HRViewPage() {
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
 
       const periodText = dateFilter === "ALL" ? "Semua_Periode" :
-                         dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
-                         dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
-                         dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
-                         dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
-                         `${customStartDate}_sampai_${customEndDate}`
+        dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
+          dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
+            dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
+              dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
+                `${customStartDate}_sampai_${customEndDate}`
 
       const fileName = `Data_SPL_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`
       XLSX.writeFile(wb, fileName)
@@ -624,9 +627,9 @@ export default function HRViewPage() {
         "TTD Atasan",
       ]
       const tableWidth = colWidths.reduce((sum, width) => sum + width, 0)
-      
+
       // FIXED: Reduced rowsPerPage from 10 to 8 to prevent overlap with footer
-      const rowsPerPage = 8 
+      const rowsPerPage = 8
       const rowHeight = 60
 
       const splsPerPage: Spl[][] = []
@@ -663,8 +666,8 @@ export default function HRViewPage() {
           page.drawImage(logoImage, { x: logoX, y: logoY, width: dims.width, height: dims.height })
         } else {
           page.drawRectangle({
-              x: margin, y: y - logoSize, width: logoSize, height: logoSize,
-              color: rgb(0.1, 0.6, 0.3), opacity: 0.2
+            x: margin, y: y - logoSize, width: logoSize, height: logoSize,
+            color: rgb(0.1, 0.6, 0.3), opacity: 0.2
           })
           page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
           page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
@@ -689,21 +692,21 @@ export default function HRViewPage() {
         })
 
         for (let i = 0; i < headers.length; i++) {
-            const textWidth = bold.widthOfTextAtSize(headers[i], 9)
-            const centerX = currentX + (colWidths[i] - textWidth) / 2
-            
-            page.drawText(headers[i], {
-                x: centerX, y: y - 17,
-                size: 9, font: bold
-            })
+          const textWidth = bold.widthOfTextAtSize(headers[i], 9)
+          const centerX = currentX + (colWidths[i] - textWidth) / 2
 
-            page.drawLine({
-                start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 },
-                thickness: 0.5, color: rgb(0, 0, 0)
-            })
-            currentX += colWidths[i]
+          page.drawText(headers[i], {
+            x: centerX, y: y - 17,
+            size: 9, font: bold
+          })
+
+          page.drawLine({
+            start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 },
+            thickness: 0.5, color: rgb(0, 0, 0)
+          })
+          currentX += colWidths[i]
         }
-        
+
         page.drawLine({ start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
         page.drawLine({ start: { x: tableX, y: y }, end: { x: currentX, y: y }, thickness: 0.5 })
         page.drawLine({ start: { x: tableX, y: y - 25 }, end: { x: currentX, y: y - 25 }, thickness: 0.5 })
@@ -711,173 +714,173 @@ export default function HRViewPage() {
 
         // --- TABEL ROWS ---
         for (let index = 0; index < rowsPerPage; index++) {
-            const spl = pageSPLs[index]
-            const rowY = y - (index + 1) * rowHeight
-            currentX = tableX
+          const spl = pageSPLs[index]
+          const rowY = y - (index + 1) * rowHeight
+          currentX = tableX
 
+          page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+          if (spl) {
+            const rowData = [
+              `${pageIndex * rowsPerPage + index + 1}`,
+              spl.requester.name,
+              spl.requester.pin || "-",
+              format(new Date(spl.date), "dd/MM/yyyy"),
+              spl.startTime,
+              spl.endTime,
+            ]
+
+            for (let i = 0; i < 6; i++) {
+              const isCenter = i !== 1
+              const rawText = rowData[i]
+              const textSize = 9
+              const displayText = fitTextToWidth(rawText, colWidths[i] - 10, font, textSize)
+              const textWidth = font.widthOfTextAtSize(displayText, textSize)
+              let textX = currentX + 5
+              if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
+
+              page.drawText(displayText, {
+                x: textX, y: rowY + (rowHeight / 2) - 4,
+                size: textSize, font: font
+              })
+              currentX += colWidths[i]
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+
+            // Keterangan
+            const ketIndex = 6
+            const ketText = spl.reason || "-"
+            const ketLines = wrapText(ketText, 25)
+            let ketY = rowY + rowHeight - 15
+            ketLines.slice(0, 4).forEach((line) => {
+              page.drawText(line, { x: currentX + 5, y: ketY, size: 8, font })
+              ketY -= 10
+            })
+            currentX += colWidths[ketIndex]
             page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
 
-            if (spl) {
-                const rowData = [
-                    `${pageIndex * rowsPerPage + index + 1}`,
-                    spl.requester.name,
-                    spl.requester.pin || "-",
-                    format(new Date(spl.date), "dd/MM/yyyy"),
-                    spl.startTime,
-                    spl.endTime,
-                ]
+            const signatureCells = [
+              {
+                name: spl.requester.name,
+                signature: spl.signature || null,
+              },
+              {
+                name:
+                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                    ? spl.supervisor?.name || "-"
+                    : "-",
+                signature:
+                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                    ? spl.supervisorSignature || null
+                    : null,
+              },
+            ]
 
-                for(let i=0; i<6; i++) {
-                    const isCenter = i !== 1
-                    const rawText = rowData[i]
-                    const textSize = 9
-                    const displayText = fitTextToWidth(rawText, colWidths[i] - 10, font, textSize)
-                    const textWidth = font.widthOfTextAtSize(displayText, textSize)
-                    let textX = currentX + 5
-                    if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
-
-                    page.drawText(displayText, {
-                        x: textX, y: rowY + (rowHeight / 2) - 4,
-                        size: textSize, font: font
-                    })
-                    currentX += colWidths[i]
-                    page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            const drawSignatureImage = async (
+              dataUrl: string,
+              boxX: number,
+              boxY: number,
+              boxWidth: number,
+              boxHeight: number
+            ) => {
+              try {
+                const signatureBytes = dataUrlToBytes(dataUrl)
+                if (!signatureBytes) return false
+                let signatureImage
+                if (dataUrl.includes("image/png")) {
+                  signatureImage = await pdfDoc.embedPng(signatureBytes)
+                } else {
+                  signatureImage = await pdfDoc.embedJpg(signatureBytes)
                 }
 
-                // Keterangan
-                const ketIndex = 6
-                const ketText = spl.reason || "-"
-                const ketLines = wrapText(ketText, 25)
-                let ketY = rowY + rowHeight - 15
-                ketLines.slice(0, 4).forEach((line) => {
-                    page.drawText(line, { x: currentX + 5, y: ketY, size: 8, font })
-                    ketY -= 10
+                const scale = Math.min(
+                  boxWidth / signatureImage.width,
+                  boxHeight / signatureImage.height
+                )
+                const dims = signatureImage.scale(scale)
+                const imgX = boxX + (boxWidth - dims.width) / 2
+                const imgY = boxY + (boxHeight - dims.height) / 2
+                page.drawImage(signatureImage, {
+                  x: imgX,
+                  y: imgY,
+                  width: dims.width,
+                  height: dims.height,
                 })
-                currentX += colWidths[ketIndex]
-                page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
-
-                const signatureCells = [
-                    {
-                        name: spl.requester.name,
-                        signature: spl.signature || null,
-                    },
-                    {
-                        name:
-                            spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
-                                ? spl.supervisor?.name || "-"
-                                : "-",
-                        signature:
-                            spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
-                                ? spl.supervisorSignature || null
-                                : null,
-                    },
-                ]
-
-                const drawSignatureImage = async (
-                    dataUrl: string,
-                    boxX: number,
-                    boxY: number,
-                    boxWidth: number,
-                    boxHeight: number
-                ) => {
-                    try {
-                        const signatureBytes = dataUrlToBytes(dataUrl)
-                        if (!signatureBytes) return false
-                        let signatureImage
-                        if (dataUrl.includes("image/png")) {
-                            signatureImage = await pdfDoc.embedPng(signatureBytes)
-                        } else {
-                            signatureImage = await pdfDoc.embedJpg(signatureBytes)
-                        }
-
-                        const scale = Math.min(
-                            boxWidth / signatureImage.width,
-                            boxHeight / signatureImage.height
-                        )
-                        const dims = signatureImage.scale(scale)
-                        const imgX = boxX + (boxWidth - dims.width) / 2
-                        const imgY = boxY + (boxHeight - dims.height) / 2
-                        page.drawImage(signatureImage, {
-                            x: imgX,
-                            y: imgY,
-                            width: dims.width,
-                            height: dims.height,
-                        })
-                        return true
-                    } catch (e) {
-                        console.error("Signature error", e)
-                        return false
-                    }
-                }
-
-                for (let sigIndex = 0; sigIndex < signatureCells.length; sigIndex++) {
-                    const cellWidth = colWidths[7 + sigIndex]
-                    const cell = signatureCells[sigIndex]
-                    const nameText = cell.name || "-"
-                    const nameSize = 7
-                    const namePadding = 4
-                    const nameMaxWidth = cellWidth - namePadding * 2
-                    const nameLines = wrapTextByWidth(nameText, nameMaxWidth, bold, nameSize, 2)
-                    const nameLineHeight = 8
-                    const nameBlockHeight = nameLines.length * nameLineHeight
-                    const nameBaseY = rowY + namePadding
-
-                    nameLines.forEach((line, lineIndex) => {
-                      const lineWidth = bold.widthOfTextAtSize(line, nameSize)
-                      const lineX = currentX + Math.max(2, (cellWidth - lineWidth) / 2)
-                      const lineY = nameBaseY + (nameLines.length - 1 - lineIndex) * nameLineHeight
-                      page.drawText(line, { x: lineX, y: lineY, size: nameSize, font: bold })
-                    })
-
-                    const padding = 4
-                    const gap = 2
-                    const signatureBoxX = currentX + padding
-                    const signatureBoxY = rowY + nameBlockHeight + padding + gap
-                    const signatureBoxWidth = cellWidth - padding * 2
-                    const signatureBoxHeight = rowHeight - nameBlockHeight - padding * 2 - gap
-
-                    if (cell.signature) {
-                        await drawSignatureImage(
-                            cell.signature,
-                            signatureBoxX,
-                            signatureBoxY,
-                            signatureBoxWidth,
-                            signatureBoxHeight
-                        )
-                    } else {
-                        page.drawText("-", {
-                            x: signatureBoxX + signatureBoxWidth / 2 - 2,
-                            y: signatureBoxY + signatureBoxHeight / 2 - 4,
-                            size: 8,
-                            font,
-                        })
-                    }
-
-                    currentX += cellWidth
-                    page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
-                }
-            } else {
-                for(let i=0; i < colWidths.length; i++) {
-                     currentX += colWidths[i]
-                     page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
-                }
+                return true
+              } catch (e) {
+                console.error("Signature error", e)
+                return false
+              }
             }
-            page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + tableWidth, y: rowY }, thickness: 0.5 })
+
+            for (let sigIndex = 0; sigIndex < signatureCells.length; sigIndex++) {
+              const cellWidth = colWidths[7 + sigIndex]
+              const cell = signatureCells[sigIndex]
+              const nameText = cell.name || "-"
+              const nameSize = 7
+              const namePadding = 4
+              const nameMaxWidth = cellWidth - namePadding * 2
+              const nameLines = wrapTextByWidth(nameText, nameMaxWidth, bold, nameSize, 2)
+              const nameLineHeight = 8
+              const nameBlockHeight = nameLines.length * nameLineHeight
+              const nameBaseY = rowY + namePadding
+
+              nameLines.forEach((line, lineIndex) => {
+                const lineWidth = bold.widthOfTextAtSize(line, nameSize)
+                const lineX = currentX + Math.max(2, (cellWidth - lineWidth) / 2)
+                const lineY = nameBaseY + (nameLines.length - 1 - lineIndex) * nameLineHeight
+                page.drawText(line, { x: lineX, y: lineY, size: nameSize, font: bold })
+              })
+
+              const padding = 4
+              const gap = 2
+              const signatureBoxX = currentX + padding
+              const signatureBoxY = rowY + nameBlockHeight + padding + gap
+              const signatureBoxWidth = cellWidth - padding * 2
+              const signatureBoxHeight = rowHeight - nameBlockHeight - padding * 2 - gap
+
+              if (cell.signature) {
+                await drawSignatureImage(
+                  cell.signature,
+                  signatureBoxX,
+                  signatureBoxY,
+                  signatureBoxWidth,
+                  signatureBoxHeight
+                )
+              } else {
+                page.drawText("-", {
+                  x: signatureBoxX + signatureBoxWidth / 2 - 2,
+                  y: signatureBoxY + signatureBoxHeight / 2 - 4,
+                  size: 8,
+                  font,
+                })
+              }
+
+              currentX += cellWidth
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+          } else {
+            for (let i = 0; i < colWidths.length; i++) {
+              currentX += colWidths[i]
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+          }
+          page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + tableWidth, y: rowY }, thickness: 0.5 })
         }
 
         // --- FOOTER TANDA TANGAN (POSISI DIATUR AGAR TIDAK NABRAK) ---
         // Dengan rowsPerPage = 8, tabel berakhir di Y ~246.
         // Kita set footerY di 80, maka Header TTD mulai di Y ~140. Aman (Gap ~100 poin).
-        
-        const footerY = 80 
+
+        const footerY = 80
         const boxWidth = 140
         const totalFooterWidth = pageWidth - (margin * 2)
-        const gap = (totalFooterWidth - (boxWidth * 3)) / 2 
+        const gap = (totalFooterWidth - (boxWidth * 3)) / 2
 
         const signatures = [
-             { role: "Diajukan Oleh", name: "..........................", title: "Pemohon / Leader" },
-             { role: "Disetujui Oleh", name: "Zhalilla Viola R.S.", title: "HR & GA Supervisor" },
-             { role: "Mengetahui", name: "Tiyas Indah S.", title: "Plant Manager" },
+          { role: "Diajukan Oleh", name: "..........................", title: "Pemohon / Leader" },
+          { role: "Disetujui Oleh", name: "Zhalilla Viola R.S.", title: "HR & GA Supervisor" },
+          { role: "Mengetahui", name: "Tiyas Indah S.", title: "Plant Manager" },
         ]
 
         // 1. Gambar Tanggal & Lokasi
@@ -885,36 +888,36 @@ export default function HRViewPage() {
         const dateXPos = margin + (2 * (boxWidth + gap))
         const dateWidth = font.widthOfTextAtSize(dateText, 10)
         const centeredDateX = dateXPos + (boxWidth - dateWidth) / 2
-        
+
         page.drawText(dateText, {
-            x: centeredDateX,
-            y: footerY + 85,
-            size: 10, font
+          x: centeredDateX,
+          y: footerY + 85,
+          size: 10, font
         })
 
         // 2. Loop Gambar Box Tanda Tangan
         signatures.forEach((sig, idx) => {
-             const xPos = margin + (idx * (boxWidth + gap))
-             
-             const drawCentered = (text: string, y: number, f: any, s: number) => {
-                const w = f.widthOfTextAtSize(text, s)
-                page.drawText(text, { x: xPos + (boxWidth - w) / 2, y, size: s, font: f })
-             }
+          const xPos = margin + (idx * (boxWidth + gap))
 
-             // Role
-             drawCentered(sig.role + " :", footerY + 60, bold, 9)
-             
-             // Garis
-             page.drawLine({
-                 start: { x: xPos, y: footerY + 25 },
-                 end: { x: xPos + boxWidth, y: footerY + 25 },
-                 thickness: 0.5
-             })
-             
-             // Nama
-             drawCentered(sig.name, footerY + 12, bold, 9)
-             // Title
-             drawCentered(sig.title, footerY, font, 9)
+          const drawCentered = (text: string, y: number, f: any, s: number) => {
+            const w = f.widthOfTextAtSize(text, s)
+            page.drawText(text, { x: xPos + (boxWidth - w) / 2, y, size: s, font: f })
+          }
+
+          // Role
+          drawCentered(sig.role + " :", footerY + 60, bold, 9)
+
+          // Garis
+          page.drawLine({
+            start: { x: xPos, y: footerY + 25 },
+            end: { x: xPos + boxWidth, y: footerY + 25 },
+            thickness: 0.5
+          })
+
+          // Nama
+          drawCentered(sig.name, footerY + 12, bold, 9)
+          // Title
+          drawCentered(sig.title, footerY, font, 9)
         })
 
       } // End Page Loop
@@ -1068,15 +1071,14 @@ export default function HRViewPage() {
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filterStatus === status
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === status
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
               >
-                {status === "ALL" ? "Semua" : 
-                 status === "PENDING" ? "Menunggu" :
-                 status === "APPROVED" ? "Disetujui" : "Ditolak"}
+                {status === "ALL" ? "Semua" :
+                  status === "PENDING" ? "Menunggu" :
+                    status === "APPROVED" ? "Disetujui" : "Ditolak"}
               </button>
             ))}
           </div>
@@ -1097,11 +1099,10 @@ export default function HRViewPage() {
               <button
                 key={period.value}
                 onClick={() => setDateFilter(period.value)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  dateFilter === period.value
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${dateFilter === period.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
               >
                 {period.label}
               </button>
@@ -1229,11 +1230,10 @@ export default function HRViewPage() {
                     <button
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                        currentPage === pageNumber
-                          ? "bg-green-600 text-white"
-                          : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${currentPage === pageNumber
+                        ? "bg-green-600 text-white"
+                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
                       {pageNumber}
                     </button>

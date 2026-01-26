@@ -87,21 +87,18 @@ function SplCard({
     return new Date() >= window.plannedEnd
   }
 
-  const roundHoursFromMinutes = (minutes: number) => {
-    if (!Number.isFinite(minutes)) return null
-    const hours = Math.floor(minutes / 60)
-    const remainder = minutes % 60
-    return remainder >= 30 ? hours + 1 : hours
-  }
-
   const formatTotalHours = (value?: number | string | null) => {
     if (value === null || value === undefined) return "-"
     const numericValue = typeof value === "number" ? value : Number(value)
     if (!Number.isFinite(numericValue)) return "-"
     const totalMinutes = Math.round(numericValue * 60)
-    const roundedHours = roundHoursFromMinutes(totalMinutes)
-    if (roundedHours === null) return "-"
-    return `${roundedHours} jam`
+    // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
+    if (totalMinutes <= 30) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
   }
 
   // Determine detailed status label based on supervisor and role - memoized
@@ -375,8 +372,22 @@ function SplCard({
           </div>
         </div>
 
-        <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-center">
-          <span className="text-[9px] text-gray-400 group-hover:text-green-600 transition-colors">
+        <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+          {/* Delete button for staff when SPL is pending */}
+          {userRole === "STAFF" &&
+            (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
+            onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(spl.id)
+                }}
+                className="px-2 py-1 text-[10px] font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors border border-red-200"
+              >
+                🗑 Hapus
+              </button>
+            )}
+          <span className="text-[9px] text-gray-400 group-hover:text-green-600 transition-colors flex-1 text-center">
             Klik untuk detail
           </span>
         </div>
@@ -581,13 +592,13 @@ function SplCard({
             {userRole === "STAFF" &&
               (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
               onDelete && (
-              <button
-                onClick={() => onDelete(spl.id)}
-                className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
-              >
-                🗑 Hapus
-              </button>
-            )}
+                <button
+                  onClick={() => onDelete(spl.id)}
+                  className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-micro motion-safe:hover:scale-[1.02] shadow-sm hover:shadow-md"
+                >
+                  🗑 Hapus
+                </button>
+              )}
           </div>
         )}
       </div>
@@ -628,29 +639,26 @@ function SplCard({
               <div key={index} className="flex items-center gap-2 flex-1">
                 <div className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                      step.done
-                        ? "bg-green-500 border-green-600 text-white shadow-md"
-                        : step.current
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step.done
+                      ? "bg-green-500 border-green-600 text-white shadow-md"
+                      : step.current
                         ? "bg-blue-500 border-blue-600 text-white shadow-md animate-pulse"
                         : "bg-gray-100 border-gray-300 text-gray-400"
-                    }`}
+                      }`}
                   >
                     {step.done ? "✓" : index + 1}
                   </div>
                   <span
-                    className={`text-[10px] font-semibold mt-1 ${
-                      step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
-                    }`}
+                    className={`text-[10px] font-semibold mt-1 ${step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
+                      }`}
                   >
                     {step.label}
                   </span>
                 </div>
                 {index < getApprovalFlow().length - 1 && (
                   <div
-                    className={`h-0.5 flex-1 ${
-                      step.done ? "bg-green-500" : "bg-gray-300"
-                    }`}
+                    className={`h-0.5 flex-1 ${step.done ? "bg-green-500" : "bg-gray-300"
+                      }`}
                   />
                 )}
               </div>
@@ -851,13 +859,13 @@ function SplCard({
           {userRole === "STAFF" &&
             (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
             onDelete && (
-            <button
-              onClick={() => onDelete(spl.id)}
-              className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-micro motion-safe:hover:scale-[1.02]"
-            >
-              Hapus
-            </button>
-          )}
+              <button
+                onClick={() => onDelete(spl.id)}
+                className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-micro motion-safe:hover:scale-[1.02]"
+              >
+                Hapus
+              </button>
+            )}
 
           {userRole === "MANAGER" &&
             ["PENDING", "PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status) && (
