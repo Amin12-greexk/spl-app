@@ -446,7 +446,7 @@ function SplCard({
 
           {spl.overrunReason && (
             <div className="pt-1.5 mt-1.5 border-t border-red-100 bg-red-50 p-2 rounded">
-              <p className="text-red-700 text-xs font-semibold mb-0.5">Melebihi Rencana:</p>
+              <p className="text-red-700 text-xs font-semibold mb-0.5">Alasan Realisasi:</p>
               <p className="text-red-600 text-xs line-clamp-2">{spl.overrunReason}</p>
             </div>
           )}
@@ -723,7 +723,7 @@ function SplCard({
             {spl.overrunReason && (
               <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2">
                 <p className="text-sm text-red-700 font-semibold mb-1">
-                  Melebihi Rencana:
+                  Alasan Realisasi:
                 </p>
                 <p className="text-sm text-red-600">{spl.overrunReason}</p>
               </div>

@@ -20,22 +20,30 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all SPLs from subordinates (users who have this user as supervisor)
+    const andFilters: any[] = [
+      {
+        NOT: {
+          OR: [
+            { isManualEntry: true, requesterSignedAt: null },
+            { source: "LEGACY", requesterSignedAt: null },
+          ],
+        },
+      },
+    ]
+
+    if (session.user.role === "MANAGER") {
+      andFilters.push({
+        NOT: { AND: [{ status: "PENDING_MANAGER" }, { actualEndAt: null }] },
+      })
+    }
+
     const spls = await prisma.spl.findMany({
       where: {
         OR: [
           { supervisorId: session.user.id },
           { supervisorId: null, requester: { supervisorId: session.user.id } },
         ],
-        AND: [
-          {
-            NOT: {
-              OR: [
-                { isManualEntry: true, requesterSignedAt: null },
-                { source: "LEGACY", requesterSignedAt: null },
-              ],
-            },
-          },
-        ],
+        AND: andFilters,
       },
       include: {
         requester: {
