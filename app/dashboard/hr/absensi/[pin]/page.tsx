@@ -298,7 +298,7 @@ export default function AbsensiDetailPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="overflow-x-auto">
-          <table className="min-w-[800px] w-full border border-gray-200 text-sm">
+          <table className="min-w-[900px] w-full border border-gray-200 text-sm">
             <thead className="bg-gray-50 text-gray-700">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold border-r border-gray-200">

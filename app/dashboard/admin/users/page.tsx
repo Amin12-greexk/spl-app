@@ -155,7 +155,7 @@ export default function AdminUsersPage() {
       {/* Users Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full whitespace-nowrap">
+          <table className="min-w-[900px] w-full whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
