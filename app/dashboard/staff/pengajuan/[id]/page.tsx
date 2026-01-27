@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import toast from "react-hot-toast"
+import { getEffectiveHours } from "@/lib/spl-hours"
 
 export default function SplDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -71,6 +72,21 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
       </div>
     )
   }
+
+  const formatHoursDisplay = (value?: number | null) => {
+    if (value === null || value === undefined) return "-"
+    if (!Number.isFinite(value)) return "-"
+    const totalMinutes = Math.round(value * 60)
+    if (totalMinutes <= 30) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
+  }
+
+  const effectiveHours = getEffectiveHours(spl)
+  const displayHoursText = formatHoursDisplay(effectiveHours ?? spl.totalHours)
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
@@ -170,7 +186,7 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
             <label className="text-sm font-medium text-gray-500 block mb-2">
               Total Jam
             </label>
-            <p className="text-gray-900 font-medium">{spl.totalHours} jam</p>
+            <p className="text-gray-900 font-medium">{displayHoursText}</p>
           </div>
 
           <div>

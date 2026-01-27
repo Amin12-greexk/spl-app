@@ -4,6 +4,7 @@ import { id } from "date-fns/locale"
 import Image from "next/image"
 import { memo, useMemo } from "react"
 import { buildOvertimeWindowFromTimes, makeWindow, startOfDay } from "@/lib/spl-time"
+import { getEffectiveHours } from "@/lib/spl-hours"
 
 interface SplCardProps {
   spl: Spl
@@ -100,6 +101,10 @@ function SplCard({
     if (minutes === 0) return `${hours} jam`
     return `${hours} jam ${minutes} menit`
   }
+
+  const effectiveHours = getEffectiveHours(spl)
+  const displayHours = effectiveHours ?? spl.totalHours
+  const displayHoursText = formatTotalHours(displayHours)
 
   // Determine detailed status label based on supervisor and role - memoized
   const detailedStatus = useMemo(() => {
@@ -350,7 +355,7 @@ function SplCard({
           <div className="flex items-center justify-between">
             <span className="text-gray-500">⏱️</span>
             <span className="font-semibold text-green-600 text-[10px]">
-              {formatTotalHours(spl.totalHours)}
+              {displayHoursText}
             </span>
           </div>
 
@@ -434,7 +439,7 @@ function SplCard({
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Total Jam:</span>
             <span className="font-semibold text-green-600">
-              {formatTotalHours(spl.totalHours)}
+              {displayHoursText}
             </span>
           </div>
 
@@ -699,7 +704,7 @@ function SplCard({
 
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-500">⏱️ Total Jam:</span>
-          <span className="font-medium">{formatTotalHours(spl.totalHours)}</span>
+          <span className="font-medium">{displayHoursText}</span>
         </div>
 
         {spl.projectName && (
@@ -895,3 +900,4 @@ function SplCard({
 }
 
 export default memo(SplCard)
+

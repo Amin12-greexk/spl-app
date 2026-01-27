@@ -9,7 +9,7 @@ import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale" // Import locale Indonesia
-import { parseTimeToMinutes } from "@/lib/spl-time"
+import { getEffectiveHours, getEffectiveMinutes } from "@/lib/spl-hours"
 import * as XLSX from 'xlsx'
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
@@ -201,8 +201,10 @@ export default function HRViewPage() {
     ])
     const sumHours = (items: Spl[]) =>
       items.reduce((sum, spl) => {
-        const hours = Number(spl.totalHours)
-        return sum + (Number.isFinite(hours) ? hours : 0)
+        const effectiveHours = getEffectiveHours(spl)
+        if (effectiveHours !== null) return sum + effectiveHours
+        const fallback = Number(spl.totalHours)
+        return sum + (Number.isFinite(fallback) ? fallback : 0)
       }, 0)
 
     const pendingItems = filteredSpls.filter((spl) =>
@@ -276,14 +278,6 @@ export default function HRViewPage() {
     { wch: 12 },
   ]
 
-  const getDurationMinutes = (startTime: string, endTime: string) => {
-    const startMinutes = parseTimeToMinutes(startTime)
-    const endMinutes = parseTimeToMinutes(endTime)
-    if (startMinutes === null || endMinutes === null) return null
-    const diff = endMinutes - startMinutes
-    return diff >= 0 ? diff : diff + 24 * 60
-  }
-
   const roundHoursFromMinutes = (minutes: number | null) => {
     if (minutes === null || !Number.isFinite(minutes)) return null
     // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
@@ -295,9 +289,9 @@ export default function HRViewPage() {
   }
 
   const formatTotalHours = (spl: Spl): number | string => {
-    const minutes = getDurationMinutes(spl.startTime, spl.endTime)
-    const roundedFromTimes = roundHoursFromMinutes(minutes)
-    if (roundedFromTimes !== null) return roundedFromTimes
+    const effectiveMinutes = getEffectiveMinutes(spl)
+    const roundedFromEffective = roundHoursFromMinutes(effectiveMinutes)
+    if (roundedFromEffective !== null) return roundedFromEffective
 
     const fallback = Number(spl.totalHours)
     if (!Number.isFinite(fallback)) return "-"
