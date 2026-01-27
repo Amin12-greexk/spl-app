@@ -3,6 +3,7 @@ import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import Image from "next/image"
 import Modal from "@/components/ui/Modal"
+import { getEffectiveHours, getRealizationMinutes } from "@/lib/spl-hours"
 
 interface SplDetailModalProps {
   spl: Spl | null
@@ -46,6 +47,17 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     if (minutes === 0) return `${hours} jam`
     return `${hours} jam ${minutes} menit`
   }
+
+  const effectiveHours = getEffectiveHours(spl)
+  const displayHours = effectiveHours ?? spl.totalHours
+  const displayHoursText = formatTotalHours(displayHours)
+  const realizationMinutes = getRealizationMinutes(spl)
+  const realizationHours =
+    realizationMinutes !== null ? realizationMinutes / 60 : spl.actualTotalHours
+  const realizationHoursText =
+    realizationHours === null || realizationHours === undefined
+      ? null
+      : formatTotalHours(realizationHours)
 
   const getDetailedStatus = () => {
     const supervisorRole = spl.supervisor?.role || requesterDepartmentName
@@ -317,7 +329,7 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
 
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500 font-medium">⏱️ Total Jam:</span>
-              <span className="font-semibold text-green-600">{formatTotalHours(spl.totalHours)}</span>
+              <span className="font-semibold text-green-600">{displayHoursText}</span>
             </div>
           </div>
 
@@ -334,7 +346,7 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
                 <span className="text-gray-500 font-medium">🎯 Realisasi:</span>
                 <span className="font-semibold text-gray-900">
                   {realizationRange()}
-                  {spl.actualTotalHours && ` (${formatTotalHours(spl.actualTotalHours)})`}
+                  {realizationHoursText ? ` (${realizationHoursText})` : ""}
                 </span>
               </div>
             )}
@@ -490,3 +502,5 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     </Modal>
   )
 }
+
+

@@ -80,11 +80,25 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { date, startTime, endTime, reason, projectName } = body
+    const {
+      date,
+      startTime,
+      endTime,
+      actualStartTime,
+      actualEndTime,
+      reason,
+      projectName,
+    } = body
 
     if (!date || !startTime || !endTime || !reason) {
       return NextResponse.json(
         { error: "Tanggal, jam mulai, jam selesai, dan alasan wajib diisi" },
+        { status: 400 }
+      )
+    }
+    if ((actualStartTime && !actualEndTime) || (!actualStartTime && actualEndTime)) {
+      return NextResponse.json(
+        { error: "Jam realisasi mulai dan selesai harus diisi berpasangan" },
         { status: 400 }
       )
     }
@@ -170,6 +184,40 @@ export async function PATCH(
     if (regularWindow) {
       updateData.regularStartAt = regularWindow.start
       updateData.regularEndAt = regularWindow.end
+    }
+
+    if (actualStartTime && actualEndTime) {
+      const actualStartMinutes = parseTimeToMinutes(actualStartTime)
+      const actualEndMinutes = parseTimeToMinutes(actualEndTime)
+      if (actualStartMinutes === null || actualEndMinutes === null) {
+        return NextResponse.json(
+          { error: "Format jam realisasi tidak valid (HH:MM)" },
+          { status: 400 }
+        )
+      }
+      if (actualStartMinutes === actualEndMinutes) {
+        return NextResponse.json(
+          { error: "Jam realisasi akhir harus > jam realisasi mulai" },
+          { status: 400 }
+        )
+      }
+
+      const actualWindow = makeWindow(requestedDate, actualStartTime, actualEndTime)
+      if (!actualWindow) {
+        return NextResponse.json(
+          { error: "Waktu realisasi tidak valid" },
+          { status: 400 }
+        )
+      }
+
+      const actualMinutes = getMinutesDiff(actualWindow.start, actualWindow.end)
+      const actualHours = Number((actualMinutes / 60).toFixed(2))
+
+      updateData.actualStartAt = actualWindow.start
+      updateData.actualEndAt = actualWindow.end
+      updateData.realizedMinutes = actualMinutes
+      updateData.actualTotalHours = actualHours
+      updateData.realizationCounted = actualMinutes > 0
     }
 
     const updated = await prisma.spl.update({

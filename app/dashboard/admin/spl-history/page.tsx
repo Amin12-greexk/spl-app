@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
+import { getEffectiveHours } from "@/lib/spl-hours"
 
 interface Spl {
   id: string
@@ -13,6 +14,10 @@ interface Spl {
   startTime: string
   endTime: string
   totalHours: number
+  actualStartAt?: Date | string | null
+  actualEndAt?: Date | string | null
+  actualTotalHours?: number | null
+  realizedMinutes?: number | null
   reason: string
   status: string
   projectName: string | null
@@ -52,6 +57,8 @@ export default function SplHistoryPage() {
     date: "",
     startTime: "",
     endTime: "",
+    actualStartTime: "",
+    actualEndTime: "",
     reason: "",
     projectName: "",
   })
@@ -84,12 +91,28 @@ export default function SplHistoryPage() {
   const formatDateInput = (value: Date) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })
 
+  const formatTimeInJakarta = (value?: Date | string | null) => {
+    if (!value) return ""
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ""
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date)
+  }
+
   const openEdit = (spl: Spl) => {
     setEditingSpl(spl)
+    const actualStartTime = formatTimeInJakarta(spl.actualStartAt) || spl.startTime
+    const actualEndTime = formatTimeInJakarta(spl.actualEndAt) || spl.endTime
     setEditForm({
       date: formatDateInput(spl.date),
       startTime: spl.startTime,
       endTime: spl.endTime,
+      actualStartTime,
+      actualEndTime,
       reason: spl.reason,
       projectName: spl.projectName || "",
     })
@@ -106,6 +129,10 @@ export default function SplHistoryPage() {
       await Swal.fire("Gagal", "Tanggal, jam, dan alasan wajib diisi.", "error")
       return
     }
+    if ((editForm.actualStartTime && !editForm.actualEndTime) || (!editForm.actualStartTime && editForm.actualEndTime)) {
+      await Swal.fire("Gagal", "Jam realisasi mulai dan selesai harus diisi berpasangan.", "error")
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -116,6 +143,8 @@ export default function SplHistoryPage() {
           date: editForm.date,
           startTime: editForm.startTime,
           endTime: editForm.endTime,
+          actualStartTime: editForm.actualStartTime || null,
+          actualEndTime: editForm.actualEndTime || null,
           reason: editForm.reason,
           projectName: editForm.projectName || null,
         }),
@@ -200,6 +229,18 @@ export default function SplHistoryPage() {
         {c.label}
       </span>
     )
+  }
+
+  const formatHoursDisplay = (value?: number | null) => {
+    if (value === null || value === undefined) return "-"
+    if (!Number.isFinite(value)) return "-"
+    const totalMinutes = Math.round(value * 60)
+    if (totalMinutes <= 30) return "0 menit"
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours === 0) return `${minutes} menit`
+    if (minutes === 0) return `${hours} jam`
+    return `${hours} jam ${minutes} menit`
   }
 
   if (loading) {
@@ -309,7 +350,7 @@ export default function SplHistoryPage() {
                     {spl.startTime} - {spl.endTime}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {spl.totalHours}h
+                    {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                     {spl.reason}
@@ -423,6 +464,43 @@ export default function SplHistoryPage() {
               />
             </div>
           </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
+            <p className="text-xs font-semibold text-emerald-800 mb-2">
+              Realisasi (prefill dari jam pengajuan)
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Jam Realisasi Mulai
+                </label>
+                <input
+                  type="time"
+                  step="60"
+                  value={editForm.actualStartTime}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, actualStartTime: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  placeholder="HH:mm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Jam Realisasi Selesai
+                </label>
+                <input
+                  type="time"
+                  step="60"
+                  value={editForm.actualEndTime}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, actualEndTime: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  placeholder="HH:mm"
+                />
+              </div>
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Alasan Lembur
@@ -455,3 +533,4 @@ export default function SplHistoryPage() {
     </div>
   )
 }
+
