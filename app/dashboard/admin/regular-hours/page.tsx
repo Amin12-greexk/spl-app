@@ -15,6 +15,8 @@ interface RegularHoursUser {
   department: { name: string } | null
   regularStartTime?: string | null
   regularEndTime?: string | null
+  saturdayStartTime?: string | null
+  saturdayEndTime?: string | null
 }
 
 const SECURITY_SHIFT_PRESETS = [
@@ -47,6 +49,8 @@ export default function RegularHoursPage() {
     userId: "",
     regularStartTime: "",
     regularEndTime: "",
+    saturdayStartTime: "",
+    saturdayEndTime: "",
   })
 
   useEffect(() => {
@@ -85,6 +89,8 @@ export default function RegularHoursPage() {
       userId,
       regularStartTime: selected?.regularStartTime || "",
       regularEndTime: selected?.regularEndTime || "",
+      saturdayStartTime: selected?.saturdayStartTime || "",
+      saturdayEndTime: selected?.saturdayEndTime || "",
     })
   }
 
@@ -118,12 +124,26 @@ export default function RegularHoursPage() {
 
     const startValue = formData.regularStartTime.trim()
     const endValue = formData.regularEndTime.trim()
+    const saturdayStartValue = formData.saturdayStartTime.trim()
+    const saturdayEndValue = formData.saturdayEndTime.trim()
 
     if ((startValue && !endValue) || (!startValue && endValue)) {
       await Swal.fire({
         icon: "error",
         title: "Jam tidak lengkap",
         text: "Jam mulai dan jam selesai harus diisi bersamaan.",
+      })
+      return
+    }
+
+    if (
+      (saturdayStartValue && !saturdayEndValue) ||
+      (!saturdayStartValue && saturdayEndValue)
+    ) {
+      await Swal.fire({
+        icon: "error",
+        title: "Jam Sabtu tidak lengkap",
+        text: "Jam mulai dan jam selesai Sabtu harus diisi bersamaan.",
       })
       return
     }
@@ -151,6 +171,27 @@ export default function RegularHoursPage() {
       }
     }
 
+    if (saturdayStartValue && saturdayEndValue) {
+      const startMinutes = parseTimeToMinutes(saturdayStartValue)
+      const endMinutes = parseTimeToMinutes(saturdayEndValue)
+      if (startMinutes === null || endMinutes === null) {
+        await Swal.fire({
+          icon: "error",
+          title: "Format jam Sabtu salah",
+          text: "Gunakan format HH:MM (24 jam).",
+        })
+        return
+      }
+      if (startMinutes === endMinutes) {
+        await Swal.fire({
+          icon: "error",
+          title: "Jam Sabtu tidak valid",
+          text: "Jam selesai Sabtu tidak boleh sama dengan jam mulai.",
+        })
+        return
+      }
+    }
+
     setSaving(true)
     try {
       const response = await fetch("/api/admin/regular-hours", {
@@ -160,6 +201,8 @@ export default function RegularHoursPage() {
           userId: formData.userId,
           regularStartTime: startValue || null,
           regularEndTime: endValue || null,
+          saturdayStartTime: saturdayStartValue || null,
+          saturdayEndTime: saturdayEndValue || null,
         }),
       })
 
@@ -176,6 +219,8 @@ export default function RegularHoursPage() {
                 ...user,
                 regularStartTime: data.user.regularStartTime,
                 regularEndTime: data.user.regularEndTime,
+                saturdayStartTime: data.user.saturdayStartTime,
+                saturdayEndTime: data.user.saturdayEndTime,
               }
             : user
         )
@@ -277,6 +322,12 @@ export default function RegularHoursPage() {
                   "Belum diatur"
                 )}
               </p>
+              <p className="text-gray-700 flex items-center gap-2 mt-1">
+                <strong>Override Sabtu:</strong>{" "}
+                {selectedUser.saturdayStartTime && selectedUser.saturdayEndTime
+                  ? `${selectedUser.saturdayStartTime} - ${selectedUser.saturdayEndTime}`
+                  : "Mengikuti jam reguler"}
+              </p>
             </div>
           )}
         </div>
@@ -348,6 +399,44 @@ export default function RegularHoursPage() {
             </div>
           </div>
 
+          <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-3">
+              Jam Kerja Sabtu (opsional override)
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Jam Mulai Sabtu
+                </label>
+                <TimePicker
+                  value={formData.saturdayStartTime}
+                  onChange={(value) =>
+                    setFormData({ ...formData, saturdayStartTime: value })
+                  }
+                  showWib
+                  selectClassName="focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Jam Selesai Sabtu
+                </label>
+                <TimePicker
+                  value={formData.saturdayEndTime}
+                  onChange={(value) =>
+                    setFormData({ ...formData, saturdayEndTime: value })
+                  }
+                  showWib
+                  selectClassName="focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-amber-700">
+              Jika diisi, jam Sabtu akan dipakai otomatis saat pengajuan di hari
+              Sabtu.
+            </p>
+          </div>
+
           <div className="flex gap-4">
             <button
               type="submit"
@@ -363,6 +452,8 @@ export default function RegularHoursPage() {
                   userId: "",
                   regularStartTime: "",
                   regularEndTime: "",
+                  saturdayStartTime: "",
+                  saturdayEndTime: "",
                 })
               }
               className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -389,12 +480,13 @@ export default function RegularHoursPage() {
                 <th className="px-4 py-3 text-left font-semibold">Role</th>
                 <th className="px-4 py-3 text-left font-semibold">Departemen</th>
                 <th className="px-4 py-3 text-left font-semibold">Jam Reguler</th>
+                <th className="px-4 py-3 text-left font-semibold">Jam Sabtu</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && !loading && (
                 <tr>
-                  <td className="px-4 py-4 text-gray-500" colSpan={5}>
+                  <td className="px-4 py-4 text-gray-500" colSpan={6}>
                     Tidak ada data user.
                   </td>
                 </tr>
@@ -429,6 +521,11 @@ export default function RegularHoursPage() {
                     ) : (
                       "Belum diatur"
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {user.saturdayStartTime && user.saturdayEndTime
+                      ? `${user.saturdayStartTime} - ${user.saturdayEndTime}`
+                      : "-"}
                   </td>
                 </tr>
               ))}

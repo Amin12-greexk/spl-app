@@ -57,6 +57,10 @@ export default function NotificationProvider({ children }: NotificationProviderP
       const lastViewedKey = `notif_last_viewed_${session.user.id}`
       const lastViewedStr = localStorage.getItem(lastViewedKey)
       const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
+      const normalizeSpls = (payload: any) => {
+        if (!payload) return []
+        return Array.isArray(payload) ? payload : payload?.data || []
+      }
 
       const fetchManualCount = async () => {
         const response = await fetch("/api/spl/telat-input")
@@ -75,9 +79,9 @@ export default function NotificationProvider({ children }: NotificationProviderP
         session.user.role === "DRIVER" ||
         session.user.role === "PRODUCTION_SUPERVISOR"
       ) {
-        const response = await fetch("/api/spl")
+        const response = await fetch("/api/spl?page=1&limit=100")
         if (response.ok) {
-          const data = await response.json()
+          const data = normalizeSpls(await response.json())
           const recentUpdates = data.filter((spl: any) => {
             const isDecisionStatus = [
               "APPROVED",
@@ -100,9 +104,9 @@ export default function NotificationProvider({ children }: NotificationProviderP
       } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
         let count = 0
 
-        const ownResponse = await fetch("/api/spl")
+        const ownResponse = await fetch("/api/spl?page=1&limit=100")
         if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
+          const ownData = normalizeSpls(await ownResponse.json())
           const ownUpdates = ownData.filter((spl: any) => {
             const isDecisionStatus = [
               "APPROVED",
@@ -119,9 +123,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
           count += ownUpdates.length
         }
 
-        const teamResponse = await fetch("/api/spl/my-team")
+        const teamResponse = await fetch(
+          "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=100"
+        )
         if (teamResponse.ok) {
-          const teamData = await teamResponse.json()
+          const teamData = normalizeSpls(await teamResponse.json())
           const pendingApprovals = teamData.filter((spl: any) => {
             const isPendingSupervisor = spl.status === "PENDING_SUPERVISOR"
             const createdDate = new Date(spl.createdAt)
@@ -136,9 +142,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
       } else if (session.user.role === "HR") {
         let count = 0
 
-        const ownResponse = await fetch(`/api/spl?userId=${session.user.id}`)
+        const ownResponse = await fetch(
+          `/api/spl?userId=${session.user.id}&page=1&limit=100`
+        )
         if (ownResponse.ok) {
-          const ownData = await ownResponse.json()
+          const ownData = normalizeSpls(await ownResponse.json())
           const ownUpdates = ownData.filter((spl: any) => {
             const isDecisionStatus = [
               "APPROVED",
@@ -159,10 +167,10 @@ export default function NotificationProvider({ children }: NotificationProviderP
         setNotificationCount(count)
       } else if (session.user.role === "MANAGER") {
         const response = await fetch(
-          "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+          "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE&page=1&limit=100"
         )
         if (response.ok) {
-          const data = await response.json()
+          const data = normalizeSpls(await response.json())
           const newPendingSPLs = data.filter((spl: any) => {
             const createdDate = new Date(spl.createdAt)
             return createdDate > lastViewedTime

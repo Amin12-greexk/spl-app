@@ -7,7 +7,7 @@ import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBA
 import { sendNotificationToUser } from "@/lib/notification-utils";
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
 import {
-  buildOvertimeWindowFromTimes,
+  getJakartaDayOfWeek,
   getJakartaTimeMinutes,
   JAKARTA_TIME_ZONE,
   makeWindow,
@@ -17,6 +17,11 @@ import {
   SecurityShiftCode,
   startOfDay,
 } from "@/lib/spl-time"
+import {
+  makeRegularOverrideKey,
+  parseRegularOverrideValue,
+  windowsOverlap,
+} from "@/lib/regular-hours"
 
 /**
  * GET /api/spl
@@ -40,19 +45,7 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Tipe any untuk where clause agar dinamis
-    const where: any = {};
-
-    if (statusParam) {
-      const statusList = statusParam
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean) as SplStatus[]
-      if (statusList.length === 1) {
-        where.status = statusList[0]
-      } else if (statusList.length > 1) {
-        where.status = { in: statusList }
-      }
-    }
+    const baseWhere: any = {};
 
     const userRole = session.user.role as Role;
     const selfOnlyRoles: Role[] = [
@@ -80,54 +73,136 @@ export async function GET(req: NextRequest) {
     }
 
     if (notConditions.length > 0) {
-      where.NOT = { OR: notConditions };
+      baseWhere.NOT = { OR: notConditions };
     }
 
     if (selfOnlyRoles.includes(userRole)) {
       // Staff/TEKNISI/DRIVER/GA/Department Head/Pengawas Produksi hanya bisa melihat data miliknya
-      where.requesterId = session.user.id;
+      baseWhere.requesterId = session.user.id;
     } else if (canViewAllRoles.includes(userRole)) {
       // HR/Manager/Super Admin bisa lihat SPL mereka sendiri ATAU semua SPL
       // Jika ada userId parameter, filter by userId
       if (userId) {
-        where.requesterId = userId;
+        baseWhere.requesterId = userId;
       }
       // Jika tidak ada userId, tidak ada filter (lihat semua)
     } else {
       // Fallback: batasi ke data milik sendiri
-      where.requesterId = session.user.id;
+      baseWhere.requesterId = session.user.id;
     }
 
-    const spls = await prisma.spl.findMany({
-      where,
-      include: {
-        requester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            pin: true,
-            departmentId: true,
-            departmentName: true,
-            department: { select: { id: true, name: true } },
-            position: true,
-            regularStartTime: true,
-            regularEndTime: true,
-          },
-        },
-        supervisor: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        approver: {
-          select: { id: true, name: true, email: true, role: true },
+    const where: any = { ...baseWhere };
+
+    const statusList = statusParam
+      ? statusParam
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
+    if (statusList.length === 1) {
+      where.status = statusList[0];
+    } else if (statusList.length > 1) {
+      where.status = { in: statusList as SplStatus[] };
+    }
+
+    const search = searchParams.get("search")?.trim();
+    if (search) {
+      where.OR = [
+        { reason: { contains: search, mode: "insensitive" } },
+        { requester: { name: { contains: search, mode: "insensitive" } } },
+        { requester: { email: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    const pageParam = Number(searchParams.get("page"));
+    const limitParam = Number(searchParams.get("limit"));
+    const usePagination =
+      Number.isFinite(pageParam) &&
+      pageParam > 0 &&
+      Number.isFinite(limitParam) &&
+      limitParam > 0;
+
+    const includeConfig = {
+      requester: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          pin: true,
+          departmentId: true,
+          departmentName: true,
+          department: { select: { id: true, name: true } },
+          position: true,
+          regularStartTime: true,
+          regularEndTime: true,
         },
       },
-      orderBy: {
-        createdAt: "desc",
+      supervisor: {
+        select: { id: true, name: true, email: true, role: true },
+      },
+      approver: {
+        select: { id: true, name: true, email: true, role: true },
+      },
+    };
+
+    if (!usePagination) {
+      const spls = await prisma.spl.findMany({
+        where,
+        include: includeConfig,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(spls);
+    }
+
+    const limit = Math.min(Math.floor(limitParam), 50);
+    const page = Math.floor(pageParam);
+    const skip = (page - 1) * limit;
+
+    const [total, approved, pending, rejected, totalAll, spls] =
+      await prisma.$transaction([
+        prisma.spl.count({ where }),
+        prisma.spl.count({
+          where: { ...baseWhere, status: "APPROVED" },
+        }),
+        prisma.spl.count({
+          where: {
+            ...baseWhere,
+            status: { in: ["PENDING_SUPERVISOR", "PENDING_MANAGER"] },
+          },
+        }),
+        prisma.spl.count({
+          where: {
+            ...baseWhere,
+            status: {
+              in: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
+            },
+          },
+        }),
+        prisma.spl.count({ where: baseWhere }),
+        prisma.spl.findMany({
+          where,
+          include: includeConfig,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip,
+        }),
+      ]);
+
+    return NextResponse.json({
+      data: spls,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+      stats: {
+        total: totalAll,
+        approved,
+        pending,
+        rejected,
       },
     });
-
-    return NextResponse.json(spls);
   } catch (error) {
     console.error("Error fetching SPLs:", error);
     return NextResponse.json(
@@ -331,16 +406,27 @@ export async function POST(req: NextRequest) {
         )
       }
     } else {
-      if (!userRecord.regularStartTime || !userRecord.regularEndTime) {
+      const dayOfWeek = getJakartaDayOfWeek(requestedDate)
+      const overrideKey = makeRegularOverrideKey(userRecord.id, dayOfWeek)
+      const overrideSetting = await prisma.setting.findUnique({
+        where: { key: overrideKey },
+        select: { value: true },
+      })
+      const overrideValue = parseRegularOverrideValue(overrideSetting?.value)
+
+      const effectiveStartTime =
+        overrideValue?.startTime || userRecord.regularStartTime
+      const effectiveEndTime =
+        overrideValue?.endTime || userRecord.regularEndTime
+
+      if (!effectiveStartTime || !effectiveEndTime) {
         return NextResponse.json(
           { error: "Jam reguler user belum diatur. Hubungi Super Admin." },
           { status: 400 }
         )
       }
-      const regularStartMinutes = parseTimeToMinutes(
-        userRecord.regularStartTime
-      )
-      const regularEndMinutes = parseTimeToMinutes(userRecord.regularEndTime)
+      const regularStartMinutes = parseTimeToMinutes(effectiveStartTime)
+      const regularEndMinutes = parseTimeToMinutes(effectiveEndTime)
       if (regularStartMinutes === null || regularEndMinutes === null) {
         return NextResponse.json(
           { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
@@ -355,8 +441,8 @@ export async function POST(req: NextRequest) {
       }
       const regularWindow = makeWindow(
         requestedDate,
-        userRecord.regularStartTime,
-        userRecord.regularEndTime
+        effectiveStartTime,
+        effectiveEndTime
       )
       if (!regularWindow) {
         return NextResponse.json(
@@ -375,11 +461,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plannedWindow = buildOvertimeWindowFromTimes(
-      regularEndAt,
-      body.startTime,
-      body.endTime
-    )
+    const plannedWindow = makeWindow(requestedDate, body.startTime, body.endTime)
     if (!plannedWindow) {
       return NextResponse.json(
         { error: "Waktu lembur tidak valid" },
@@ -394,9 +476,14 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    if (plannedStartAt < regularEndAt) {
+
+    const overlapsRegular = windowsOverlap(
+      { start: regularStartAt, end: regularEndAt },
+      { start: plannedStartAt, end: plannedEndAt }
+    )
+    if (overlapsRegular) {
       return NextResponse.json(
-        { error: "Jam lembur mulai harus >= jam reguler selesai" },
+        { error: "Jam lembur tidak boleh bentrok dengan jam reguler" },
         { status: 400 }
       )
     }

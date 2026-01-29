@@ -48,6 +48,13 @@ export default function SplForm() {
   const departmentKey = (session?.user?.department || "").toLowerCase()
   const isSecurityDepartment = departmentKey === "security"
   const isGaSupervisedDepartment = GA_SUPERVISED_DEPARTMENTS.has(departmentKey)
+  const todayInputValue = (() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+    const day = String(now.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  })()
 
   useEffect(() => {
     const loadMin = async () => {
@@ -69,7 +76,10 @@ export default function SplForm() {
       if (!session?.user?.id || session.user.role === "MANAGER") return
       setRegularHoursLoading(true)
       try {
-        const res = await fetch("/api/user/profile")
+        const targetDate = formData.date || todayInputValue
+        const res = await fetch(
+          `/api/user/profile?date=${encodeURIComponent(targetDate)}`
+        )
         if (!res.ok) {
           throw new Error("Gagal mengambil jam reguler")
         }
@@ -89,7 +99,7 @@ export default function SplForm() {
       }
     }
     loadRegularHours()
-  }, [session?.user?.id, session?.user?.role])
+  }, [session?.user?.id, session?.user?.role, formData.date, todayInputValue])
 
   const parseTimeToMinutes = (value: string) => {
     if (!value || typeof value !== "string") return null
@@ -115,6 +125,23 @@ export default function SplForm() {
     return trimmed.length > 0 ? trimmed : null
   }
 
+  type TimeRange = { start: number; end: number }
+  const DAY_MINUTES = 24 * 60
+
+  const toRanges = (start: number, end: number): TimeRange[] => {
+    if (start < end) return [{ start, end }]
+    return [
+      { start, end: DAY_MINUTES },
+      { start: 0, end },
+    ]
+  }
+
+  const rangesOverlap = (a: TimeRange, b: TimeRange) =>
+    a.start < b.end && b.start < a.end
+
+  const hasOverlap = (aRanges: TimeRange[], bRanges: TimeRange[]) =>
+    aRanges.some((a) => bRanges.some((b) => rangesOverlap(a, b)))
+
   const handleRegularStartChange = (value: string) => {
     setRegularHours((prev) => ({
       start: value || null,
@@ -128,14 +155,6 @@ export default function SplForm() {
       end: value || null,
     }))
   }
-
-  const todayInputValue = (() => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, "0")
-    const day = String(now.getDate()).padStart(2, "0")
-    return `${year}-${month}-${day}`
-  })()
 
   const canEditRegularHours = isSecurityDepartment && !regularHoursLoading
 
@@ -280,12 +299,18 @@ export default function SplForm() {
       }
     }
 
-    if (normalizedRegularEnd) {
+    if (normalizedRegularStart && normalizedRegularEnd) {
       const startMinutes = parseTimeToMinutes(formData.startTime)
-      const regularStartMinutes = parseTimeToMinutes(normalizedRegularStart || "")
+      const endMinutes = parseTimeToMinutes(formData.endTime)
+      const regularStartMinutes = parseTimeToMinutes(normalizedRegularStart)
       const regularEndMinutes = parseTimeToMinutes(normalizedRegularEnd)
 
-      if (startMinutes === null || regularEndMinutes === null) {
+      if (
+        startMinutes === null ||
+        endMinutes === null ||
+        regularStartMinutes === null ||
+        regularEndMinutes === null
+      ) {
         await Swal.fire({
           icon: "error",
           title: "Format jam tidak valid",
@@ -294,34 +319,15 @@ export default function SplForm() {
         return
       }
 
-      // Check if overtime conflicts with regular hours
-      const isRegularOvernight = regularStartMinutes !== null && regularEndMinutes < regularStartMinutes
-
-      if (isRegularOvernight) {
-        // For overnight regular shift (e.g., 22:00-06:00)
-        // Overtime is invalid if it's within the regular shift window
-        // Regular shift spans from regularStartMinutes to 23:59, then 00:00 to regularEndMinutes
-        const isDuringNightPortion = startMinutes >= regularStartMinutes // e.g., >= 22:00
-        const isDuringMorningPortion = startMinutes < regularEndMinutes // e.g., < 06:00
-
-        if (isDuringNightPortion || isDuringMorningPortion) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Waktu lembur bentrok",
-            text: `Waktu lembur tidak boleh berada dalam jam kerja reguler (${normalizedRegularStart} - ${normalizedRegularEnd} keesokan hari).`,
-          })
-          return
-        }
-      } else {
-        // For normal shift (e.g., 08:00-17:00)
-        if (startMinutes < regularEndMinutes) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Waktu lembur terlalu awal",
-            text: "Waktu mulai lembur harus lebih besar dari jam kerja reguler.",
-          })
-          return
-        }
+      const overtimeRanges = toRanges(startMinutes, endMinutes)
+      const regularRanges = toRanges(regularStartMinutes, regularEndMinutes)
+      if (hasOverlap(overtimeRanges, regularRanges)) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Waktu lembur bentrok",
+          text: `Waktu lembur tidak boleh bentrok dengan jam kerja reguler (${normalizedRegularStart} - ${normalizedRegularEnd}).`,
+        })
+        return
       }
     }
 

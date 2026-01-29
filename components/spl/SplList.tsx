@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useSession } from "next-auth/react"
 import { Spl } from "@/types"
 import SplCard from "./SplCard"
 import SplDetailModal from "./SplDetailModal"
@@ -18,15 +17,15 @@ export default function SplList({
   userRole,
   userId,
 }: SplListProps) {
-  const { data: session } = useSession()
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
 
-  // Pagination state
+  // Pagination state (server-side)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
+  const [totalItems, setTotalItems] = useState(0)
 
   // GSAP stagger animation for cards
   const gridRef = useStaggerAnimation<HTMLDivElement>({
@@ -48,6 +47,8 @@ export default function SplList({
       if (userId) {
         params.append("userId", userId)
       }
+      params.set("page", String(currentPage))
+      params.set("limit", String(itemsPerPage))
 
       const response = await fetch(`/api/spl?${params.toString()}`)
       if (!response.ok) {
@@ -55,22 +56,21 @@ export default function SplList({
       }
 
       const data = await response.json()
-      const effectiveRole = session?.user?.role || userRole
-      const selfOnlyRoles = ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR"]
-
-      const filteredData =
-        session?.user?.id && effectiveRole && selfOnlyRoles.includes(effectiveRole)
-          ? data.filter((spl: Spl) => spl.requester?.id === session.user.id)
-          : data
-
-      setSpls(filteredData)
+      if (Array.isArray(data)) {
+        setSpls(data)
+        setTotalItems(data.length)
+      } else {
+        setSpls(data.data || [])
+        setTotalItems(data.pagination?.total || 0)
+      }
     } catch (error: any) {
       setSpls([])
+      setTotalItems(0)
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
       setIsLoading(false)
     }
-  }, [userId, session?.user?.id, session?.user?.role, userRole])
+  }, [userId, currentPage, itemsPerPage])
 
   useEffect(() => {
     fetchSpls()
@@ -120,10 +120,9 @@ export default function SplList({
   }
 
   // Pagination logic
-  const totalPages = Math.ceil(spls.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentSpls = spls.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + spls.length, totalItems)
 
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber)
@@ -180,7 +179,7 @@ export default function SplList({
             </div>
 
             <div className="text-sm text-gray-600">
-              Menampilkan <span className="font-semibold text-gray-900">{startIndex + 1}</span> - <span className="font-semibold text-gray-900">{Math.min(endIndex, spls.length)}</span> dari <span className="font-semibold text-gray-900">{spls.length}</span> SPL
+              Menampilkan <span className="font-semibold text-gray-900">{totalItems === 0 ? 0 : startIndex + 1}</span> - <span className="font-semibold text-gray-900">{endIndex}</span> dari <span className="font-semibold text-gray-900">{totalItems}</span> SPL
             </div>
           </div>
         </div>
@@ -221,7 +220,7 @@ export default function SplList({
             ref={gridRef}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 lg:gap-6"
           >
-            {currentSpls.map((spl) => (
+          {spls.map((spl) => (
               <div
                 key={spl.id}
                 data-animate
@@ -274,8 +273,8 @@ export default function SplList({
                 <div>
                   <p className="text-sm text-gray-700">
                     Menampilkan <span className="font-medium">{startIndex + 1}</span> sampai{" "}
-                    <span className="font-medium">{Math.min(endIndex, spls.length)}</span> dari{" "}
-                    <span className="font-medium">{spls.length}</span> hasil
+                    <span className="font-medium">{endIndex}</span> dari{" "}
+                    <span className="font-medium">{totalItems}</span> hasil
                   </p>
                 </div>
                 <div>

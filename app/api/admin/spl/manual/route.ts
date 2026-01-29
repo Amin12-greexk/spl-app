@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
 import { sendNotificationToUser } from "@/lib/notification-utils"
 import {
-  buildOvertimeWindowFromTimes,
+  getJakartaDayOfWeek,
   JAKARTA_TIME_ZONE,
   makeWindow,
   parseDateOnly,
@@ -14,6 +14,11 @@ import {
   SecurityShiftCode,
   startOfDay,
 } from "@/lib/spl-time"
+import {
+  makeRegularOverrideKey,
+  parseRegularOverrideValue,
+  windowsOverlap,
+} from "@/lib/regular-hours"
 
 // POST - Create manual SPL for user (by Super Admin)
 export async function POST(req: NextRequest) {
@@ -165,14 +170,25 @@ export async function POST(req: NextRequest) {
         )
       }
     } else {
-      if (!user.regularStartTime || !user.regularEndTime) {
+      const dayOfWeek = getJakartaDayOfWeek(requestedDate)
+      const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)
+      const overrideSetting = await prisma.setting.findUnique({
+        where: { key: overrideKey },
+        select: { value: true },
+      })
+      const overrideValue = parseRegularOverrideValue(overrideSetting?.value)
+
+      const effectiveStartTime = overrideValue?.startTime || user.regularStartTime
+      const effectiveEndTime = overrideValue?.endTime || user.regularEndTime
+
+      if (!effectiveStartTime || !effectiveEndTime) {
         return NextResponse.json(
           { error: "Jam reguler user belum diatur. Hubungi Super Admin." },
           { status: 400 }
         )
       }
-      const regularStartMinutes = parseTimeToMinutes(user.regularStartTime)
-      const regularEndMinutes = parseTimeToMinutes(user.regularEndTime)
+      const regularStartMinutes = parseTimeToMinutes(effectiveStartTime)
+      const regularEndMinutes = parseTimeToMinutes(effectiveEndTime)
       if (regularStartMinutes === null || regularEndMinutes === null) {
         return NextResponse.json(
           { error: "Jam reguler user tidak valid. Hubungi Super Admin." },
@@ -187,8 +203,8 @@ export async function POST(req: NextRequest) {
       }
       const regularWindow = makeWindow(
         requestedDate,
-        user.regularStartTime,
-        user.regularEndTime
+        effectiveStartTime,
+        effectiveEndTime
       )
       if (!regularWindow) {
         return NextResponse.json(
@@ -207,11 +223,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plannedWindow = buildOvertimeWindowFromTimes(
-      regularEndAt,
-      startTime,
-      endTime
-    )
+    const plannedWindow = makeWindow(requestedDate, startTime, endTime)
     if (!plannedWindow) {
       return NextResponse.json(
         { error: "Waktu lembur tidak valid" },
@@ -226,9 +238,14 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    if (plannedStartAt < regularEndAt) {
+
+    const overlapsRegular = windowsOverlap(
+      { start: regularStartAt, end: regularEndAt },
+      { start: plannedStartAt, end: plannedEndAt }
+    )
+    if (overlapsRegular) {
       return NextResponse.json(
-        { error: "Jam lembur mulai harus >= jam reguler selesai" },
+        { error: "Jam lembur tidak boleh bentrok dengan jam reguler" },
         { status: 400 }
       )
     }

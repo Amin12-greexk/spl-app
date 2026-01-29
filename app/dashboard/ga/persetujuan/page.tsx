@@ -62,12 +62,13 @@ export default function GAApprovalPage() {
   const fetchPendingSpls = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/spl/my-team")
+      const response = await fetch(
+        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50"
+      )
       if (!response.ok) throw new Error("Gagal mengambil data")
 
       const data = await response.json()
-      // Filter only PENDING_SUPERVISOR
-      const pendingSpls = data.filter((spl: Spl) => spl.status === "PENDING_SUPERVISOR")
+      const pendingSpls = Array.isArray(data) ? data : data?.data || []
       setSpls(pendingSpls)
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")

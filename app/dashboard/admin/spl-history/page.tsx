@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
@@ -48,10 +48,19 @@ interface Spl {
 export default function SplHistoryPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const PAGE_SIZE = 10
   const [spls, setSpls] = useState<Spl[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("ALL")
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [stats, setStats] = useState({
+    total: 0,
+    approved: 0,
+    pending: 0,
+    rejected: 0,
+  })
   const [editingSpl, setEditingSpl] = useState<Spl | null>(null)
   const [editForm, setEditForm] = useState({
     date: "",
@@ -64,6 +73,49 @@ export default function SplHistoryPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
 
+  const fetchSpls = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.set("page", String(page))
+      params.set("limit", String(PAGE_SIZE))
+      if (search.trim()) {
+        params.set("search", search.trim())
+      }
+      if (filterStatus !== "ALL") {
+        params.set("status", filterStatus)
+      }
+
+      const response = await fetch(`/api/spl?${params.toString()}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setSpls(data)
+          setTotal(data.length)
+          setStats({
+            total: data.length,
+            approved: data.filter((s: Spl) => s.status === "APPROVED").length,
+            pending: data.filter((s: Spl) => s.status.includes("PENDING")).length,
+            rejected: data.filter((s: Spl) => s.status.includes("REJECTED")).length,
+          })
+        } else {
+          setSpls(data.data || [])
+          setTotal(data.pagination?.total || 0)
+          setStats({
+            total: data.stats?.total || 0,
+            approved: data.stats?.approved || 0,
+            pending: data.stats?.pending || 0,
+            rejected: data.stats?.rejected || 0,
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching SPLs:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [PAGE_SIZE, page, search, filterStatus])
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login")
@@ -72,21 +124,7 @@ export default function SplHistoryPage() {
     } else {
       fetchSpls()
     }
-  }, [session, status, router])
-
-  const fetchSpls = async () => {
-    try {
-      const response = await fetch("/api/spl")
-      if (response.ok) {
-        const data = await response.json()
-        setSpls(data)
-      }
-    } catch (error) {
-      console.error("Error fetching SPLs:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [session, status, router, fetchSpls])
 
   const formatDateInput = (value: Date) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })
@@ -202,16 +240,7 @@ export default function SplHistoryPage() {
     }
   }
 
-  const filteredSpls = spls.filter((spl) => {
-    const matchSearch =
-      spl.requester.name.toLowerCase().includes(search.toLowerCase()) ||
-      spl.requester.email.toLowerCase().includes(search.toLowerCase()) ||
-      spl.reason.toLowerCase().includes(search.toLowerCase())
-
-    const matchStatus = filterStatus === "ALL" || spl.status === filterStatus
-
-    return matchSearch && matchStatus
-  })
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
@@ -263,24 +292,24 @@ export default function SplHistoryPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="text-sm text-gray-600">Total SPL</div>
-          <div className="text-2xl font-bold text-gray-900">{spls.length}</div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="text-sm text-gray-600">Approved</div>
           <div className="text-2xl font-bold text-green-600">
-            {spls.filter((s) => s.status === "APPROVED").length}
+            {stats.approved}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="text-sm text-gray-600">Pending</div>
           <div className="text-2xl font-bold text-yellow-600">
-            {spls.filter((s) => s.status.includes("PENDING")).length}
+            {stats.pending}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="text-sm text-gray-600">Rejected</div>
           <div className="text-2xl font-bold text-red-600">
-            {spls.filter((s) => s.status.includes("REJECTED")).length}
+            {stats.rejected}
           </div>
         </div>
       </div>
@@ -292,12 +321,18 @@ export default function SplHistoryPage() {
             type="text"
             placeholder="Cari user, email, atau alasan..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => {
+              setFilterStatus(e.target.value)
+              setPage(1)
+            }}
             className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="ALL">Semua Status</option>
@@ -329,7 +364,7 @@ export default function SplHistoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredSpls.map((spl) => (
+              {spls.map((spl) => (
                 <tr key={spl.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-900">
                     {new Date(spl.date).toLocaleDateString("id-ID", {
@@ -390,9 +425,33 @@ export default function SplHistoryPage() {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-col gap-3 px-4 py-3 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-gray-600">
+            Menampilkan {spls.length} dari {total} data
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page <= 1 || loading}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Sebelumnya
+            </button>
+            <span className="text-sm text-gray-600">
+              Hal {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages || loading}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
       </div>
 
-      {filteredSpls.length === 0 && (
+      {spls.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           Tidak ada SPL ditemukan
         </div>

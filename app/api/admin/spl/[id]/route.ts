@@ -3,13 +3,13 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import {
-  buildOvertimeWindowFromTimes,
   getMinutesDiff,
   JAKARTA_TIME_ZONE,
   makeWindow,
   parseDateOnly,
   parseTimeToMinutes,
 } from "@/lib/spl-time"
+import { windowsOverlap } from "@/lib/regular-hours"
 
 // DELETE - Delete SPL (by Super Admin)
 export async function DELETE(
@@ -155,15 +155,15 @@ export async function PATCH(
       const regularStartTime = formatHHMM(existing.regularStartAt)
       const regularEndTime = formatHHMM(existing.regularEndAt)
       regularWindow = makeWindow(requestedDate, regularStartTime, regularEndTime)
-      if (regularWindow) {
-        const anchored = buildOvertimeWindowFromTimes(
-          regularWindow.end,
-          startTime,
-          endTime
+    }
+
+    if (regularWindow) {
+      const overlapsRegular = windowsOverlap(regularWindow, plannedWindow)
+      if (overlapsRegular) {
+        return NextResponse.json(
+          { error: "Jam lembur tidak boleh bentrok dengan jam reguler" },
+          { status: 400 }
         )
-        if (anchored) {
-          plannedWindow = anchored
-        }
       }
     }
 
