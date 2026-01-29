@@ -3,7 +3,7 @@ import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import Image from "next/image"
 import { memo, useMemo } from "react"
-import { buildOvertimeWindowFromTimes, makeWindow, startOfDay } from "@/lib/spl-time"
+import { makeWindow, startOfDay } from "@/lib/spl-time"
 import { getEffectiveHours } from "@/lib/spl-hours"
 
 interface SplCardProps {
@@ -61,17 +61,6 @@ function SplCard({
       const plannedEnd = new Date(spl.plannedEndAt)
       if (!Number.isNaN(plannedStart.getTime()) && !Number.isNaN(plannedEnd.getTime())) {
         return { plannedStart, plannedEnd }
-      }
-    }
-
-    if (spl.regularEndAt) {
-      const plannedWindow = buildOvertimeWindowFromTimes(
-        new Date(spl.regularEndAt),
-        spl.startTime,
-        spl.endTime
-      )
-      if (plannedWindow) {
-        return { plannedStart: plannedWindow.start, plannedEnd: plannedWindow.end }
       }
     }
 

@@ -88,6 +88,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
       }
 
+      const normalizeSpls = (payload: any) => {
+        if (!payload) return null
+        return Array.isArray(payload) ? payload : payload?.data || []
+      }
+
       const buildManualEntryNotifications = (manualData: any[]) => {
         const formatDate = (dateString: string) => {
           if (!dateString) return 'tanggal tidak tersedia'
@@ -116,7 +121,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
       if (sessionUserRole === "STAFF" || sessionUserRole === "TEKNISI" || sessionUserRole === "DRIVER" || sessionUserRole === "PRODUCTION_SUPERVISOR") {
         const allNotifications: any[] = []
-        const data = await fetchJson("/api/spl")
+        const data = normalizeSpls(await fetchJson("/api/spl?page=1&limit=50"))
         if (!data) {
           setNotifications([])
           return
@@ -198,7 +203,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const allNotifications: any[] = []
 
         // 1. Fetch own SPL updates
-        const ownData = await fetchJson("/api/spl")
+        const ownData = normalizeSpls(await fetchJson("/api/spl?page=1&limit=50"))
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
@@ -237,10 +242,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
 
         // 2. Fetch team SPL pending approval
-        const teamData = await fetchJson("/api/spl/my-team")
+        const teamData = normalizeSpls(
+          await fetchJson(
+            "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50"
+          )
+        )
         if (teamData) {
           const pendingApprovals = teamData
-            .filter((spl: any) => spl.status === "PENDING_SUPERVISOR")
             .map((spl: any) => {
               const formatDate = (dateString: string) => {
                 if (!dateString) return 'tanggal tidak tersedia'
@@ -290,7 +298,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const allNotifications: any[] = []
 
         // 1. Fetch own SPL updates
-        const ownData = await fetchJson(`/api/spl?userId=${sessionUserId}`)
+        const ownData = normalizeSpls(
+          await fetchJson(`/api/spl?userId=${sessionUserId}&page=1&limit=50`)
+        )
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
@@ -343,8 +353,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
       } else if (sessionUserRole === "MANAGER") {
         // MANAGER hanya lihat pending approvals
-        const data = await fetchJson(
-          "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+        const data = normalizeSpls(
+          await fetchJson(
+            "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE&page=1&limit=50"
+          )
         )
         if (!data) {
           setNotifications([])

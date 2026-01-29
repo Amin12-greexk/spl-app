@@ -65,34 +65,43 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const lastViewedKey = `notif_last_viewed_${session.user.id}`
     const lastViewedStr = typeof window !== "undefined" ? localStorage.getItem(lastViewedKey) : null
     const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
+    const normalizeSpls = (payload: any) => {
+      if (!payload) return []
+      return Array.isArray(payload) ? payload : payload?.data || []
+    }
 
     const countManual = async () => {
       const response = await fetch("/api/spl/telat-input")
       if (!response.ok) return 0
       const data = await response.json()
-      return data.filter((spl: any) => {
+      const list = normalizeSpls(data)
+      return list.filter((spl: any) => {
         const createdAt = new Date(spl.createdAt || spl.date)
         return createdAt > lastViewedTime
       }).length
     }
 
     const countTeamPending = async () => {
-      const response = await fetch("/api/spl/my-team")
+      const response = await fetch(
+        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=100"
+      )
       if (!response.ok) return 0
       const data = await response.json()
-      return data.filter((spl: any) => {
+      const list = normalizeSpls(data)
+      return list.filter((spl: any) => {
         const createdAt = new Date(spl.createdAt)
-        return spl.status === "PENDING_SUPERVISOR" && createdAt > lastViewedTime
+        return createdAt > lastViewedTime
       }).length
     }
 
     const countManagerPending = async () => {
       const response = await fetch(
-        "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
+        "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE&page=1&limit=100"
       )
       if (!response.ok) return 0
       const data = await response.json()
-      return data.filter((spl: any) => {
+      const list = normalizeSpls(data)
+      return list.filter((spl: any) => {
         const createdAt = new Date(spl.createdAt)
         return createdAt > lastViewedTime
       }).length

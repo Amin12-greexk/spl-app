@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  SATURDAY_DAY,
+  makeRegularOverrideKey,
+  parseRegularOverrideKey,
+  parseRegularOverrideValue,
+  serializeRegularOverrideValue,
+} from "@/lib/regular-hours"
 
 const parseTimeToMinutes = (value: string) => {
   if (!/^\d{2}:\d{2}$/.test(value)) return null
@@ -47,7 +54,30 @@ export async function GET() {
       orderBy: { name: "asc" },
     })
 
-    return NextResponse.json(users)
+    const overrideSettings = await prisma.setting.findMany({
+      where: { key: { startsWith: "REGULAR_HOURS_OVERRIDE:" } },
+      select: { key: true, value: true },
+    })
+
+    const saturdayOverrideByUser = new Map<string, { startTime: string; endTime: string }>()
+    for (const setting of overrideSettings) {
+      const parsedKey = parseRegularOverrideKey(setting.key)
+      if (!parsedKey || parsedKey.dayOfWeek !== SATURDAY_DAY) continue
+      const parsedValue = parseRegularOverrideValue(setting.value)
+      if (!parsedValue) continue
+      saturdayOverrideByUser.set(parsedKey.userId, parsedValue)
+    }
+
+    const usersWithOverrides = users.map((user) => {
+      const saturdayOverride = saturdayOverrideByUser.get(user.id)
+      return {
+        ...user,
+        saturdayStartTime: saturdayOverride?.startTime || null,
+        saturdayEndTime: saturdayOverride?.endTime || null,
+      }
+    })
+
+    return NextResponse.json(usersWithOverrides)
   } catch (error) {
     console.error("Error fetching regular hours:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
@@ -62,7 +92,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { userId, regularStartTime, regularEndTime } = body
+    const {
+      userId,
+      regularStartTime,
+      regularEndTime,
+      saturdayStartTime,
+      saturdayEndTime,
+    } = body
 
     if (!userId || typeof userId !== "string") {
       return NextResponse.json({ error: "User ID wajib diisi" }, { status: 400 })
@@ -94,6 +130,16 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    const saturdayStartValue = normalizeTime(saturdayStartTime)
+    const saturdayEndValue = normalizeTime(saturdayEndTime)
+
+    if ((saturdayStartValue && !saturdayEndValue) || (!saturdayStartValue && saturdayEndValue)) {
+      return NextResponse.json(
+        { error: "Jam Sabtu mulai dan selesai harus diisi bersamaan" },
+        { status: 400 }
+      )
+    }
+
     if (startValue && endValue) {
       const startMinutes = parseTimeToMinutes(startValue)
       const endMinutes = parseTimeToMinutes(endValue)
@@ -110,6 +156,25 @@ export async function PATCH(request: NextRequest) {
       if (startMinutes === endMinutes) {
         return NextResponse.json(
           { error: "Jam selesai tidak boleh sama dengan jam mulai" },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (saturdayStartValue && saturdayEndValue) {
+      const startMinutes = parseTimeToMinutes(saturdayStartValue)
+      const endMinutes = parseTimeToMinutes(saturdayEndValue)
+
+      if (startMinutes === null || endMinutes === null) {
+        return NextResponse.json(
+          { error: "Format jam Sabtu tidak valid (HH:MM)" },
+          { status: 400 }
+        )
+      }
+
+      if (startMinutes === endMinutes) {
+        return NextResponse.json(
+          { error: "Jam Sabtu selesai tidak boleh sama dengan jam mulai" },
           { status: 400 }
         )
       }
@@ -133,9 +198,44 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
+    const saturdayOverrideKey = makeRegularOverrideKey(userId, SATURDAY_DAY)
+
+    if (saturdayStartValue && saturdayEndValue) {
+      await prisma.setting.upsert({
+        where: { key: saturdayOverrideKey },
+        create: {
+          key: saturdayOverrideKey,
+          value: serializeRegularOverrideValue({
+            startTime: saturdayStartValue,
+            endTime: saturdayEndValue,
+          }),
+        },
+        update: {
+          value: serializeRegularOverrideValue({
+            startTime: saturdayStartValue,
+            endTime: saturdayEndValue,
+          }),
+        },
+      })
+    } else {
+      await prisma.setting.deleteMany({
+        where: { key: saturdayOverrideKey },
+      })
+    }
+
+    const saturdayOverrideSetting = await prisma.setting.findUnique({
+      where: { key: saturdayOverrideKey },
+      select: { value: true },
+    })
+    const saturdayOverride = parseRegularOverrideValue(saturdayOverrideSetting?.value)
+
     return NextResponse.json({
       message: "Jam reguler berhasil diperbarui",
-      user: updatedUser,
+      user: {
+        ...updatedUser,
+        saturdayStartTime: saturdayOverride?.startTime || null,
+        saturdayEndTime: saturdayOverride?.endTime || null,
+      },
     })
   } catch (error) {
     console.error("Error updating regular hours:", error)

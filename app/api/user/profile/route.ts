@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { getJakartaDayOfWeek, parseDateOnly, startOfDay } from "@/lib/spl-time"
+import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
 
 const normalizeTimeValue = (value: unknown) => {
   if (typeof value !== "string") return null
@@ -26,12 +28,16 @@ const parseTimeToMinutes = (value: string) => {
   return hour * 60 + minute
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const { searchParams } = new URL(request.url)
+    const dateParam = searchParams.get("date")
+    const targetDate = dateParam ? parseDateOnly(dateParam) : null
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -54,7 +60,36 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    return NextResponse.json(user)
+    let effectiveRegularStartTime = user.regularStartTime
+    let effectiveRegularEndTime = user.regularEndTime
+    let overrideDayOfWeek: number | null = null
+
+    if (targetDate) {
+      const dayOfWeek = getJakartaDayOfWeek(targetDate)
+      overrideDayOfWeek = dayOfWeek
+      const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)
+      const overrideSetting = await prisma.setting.findUnique({
+        where: { key: overrideKey },
+        select: { value: true },
+      })
+      const overrideValue = parseRegularOverrideValue(overrideSetting?.value)
+      if (overrideValue) {
+        effectiveRegularStartTime = overrideValue.startTime
+        effectiveRegularEndTime = overrideValue.endTime
+      }
+    } else {
+      // Keep behavior unchanged when no date is provided.
+      overrideDayOfWeek = getJakartaDayOfWeek(startOfDay(new Date()))
+    }
+
+    return NextResponse.json({
+      ...user,
+      regularStartTime: effectiveRegularStartTime,
+      regularEndTime: effectiveRegularEndTime,
+      baseRegularStartTime: user.regularStartTime,
+      baseRegularEndTime: user.regularEndTime,
+      overrideDayOfWeek,
+    })
   } catch (error) {
     console.error("Error fetching profile:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

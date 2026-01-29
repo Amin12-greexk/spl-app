@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToRoles } from "@/lib/notification-utils"
 import {
-  buildOvertimeWindowFromTimes,
   clampRealizationMinutes,
   JAKARTA_TIME_ZONE,
   makeWindow,
@@ -23,7 +22,6 @@ const resolvePlannedWindow = (spl: {
   endTime: string
   plannedStartAt?: Date | null
   plannedEndAt?: Date | null
-  regularEndAt?: Date | null
 }) => {
   if (spl.plannedStartAt && spl.plannedEndAt) {
     const plannedStart = new Date(spl.plannedStartAt)
@@ -33,17 +31,6 @@ const resolvePlannedWindow = (spl: {
       !Number.isNaN(plannedEnd.getTime())
     ) {
       return { plannedStart, plannedEnd }
-    }
-  }
-
-  if (spl.regularEndAt) {
-    const plannedWindow = buildOvertimeWindowFromTimes(
-      new Date(spl.regularEndAt),
-      spl.startTime,
-      spl.endTime
-    )
-    if (plannedWindow) {
-      return { plannedStart: plannedWindow.start, plannedEnd: plannedWindow.end }
     }
   }
 
@@ -159,12 +146,8 @@ export async function POST(
       )
     }
 
-    const anchorDate = spl.plannedStartAt ?? spl.regularEndAt ?? spl.date
-    const actualWindow = buildActualWindow(
-      new Date(anchorDate),
-      startTime,
-      endTime
-    )
+    const anchorDate = spl.plannedStartAt ?? spl.date
+    const actualWindow = buildActualWindow(new Date(anchorDate), startTime, endTime)
     if (!actualWindow) {
       return NextResponse.json(
         { error: "Jam realisasi tidak valid" },

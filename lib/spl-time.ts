@@ -123,6 +123,13 @@ export const getJakartaTimeMinutes = (value: Date = new Date()) => {
   return parts.hour * 60 + parts.minute
 }
 
+export const getJakartaDayOfWeek = (value: Date) => {
+  const parts = getJakartaParts(value)
+  // Use noon UTC to avoid any timezone edge cases when computing weekday.
+  const noonUtc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0))
+  return noonUtc.getUTCDay()
+}
+
 export const getMinutesDiff = (start: Date, end: Date) => {
   const diffMs = end.getTime() - start.getTime()
   if (diffMs <= 0) return 0
