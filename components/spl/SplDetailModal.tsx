@@ -4,6 +4,7 @@ import { id } from "date-fns/locale"
 import Image from "next/image"
 import Modal from "@/components/ui/Modal"
 import { getEffectiveHours, getRealizationMinutes } from "@/lib/spl-hours"
+import { isMorningOvertime } from "@/lib/spl-labels"
 
 interface SplDetailModalProps {
   spl: Spl | null
@@ -123,6 +124,7 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
   }
 
   const statusInfo = getDetailedStatus()
+  const showMorningBadge = isMorningOvertime(spl)
 
   const getStatusBadge = () => {
     const statusConfig = {
@@ -247,6 +249,11 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
             {spl.source === "LEGACY" && (
               <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-blue-50 text-blue-700 border-blue-200">
                 Data Lama
+              </span>
+            )}
+            {showMorningBadge && (
+              <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200">
+                Lembur Pagi
               </span>
             )}
             {getStatusBadge()}

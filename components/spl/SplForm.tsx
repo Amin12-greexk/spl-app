@@ -329,6 +329,17 @@ export default function SplForm() {
         })
         return
       }
+
+      if (regularStartMinutes !== null && startMinutes !== null) {
+        if (startMinutes < regularStartMinutes) {
+          await Swal.fire({
+            icon: "warning",
+            title: "Lembur pagi dibatasi",
+            text: "Lembur sebelum jam reguler hanya bisa dibuat oleh Super Admin. Silakan hubungi admin.",
+          })
+          return
+        }
+      }
     }
 
     if (!isSecurityDepartment) {
