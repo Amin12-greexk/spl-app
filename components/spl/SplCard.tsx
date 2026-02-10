@@ -4,6 +4,7 @@ import { id } from "date-fns/locale"
 import Image from "next/image"
 import { memo, useMemo } from "react"
 import { makeWindow, startOfDay } from "@/lib/spl-time"
+import { isMorningOvertime } from "@/lib/spl-labels"
 import { getEffectiveHours } from "@/lib/spl-hours"
 
 interface SplCardProps {
@@ -271,6 +272,11 @@ function SplCard({
       Kadaluarsa
     </span>
   ) : null
+  const morningBadge = isMorningOvertime(spl) ? (
+    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200">
+      Lembur Pagi
+    </span>
+  ) : null
 
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
@@ -322,6 +328,7 @@ function SplCard({
             {manualBadge}
             {legacyBadge}
             {expiredBadge}
+            {morningBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -406,6 +413,7 @@ function SplCard({
             {manualBadge}
             {legacyBadge}
             {expiredBadge}
+            {morningBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -615,6 +623,7 @@ function SplCard({
           {manualBadge}
           {legacyBadge}
           {expiredBadge}
+          {morningBadge}
           {getStatusBadge(spl.status, false)}
         </div>
       </div>

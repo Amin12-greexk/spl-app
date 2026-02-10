@@ -11,6 +11,7 @@ import Link from "next/link" // <-- TAMBAHAN: Import Link
 import TimePicker from "@/components/ui/TimePicker"
 import Modal from "@/components/ui/Modal"
 import Image from "next/image"
+import { isMorningOvertime } from "@/lib/spl-labels"
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
@@ -885,7 +886,16 @@ export default function DashboardPage() {
                             {getRegularHoursLabel(spl)}
                           </td>
                           <td className="px-4 py-3 text-gray-700">
-                            {spl.startTime} - {spl.endTime}
+                            <div className="flex items-center gap-2">
+                              <span>
+                                {spl.startTime} - {spl.endTime}
+                              </span>
+                              {isMorningOvertime(spl) && (
+                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200">
+                                  Lembur Pagi
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-gray-700">
                             {getActualRangeLabel(spl)}

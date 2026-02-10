@@ -477,6 +477,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (plannedEndAt <= regularStartAt) {
+      return NextResponse.json(
+        { error: "Lembur pagi hanya bisa diajukan oleh Super Admin" },
+        { status: 400 }
+      )
+    }
+
     const overlapsRegular = windowsOverlap(
       { start: regularStartAt, end: regularEndAt },
       { start: plannedStartAt, end: plannedEndAt }

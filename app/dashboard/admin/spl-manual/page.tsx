@@ -61,7 +61,7 @@ export default function ManualSPLPage() {
         const data = await response.json()
         // Filter only staff, teknisi, and users who can have SPL
         const filteredUsers = data.filter((u: User) =>
-          ["STAFF", "TEKNISI", "GA", "DEPARTMENT_HEAD", "HR", "PRODUCTION_SUPERVISOR"].includes(u.role)
+          ["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "HR", "PRODUCTION_SUPERVISOR"].includes(u.role)
         )
         setUsers(filteredUsers)
       }

@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
 import { getEffectiveHours } from "@/lib/spl-hours"
+import { isMorningOvertime } from "@/lib/spl-labels"
 
 interface Spl {
   id: string
@@ -18,6 +19,9 @@ interface Spl {
   actualEndAt?: Date | string | null
   actualTotalHours?: number | null
   realizedMinutes?: number | null
+  regularStartAt?: Date | string | null
+  plannedStartAt?: Date | string | null
+  plannedEndAt?: Date | string | null
   reason: string
   status: string
   projectName: string | null
@@ -392,11 +396,18 @@ export default function SplHistoryPage() {
                   </td>
                   <td className="px-6 py-4">{getStatusBadge(spl.status)}</td>
                   <td className="px-6 py-4">
-                    {spl.isManualEntry && (
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
-                        Manual
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {spl.isManualEntry && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                          Manual
+                        </span>
+                      )}
+                      {isMorningOvertime(spl) && (
+                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded">
+                          Lembur Pagi
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
