@@ -184,12 +184,19 @@ export async function GET(req: NextRequest) {
       approver: includeConfig.approver,
     };
 
-    const listSelect = lite ? { select: liteSelect } : { include: includeConfig };
-
     if (!usePagination) {
+      if (lite) {
+        const spls = await prisma.spl.findMany({
+          where,
+          select: liteSelect,
+          orderBy: { createdAt: "desc" },
+        });
+        return NextResponse.json(spls);
+      }
+
       const spls = await prisma.spl.findMany({
         where,
-        ...listSelect,
+        include: includeConfig,
         orderBy: { createdAt: "desc" },
       });
       return NextResponse.json(spls);
@@ -198,6 +205,54 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.floor(limitParam), 50);
     const page = Math.floor(pageParam);
     const skip = (page - 1) * limit;
+
+    if (lite) {
+      const [total, approved, pending, rejected, totalAll, spls] =
+        await prisma.$transaction([
+          prisma.spl.count({ where }),
+          prisma.spl.count({
+            where: { ...baseWhere, status: "APPROVED" },
+          }),
+          prisma.spl.count({
+            where: {
+              ...baseWhere,
+              status: { in: ["PENDING_SUPERVISOR", "PENDING_MANAGER"] },
+            },
+          }),
+          prisma.spl.count({
+            where: {
+              ...baseWhere,
+              status: {
+                in: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
+              },
+            },
+          }),
+          prisma.spl.count({ where: baseWhere }),
+          prisma.spl.findMany({
+            where,
+            select: liteSelect,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            skip,
+          }),
+        ]);
+
+      return NextResponse.json({
+        data: spls,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+        stats: {
+          total: totalAll,
+          approved,
+          pending,
+          rejected,
+        },
+      });
+    }
 
     const [total, approved, pending, rejected, totalAll, spls] =
       await prisma.$transaction([
@@ -222,7 +277,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.count({ where: baseWhere }),
         prisma.spl.findMany({
           where,
-          ...listSelect,
+          include: includeConfig,
           orderBy: { createdAt: "desc" },
           take: limit,
           skip,
