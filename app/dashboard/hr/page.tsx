@@ -37,7 +37,7 @@ export default function HRViewPage() {
   const fetchSpls = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/spl")
+      const response = await fetch("/api/spl?lite=1")
       if (!response.ok) {
         throw new Error("Gagal mengambil data SPL")
       }

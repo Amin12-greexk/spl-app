@@ -43,6 +43,9 @@ export async function GET(req: NextRequest) {
     // Menggunakan tipe SplStatus dari @/types
     const statusParam = searchParams.get("status");
     const userId = searchParams.get("userId");
+    const lite =
+      searchParams.get("lite") === "1" ||
+      searchParams.get("lite") === "true";
 
     // Tipe any untuk where clause agar dinamis
     const baseWhere: any = {};
@@ -57,8 +60,8 @@ export async function GET(req: NextRequest) {
       "PRODUCTION_SUPERVISOR",
     ];
     const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"];
-    const hideUnsignedManual = userRole !== "SUPER_ADMIN";
-    const hideUnrealizedForManager = ["HR", "MANAGER"].includes(userRole);
+    const hideUnsignedManual = !["SUPER_ADMIN", "HR"].includes(userRole);
+    const hideUnrealizedForManager = userRole === "MANAGER";
     const notConditions: any[] = [];
 
     if (hideUnsignedManual) {
@@ -145,10 +148,48 @@ export async function GET(req: NextRequest) {
       },
     };
 
+    const liteSelect = {
+      id: true,
+      requesterId: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+      totalHours: true,
+      reason: true,
+      projectName: true,
+      status: true,
+      source: true,
+      isManualEntry: true,
+      requesterSignedAt: true,
+      actualStartAt: true,
+      actualEndAt: true,
+      actualTotalHours: true,
+      realizationNote: true,
+      overrunReason: true,
+      realizedMinutes: true,
+      realizationCounted: true,
+      regularStartAt: true,
+      regularEndAt: true,
+      plannedStartAt: true,
+      plannedEndAt: true,
+      supervisorApprovalDate: true,
+      supervisorRejectionReason: true,
+      rejectionReason: true,
+      approverId: true,
+      approvalDate: true,
+      createdAt: true,
+      updatedAt: true,
+      requester: includeConfig.requester,
+      supervisor: includeConfig.supervisor,
+      approver: includeConfig.approver,
+    };
+
+    const listSelect = lite ? { select: liteSelect } : { include: includeConfig };
+
     if (!usePagination) {
       const spls = await prisma.spl.findMany({
         where,
-        include: includeConfig,
+        ...listSelect,
         orderBy: { createdAt: "desc" },
       });
       return NextResponse.json(spls);
@@ -181,7 +222,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.count({ where: baseWhere }),
         prisma.spl.findMany({
           where,
-          include: includeConfig,
+          ...listSelect,
           orderBy: { createdAt: "desc" },
           take: limit,
           skip,
