@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
 import SplDetailModal from "@/components/spl/SplDetailModal"
@@ -10,8 +10,6 @@ import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale" // Import locale Indonesia
 import { getEffectiveHours, getEffectiveMinutes } from "@/lib/spl-hours"
-import * as XLSX from 'xlsx'
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
 interface AttendanceRecord {
   pin?: string | null
@@ -23,8 +21,8 @@ type ExportRow = Record<string, string | number>
 export default function HRViewPage() {
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("ALL")
-  const [filteredSpls, setFilteredSpls] = useState<Spl[]>([])
   const [dateFilter, setDateFilter] = useState<string>("ALL")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
@@ -36,19 +34,43 @@ export default function HRViewPage() {
 
   const fetchSpls = async () => {
     setIsLoading(true)
+    setIsFetchingMore(false)
     try {
-      const response = await fetch("/api/spl?lite=1")
-      if (!response.ok) {
-        throw new Error("Gagal mengambil data SPL")
-      }
+      const limit = 50
+      let page = 1
+      let loadedAny = false
+      setIsFetchingMore(true)
 
-      const data = await response.json()
-      setSpls(data)
+      while (true) {
+        const response = await fetch(
+          `/api/spl?lite=1&skipStats=1&page=${page}&limit=${limit}`
+        )
+        if (!response.ok) {
+          throw new Error("Gagal mengambil data SPL")
+        }
+
+        const payload = await response.json()
+        const items = Array.isArray(payload) ? payload : payload?.data || []
+
+        if (!loadedAny) {
+          setSpls(items)
+          setIsLoading(false)
+          loadedAny = true
+        } else if (items.length > 0) {
+          setSpls((prev) => [...prev, ...items])
+        }
+
+        if (items.length < limit) break
+        page += 1
+      }
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
-    } finally {
       setIsLoading(false)
+      setIsFetchingMore(false)
+      return
     }
+
+    setIsFetchingMore(false)
   }
 
   const handleOpenDetail = (spl: Spl) => {
@@ -65,37 +87,39 @@ export default function HRViewPage() {
     fetchSpls()
   }, [])
 
-  // Filter data berdasarkan status, tanggal, dan search
-  useEffect(() => {
+  const filteredSpls = useMemo(() => {
     let filtered = spls
 
     // Filter by status
     if (filterStatus !== "ALL") {
       if (filterStatus === "PENDING") {
-        filtered = filtered.filter(spl =>
-          spl.status === "PENDING" ||
-          spl.status === "PENDING_SUPERVISOR" ||
-          spl.status === "PENDING_MANAGER" ||
-          spl.status === "IN_PROGRESS" ||
-          spl.status === "DONE"
+        filtered = filtered.filter(
+          (spl) =>
+            spl.status === "PENDING" ||
+            spl.status === "PENDING_SUPERVISOR" ||
+            spl.status === "PENDING_MANAGER" ||
+            spl.status === "IN_PROGRESS" ||
+            spl.status === "DONE"
         )
       } else if (filterStatus === "REJECTED") {
-        filtered = filtered.filter(spl =>
-          spl.status === "REJECTED" ||
-          spl.status === "REJECTED_BY_SUPERVISOR" ||
-          spl.status === "REJECTED_BY_MANAGER"
+        filtered = filtered.filter(
+          (spl) =>
+            spl.status === "REJECTED" ||
+            spl.status === "REJECTED_BY_SUPERVISOR" ||
+            spl.status === "REJECTED_BY_MANAGER"
         )
       } else {
-        filtered = filtered.filter(spl => spl.status === filterStatus)
+        filtered = filtered.filter((spl) => spl.status === filterStatus)
       }
     }
 
     // Filter by search query (nama atau PIN)
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase().trim()
-      filtered = filtered.filter(spl =>
-        spl.requester.name.toLowerCase().includes(query) ||
-        (spl.requester.pin && spl.requester.pin.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        (spl) =>
+          spl.requester.name.toLowerCase().includes(query) ||
+          (spl.requester.pin && spl.requester.pin.toLowerCase().includes(query))
       )
     }
 
@@ -103,56 +127,63 @@ export default function HRViewPage() {
     const now = new Date()
 
     switch (dateFilter) {
-      case "THIS_WEEK":
+      case "THIS_WEEK": {
         const weekStart = startOfWeek(now, { weekStartsOn: 1 })
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
-        filtered = filtered.filter(spl =>
+        filtered = filtered.filter((spl) =>
           isWithinInterval(new Date(spl.date), { start: weekStart, end: weekEnd })
         )
         break
+      }
 
-      case "THIS_MONTH":
+      case "THIS_MONTH": {
         const monthStart = startOfMonth(now)
         const monthEnd = endOfMonth(now)
-        filtered = filtered.filter(spl =>
+        filtered = filtered.filter((spl) =>
           isWithinInterval(new Date(spl.date), { start: monthStart, end: monthEnd })
         )
         break
+      }
 
-      case "LAST_MONTH":
+      case "LAST_MONTH": {
         const lastMonth = subMonths(now, 1)
         const lastMonthStart = startOfMonth(lastMonth)
         const lastMonthEnd = endOfMonth(lastMonth)
-        filtered = filtered.filter(spl =>
+        filtered = filtered.filter((spl) =>
           isWithinInterval(new Date(spl.date), { start: lastMonthStart, end: lastMonthEnd })
         )
         break
+      }
 
-      case "LAST_3_MONTHS":
+      case "LAST_3_MONTHS": {
         const threeMonthsAgo = subMonths(now, 3)
-        filtered = filtered.filter(spl =>
-          new Date(spl.date) >= threeMonthsAgo
+        filtered = filtered.filter(
+          (spl) => new Date(spl.date) >= threeMonthsAgo
         )
         break
+      }
 
-      case "CUSTOM":
+      case "CUSTOM": {
         if (customStartDate && customEndDate) {
           const start = new Date(customStartDate)
           const end = new Date(customEndDate)
-          filtered = filtered.filter(spl =>
+          filtered = filtered.filter((spl) =>
             isWithinInterval(new Date(spl.date), { start, end })
           )
         }
         break
+      }
 
-      default: // "ALL"
+      default:
         break
     }
 
-    setFilteredSpls(filtered)
-    // Reset ke halaman 1 ketika filter berubah
+    return filtered
+  }, [spls, filterStatus, dateFilter, customStartDate, customEndDate, searchQuery])
+
+  useEffect(() => {
     setCurrentPage(1)
-  }, [filterStatus, dateFilter, customStartDate, customEndDate, spls, searchQuery])
+  }, [filterStatus, dateFilter, customStartDate, customEndDate, searchQuery])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredSpls.length / itemsPerPage)
@@ -459,6 +490,7 @@ export default function HRViewPage() {
 
   const exportToExcel = async () => {
     try {
+      const XLSX = await import("xlsx")
       const exportData = await buildExportRows()
       if (exportData.length === 0) {
         toast.error("Tidak ada data untuk diexport")
@@ -602,6 +634,7 @@ export default function HRViewPage() {
     }
 
     try {
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
       const pdfDoc = await PDFDocument.create()
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -944,7 +977,7 @@ export default function HRViewPage() {
     }
   }
 
-  const stats = getStats()
+  const stats = useMemo(getStats, [filteredSpls])
 
   if (isLoading) {
     return (
@@ -972,6 +1005,11 @@ export default function HRViewPage() {
             <div className="mt-2 text-sm text-green-100">
               Filter: {getDateFilterLabel()} • Status: {filterStatus === "ALL" ? "Semua" : filterStatus}
             </div>
+            {isFetchingMore && (
+              <div className="mt-1 text-xs text-green-100/90">
+                Memuat data tambahan...
+              </div>
+            )}
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-2">
             <div className="bg-white/20 rounded-lg px-4 py-2">
