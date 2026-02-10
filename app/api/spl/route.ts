@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
     const lite =
       searchParams.get("lite") === "1" ||
       searchParams.get("lite") === "true";
+    const skipStats =
+      searchParams.get("skipStats") === "1" ||
+      searchParams.get("skipStats") === "true";
 
     // Tipe any untuk where clause agar dinamis
     const baseWhere: any = {};
@@ -205,6 +208,46 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.floor(limitParam), 50);
     const page = Math.floor(pageParam);
     const skip = (page - 1) * limit;
+
+    if (usePagination && skipStats) {
+      if (lite) {
+        const spls = await prisma.spl.findMany({
+          where,
+          select: liteSelect,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip,
+        })
+        return NextResponse.json({
+          data: spls,
+          pagination: {
+            page,
+            limit,
+            total: null,
+            totalPages: null,
+          },
+          stats: null,
+        })
+      }
+
+      const spls = await prisma.spl.findMany({
+        where,
+        include: includeConfig,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip,
+      })
+      return NextResponse.json({
+        data: spls,
+        pagination: {
+          page,
+          limit,
+          total: null,
+          totalPages: null,
+        },
+        stats: null,
+      })
+    }
 
     if (lite) {
       const [total, approved, pending, rejected, totalAll, spls] =
