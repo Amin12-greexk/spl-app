@@ -1,7 +1,7 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
@@ -30,6 +30,34 @@ const LEGACY_PROMPT_ROLES: Role[] = [
 ]
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 const REJECTED_STATUSES = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
+
+const formatTimeValue = (value?: Date | string | null) => {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+  return date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+const parseTimeToMinutes = (value: string) => {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
+  const [hour, minute] = trimmed.split(":").map(Number)
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null
+  }
+  return hour * 60 + minute
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -71,9 +99,9 @@ export default function DashboardPage() {
     userRole === "DEPARTMENT_HEAD" &&
     (normalizedDepartment === "produksi" || normalizedDepartment === "production")
 
-  const refreshSpls = useCallback(
+  const fetchUserSpls = useCallback(
     async (showLoading = false) => {
-      if (!session) {
+      if (!session?.user?.id) {
         return
       }
 
@@ -82,34 +110,30 @@ export default function DashboardPage() {
       }
 
       try {
-        const response = await fetch("/api/spl")
-        if (!response.ok) {
-          throw new Error("Gagal mengambil data")
+        const limit = 50
+        let page = 1
+        const all: Spl[] = []
+        const params = new URLSearchParams({
+          lite: "1",
+          skipStats: "1",
+          userId: session.user.id,
+        })
+
+        while (true) {
+          params.set("page", String(page))
+          params.set("limit", String(limit))
+          const response = await fetch(`/api/spl?${params.toString()}`)
+          if (!response.ok) {
+            throw new Error("Gagal mengambil data")
+          }
+          const payload = await response.json()
+          const items = Array.isArray(payload) ? payload : payload?.data || []
+          all.push(...items)
+          if (items.length < limit) break
+          page += 1
         }
 
-        const data: Spl[] = await response.json()
-        const requesterId = session.user.id
-        const ownSpls = data.filter(
-          (spl) => (spl.requesterId || spl.requester?.id) === requesterId
-        )
-
-        const pendingStatuses = [
-          "PENDING",
-          "PENDING_SUPERVISOR",
-          "PENDING_MANAGER",
-          "IN_PROGRESS",
-          "DONE",
-        ]
-        const rejectedStatuses = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
-
-        setStats({
-          total: data.length,
-          pending: data.filter((spl) => pendingStatuses.includes(spl.status)).length,
-          approved: data.filter((spl) => spl.status === "APPROVED").length,
-          rejected: data.filter((spl) => rejectedStatuses.includes(spl.status)).length,
-        })
-        setUserSpls(ownSpls)
-
+        setUserSpls(all)
       } catch (error: any) {
         await Swal.fire({
           icon: "error",
@@ -122,81 +146,43 @@ export default function DashboardPage() {
         }
       }
     },
-    [session]
+    [session?.user?.id]
   )
 
-  useEffect(() => {
-    if (!session) {
-      return
+  const fetchStats = useCallback(async () => {
+    if (!session) return
+    try {
+      const response = await fetch("/api/spl/stats")
+      if (!response.ok) return
+      const data = await response.json()
+      setStats({
+        total: Number(data?.total || 0),
+        pending: Number(data?.pending || 0),
+        approved: Number(data?.approved || 0),
+        rejected: Number(data?.rejected || 0),
+      })
+    } catch (error) {
+      // ignore stats failure
     }
+  }, [session])
 
-    refreshSpls(true)
-    if (session.user.role !== "MANAGER") {
-      const visibleManagerName = (value: unknown) =>
-        typeof value === "string" && value.trim().length > 0
-
-      const fetchManager = async () => {
-        try {
-          const response = await fetch("/api/manager")
-          if (!response.ok) {
-            return
-          }
-          const data = await response.json()
-          if (visibleManagerName(data?.name)) {
-            setManagerName(data.name)
-          }
-        } catch (error) {
-          // ignore manager name failure
-        }
+  const fetchManagerName = useCallback(async () => {
+    if (!session || session.user.role === "MANAGER") return
+    const visibleManagerName = (value: unknown) =>
+      typeof value === "string" && value.trim().length > 0
+    try {
+      const response = await fetch("/api/manager")
+      if (!response.ok) return
+      const data = await response.json()
+      if (visibleManagerName(data?.name)) {
+        setManagerName(data.name)
       }
-
-      fetchManager()
+    } catch (error) {
+      // ignore manager name failure
     }
-  }, [session, refreshSpls])
+  }, [session])
 
-  useEffect(() => {
-    if (!session || hasPromptedLegacy) return
-    const role = session.user.role as Role
-    if (!LEGACY_PROMPT_ROLES.includes(role)) return
-
-    let isActive = true
-
-    const checkLegacy = async () => {
-      try {
-        const response = await fetch("/api/spl/legacy")
-        if (!response.ok) return
-        const data = await response.json()
-        if (!isActive) return
-        if (Array.isArray(data) && data.length > 0) {
-          const result = await Swal.fire({
-            icon: "info",
-            title: "Data Lama Menunggu TTD",
-            text: "Ada data lembur lama sebelum sistem dibuat. Mohon tanda tangan dulu agar bisa diproses.",
-            showCancelButton: true,
-            confirmButtonText: "Buka Data Lama",
-            cancelButtonText: "Nanti",
-          })
-          if (result.isConfirmed) {
-            router.push("/dashboard/data-lama")
-          }
-        }
-      } catch (error) {
-        // ignore legacy prompt errors
-      } finally {
-        if (isActive) {
-          setHasPromptedLegacy(true)
-        }
-      }
-    }
-
-    checkLegacy()
-
-    return () => {
-      isActive = false
-    }
-  }, [session, hasPromptedLegacy, router])
-
-  useEffect(() => {
+  const fetchSupervisorInfo = useCallback(async () => {
     if (!session || session.user.role === "MANAGER") {
       setHasSupervisor(null)
       setSupervisorName(null)
@@ -221,80 +207,135 @@ export default function DashboardPage() {
       return
     }
 
-    const fetchSupervisorInfo = async () => {
-      try {
-        const query = departmentId
-          ? `departmentId=${encodeURIComponent(departmentId)}`
-          : `department=${encodeURIComponent(departmentName || "")}`
-        const response = await fetch(`/api/auth/supervisor-info?${query}`)
-        if (!response.ok) {
-          setHasSupervisor(null)
-          setSupervisorName(null)
-          setSupervisorLabel(null)
-          return
-        }
-        const data = await response.json()
-        const hasSupervisorValue =
-          typeof data?.hasSupervisor === "boolean" ? data.hasSupervisor : null
-        setHasSupervisor(hasSupervisorValue)
-        setSupervisorName(
-          typeof data?.supervisor?.name === "string" && data.supervisor.name.trim().length > 0
-            ? data.supervisor.name
-            : null
-        )
-        setSupervisorLabel(
-          typeof data?.supervisor?.position === "string" && data.supervisor.position.trim().length > 0
-            ? data.supervisor.position
-            : null
-        )
-      } catch (error) {
+    try {
+      const query = departmentId
+        ? `departmentId=${encodeURIComponent(departmentId)}`
+        : `department=${encodeURIComponent(departmentName || "")}`
+      const response = await fetch(`/api/auth/supervisor-info?${query}`)
+      if (!response.ok) {
         setHasSupervisor(null)
         setSupervisorName(null)
         setSupervisorLabel(null)
+        return
       }
+      const data = await response.json()
+      const hasSupervisorValue =
+        typeof data?.hasSupervisor === "boolean" ? data.hasSupervisor : null
+      setHasSupervisor(hasSupervisorValue)
+      setSupervisorName(
+        typeof data?.supervisor?.name === "string" && data.supervisor.name.trim().length > 0
+          ? data.supervisor.name
+          : null
+      )
+      setSupervisorLabel(
+        typeof data?.supervisor?.position === "string" && data.supervisor.position.trim().length > 0
+          ? data.supervisor.position
+          : null
+      )
+    } catch (error) {
+      setHasSupervisor(null)
+      setSupervisorName(null)
+      setSupervisorLabel(null)
     }
+  }, [session])
 
-    fetchSupervisorInfo()
-  }, [session, session?.user?.departmentId, session?.user?.department, session?.user?.role])
+  const fetchMinOvertime = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/min-overtime")
+      const data = await res.json()
+      if (res.ok && data?.value) {
+        setMinOvertime(data.value)
+      }
+    } catch (err) {
+      // ignore min overtime failure
+    }
+  }, [])
+
+  const checkLegacy = useCallback(async () => {
+    if (!session || hasPromptedLegacy) return
+    const role = session.user.role as Role
+    if (!LEGACY_PROMPT_ROLES.includes(role)) return
+
+    try {
+      const response = await fetch("/api/spl/legacy")
+      if (!response.ok) return
+      const data = await response.json()
+      if (Array.isArray(data) && data.length > 0) {
+        const result = await Swal.fire({
+          icon: "info",
+          title: "Data Lama Menunggu TTD",
+          text: "Ada data lembur lama sebelum sistem dibuat. Mohon tanda tangan dulu agar bisa diproses.",
+          showCancelButton: true,
+          confirmButtonText: "Buka Data Lama",
+          cancelButtonText: "Nanti",
+        })
+        if (result.isConfirmed) {
+          router.push("/dashboard/data-lama")
+        }
+      }
+    } catch (error) {
+      // ignore legacy prompt errors
+    } finally {
+      setHasPromptedLegacy(true)
+    }
+  }, [session, hasPromptedLegacy, router])
+
+  useEffect(() => {
+    if (!session) return
+
+    fetchUserSpls(true)
+    Promise.allSettled([
+      fetchStats(),
+      fetchManagerName(),
+      fetchSupervisorInfo(),
+      fetchMinOvertime(),
+      checkLegacy(),
+    ])
+  }, [
+    session,
+    fetchUserSpls,
+    fetchStats,
+    fetchManagerName,
+    fetchSupervisorInfo,
+    fetchMinOvertime,
+    checkLegacy,
+  ])
 
   useEffect(() => {
     setHistoryPage(1)
   }, [userSpls.length])
 
-  // Load minimal lembur for manager view
-  useEffect(() => {
-    const loadMin = async () => {
-      try {
-        const res = await fetch("/api/settings/min-overtime")
-        const data = await res.json()
-        if (res.ok && data?.value) {
-          setMinOvertime(data.value)
-        }
-      } catch (err) {
-        // Failed to load minimal overtime setting
-      }
-    }
-    loadMin()
-  }, [])
-
   const historyItemsPerPage = 10
-  const sortedHistory = [...userSpls].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  const sortedHistory = useMemo(
+    () =>
+      [...userSpls].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [userSpls]
   )
-  const totalHistoryPages = Math.max(
-    1,
-    Math.ceil(sortedHistory.length / historyItemsPerPage)
+  const totalHistoryPages = useMemo(
+    () => Math.max(1, Math.ceil(sortedHistory.length / historyItemsPerPage)),
+    [sortedHistory.length, historyItemsPerPage]
   )
-  const currentHistoryPage = Math.min(historyPage, totalHistoryPages)
-  const historyStartIndex = (currentHistoryPage - 1) * historyItemsPerPage
-  const historyItems = sortedHistory.slice(
-    historyStartIndex,
-    historyStartIndex + historyItemsPerPage
+  const currentHistoryPage = useMemo(
+    () => Math.min(historyPage, totalHistoryPages),
+    [historyPage, totalHistoryPages]
   )
-  const showHistoryTable = userRole !== "SUPER_ADMIN" && !isProductionHead
-  const showManagerWidgets = userRole === "MANAGER"
+  const historyStartIndex = useMemo(
+    () => (currentHistoryPage - 1) * historyItemsPerPage,
+    [currentHistoryPage, historyItemsPerPage]
+  )
+  const historyItems = useMemo(
+    () => sortedHistory.slice(historyStartIndex, historyStartIndex + historyItemsPerPage),
+    [sortedHistory, historyStartIndex, historyItemsPerPage]
+  )
+  const showHistoryTable = useMemo(
+    () => userRole !== "SUPER_ADMIN" && !isProductionHead,
+    [userRole, isProductionHead]
+  )
+  const showManagerWidgets = useMemo(() => userRole === "MANAGER", [userRole])
 
-  const getLeaderName = (spl: Spl) => {
+  const getLeaderName = useCallback((spl: Spl) => {
     if (hasSupervisor === true) {
       if (supervisorName) return supervisorName
       if (spl.supervisor?.name) return spl.supervisor.name
@@ -311,9 +352,9 @@ export default function DashboardPage() {
     if (managerName) return managerName
     if (spl.approver?.name) return spl.approver.name
     return "Manager"
-  }
+  }, [hasSupervisor, supervisorName, supervisorLabel, managerName])
 
-  const getRegularHoursLabel = (spl: Spl) => {
+  const getRegularHoursLabel = useCallback((spl: Spl) => {
     const snapshotStart = spl.regularStartAt ? formatTimeValue(spl.regularStartAt) : ""
     const snapshotEnd = spl.regularEndAt ? formatTimeValue(spl.regularEndAt) : ""
     if (snapshotStart && snapshotEnd) {
@@ -327,62 +368,23 @@ export default function DashboardPage() {
       return `${start} - ${end}`
     }
     return "-"
-  }
+  }, [session?.user?.regularStartTime, session?.user?.regularEndTime])
 
-  const getDepartmentKey = (spl: Spl) => {
+  const getDepartmentKey = useCallback((spl: Spl) => {
     const departmentName =
       spl.requester?.department?.name ||
       spl.requester?.departmentName ||
       session?.user?.department ||
       ""
     return departmentName.toLowerCase()
-  }
+  }, [session?.user?.department])
 
-  const isGaSupervisedDepartment = (spl: Spl) =>
-    GA_SUPERVISED_DEPARTMENTS.has(getDepartmentKey(spl))
+  const isGaSupervisedDepartment = useCallback(
+    (spl: Spl) => GA_SUPERVISED_DEPARTMENTS.has(getDepartmentKey(spl)),
+    [getDepartmentKey]
+  )
 
-  function formatTimeValue(value?: Date | string | null) {
-    if (!value) return "-"
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return "-"
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const getActualRangeLabel = (spl: Spl) => {
-    if (spl.actualStartAt && spl.actualEndAt) {
-      return `${formatTimeValue(spl.actualStartAt)} - ${formatTimeValue(spl.actualEndAt)}`
-    }
-    if (spl.actualStartAt) {
-      return `${formatTimeValue(spl.actualStartAt)} - Berjalan`
-    }
-    if (isOvertimeExpired(spl)) {
-      return "Surat kadaluarsa"
-    }
-    return "Belum diinput"
-  }
-
-  const parseTimeToMinutes = (value: string) => {
-    if (typeof value !== "string") return null
-    const trimmed = value.trim()
-    if (!/^\d{2}:\d{2}$/.test(trimmed)) return null
-    const [hour, minute] = trimmed.split(":").map(Number)
-    if (
-      Number.isNaN(hour) ||
-      Number.isNaN(minute) ||
-      hour < 0 ||
-      hour > 23 ||
-      minute < 0 ||
-      minute > 59
-    ) {
-      return null
-    }
-    return hour * 60 + minute
-  }
-
-  const getManualWindow = (spl: Spl, startTime: string, endTime: string) => {
+  const getManualWindow = useCallback((spl: Spl, startTime: string, endTime: string) => {
     const startMinutes = parseTimeToMinutes(startTime)
     const endMinutes = parseTimeToMinutes(endTime)
     if (startMinutes === null || endMinutes === null) return null
@@ -403,9 +405,9 @@ export default function DashboardPage() {
     }
 
     return { start, end }
-  }
+  }, [])
 
-  const getPlannedWindow = (spl: Spl) => {
+  const getPlannedWindow = useCallback((spl: Spl) => {
     if (spl.plannedStartAt && spl.plannedEndAt) {
       const plannedStart = new Date(spl.plannedStartAt)
       const plannedEnd = new Date(spl.plannedEndAt)
@@ -434,16 +436,29 @@ export default function DashboardPage() {
       plannedEnd.setDate(plannedEnd.getDate() + 1)
     }
     return { plannedStart, plannedEnd }
-  }
+  }, [])
 
-  const isOvertimeExpired = (spl: Spl) => {
+  const isOvertimeExpired = useCallback((spl: Spl) => {
     if (spl.actualStartAt) return false
     const window = getPlannedWindow(spl)
     if (!window) return false
     return new Date() >= window.plannedEnd
-  }
+  }, [getPlannedWindow])
 
-  const canInputRealization = (spl: Spl) => {
+  const getActualRangeLabel = useCallback((spl: Spl) => {
+    if (spl.actualStartAt && spl.actualEndAt) {
+      return `${formatTimeValue(spl.actualStartAt)} - ${formatTimeValue(spl.actualEndAt)}`
+    }
+    if (spl.actualStartAt) {
+      return `${formatTimeValue(spl.actualStartAt)} - Berjalan`
+    }
+    if (isOvertimeExpired(spl)) {
+      return "Surat kadaluarsa"
+    }
+    return "Belum diinput"
+  }, [isOvertimeExpired])
+
+  const canInputRealization = useCallback((spl: Spl) => {
     const requesterId = spl.requesterId || spl.requester?.id
     if (requesterId !== session?.user?.id) return false
     if (spl.source === "LEGACY") return false
@@ -452,10 +467,12 @@ export default function DashboardPage() {
     if (spl.status !== "PENDING_MANAGER") return false
     if (spl.actualEndAt) return false
     return true
-  }
+  }, [session?.user?.id])
 
-  const isGaApprovalBlocked = (spl: Spl) =>
-    isGaSupervisedDepartment(spl) && spl.status === "PENDING_SUPERVISOR"
+  const isGaApprovalBlocked = useCallback(
+    (spl: Spl) => isGaSupervisedDepartment(spl) && spl.status === "PENDING_SUPERVISOR",
+    [isGaSupervisedDepartment]
+  )
 
   const openFinishModal = (spl: Spl) => {
     setSelectedSpl(spl)
@@ -537,7 +554,7 @@ export default function DashboardPage() {
       setSelectedSpl(null)
       setRealizationStartTime("")
       setRealizationEndTime("")
-      await refreshSpls()
+      await Promise.allSettled([fetchUserSpls(), fetchStats()])
     } catch (error: any) {
       await Swal.fire({
         icon: "error",
@@ -549,14 +566,14 @@ export default function DashboardPage() {
     }
   }
 
-  const getGreeting = () => {
+  const getGreeting = useCallback(() => {
     const hour = new Date().getHours()
     if (hour < 12) return "Selamat pagi"
     if (hour < 17) return "Selamat siang"
     return "Selamat sore"
-  }
+  }, [])
 
-  function getStatusBadge(status: string) {
+  const getStatusBadge = useCallback((status: string) => {
     const config = {
       PENDING: {
         bg: "bg-yellow-100",
@@ -608,9 +625,9 @@ export default function DashboardPage() {
         {c.label}
       </span>
     )
-  }
+  }, [])
 
-  const getHeaderGradient = () => {
+  const getHeaderGradient = useCallback(() => {
     switch (userRole) {
       case "HR":
         return "from-green-600 via-green-700 to-green-800"
@@ -619,9 +636,9 @@ export default function DashboardPage() {
       default:
         return "from-blue-600 via-blue-700 to-blue-800"
     }
-  }
+  }, [userRole])
 
-  const getHeaderIcon = () => {
+  const getHeaderIcon = useCallback(() => {
     switch (userRole) {
       case "HR":
         return "📊"
@@ -630,9 +647,9 @@ export default function DashboardPage() {
       default:
         return "👋"
     }
-  }
+  }, [userRole])
 
-  const getHeaderDescription = () => {
+  const getHeaderDescription = useCallback(() => {
     switch (userRole) {
       case "HR":
         return "Kelola data dan laporan SPL seluruh karyawan"
@@ -641,7 +658,7 @@ export default function DashboardPage() {
       default:
         return "Selamat datang di Sistem Pengajuan Surat Perintah Lembur"
     }
-  }
+  }, [userRole])
 
   const saveMinOvertime = async () => {
     if (!/^\d{2}:\d{2}$/.test(minOvertime)) {
