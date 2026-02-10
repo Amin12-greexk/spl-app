@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
 import SplDetailModal from "@/components/spl/SplDetailModal"
@@ -26,52 +26,69 @@ export default function HRViewPage() {
   const [dateFilter, setDateFilter] = useState<string>("ALL")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
+  const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(15)
   const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  const fetchSpls = async () => {
+  const fetchSpls = useCallback(async () => {
     setIsLoading(true)
     setIsFetchingMore(false)
     try {
       const limit = 50
-      let page = 1
-      let loadedAny = false
+
+      // Fetch halaman pertama dulu agar UI langsung tampil
+      const firstResponse = await fetch(`/api/spl?lite=1&skipStats=1&page=1&limit=${limit}`)
+      if (!firstResponse.ok) throw new Error("Gagal mengambil data SPL")
+
+      const firstPayload = await firstResponse.json()
+      const firstItems: Spl[] = Array.isArray(firstPayload) ? firstPayload : firstPayload?.data || []
+      setSpls(firstItems)
+      setIsLoading(false)
+
+      // Jika halaman pertama sudah < limit, tidak perlu fetch lagi
+      if (firstItems.length < limit) return
+
       setIsFetchingMore(true)
 
+      // Fetch halaman berikutnya secara paralel (batch 5 halaman sekaligus)
+      let currentPage = 2
       while (true) {
-        const response = await fetch(
-          `/api/spl?lite=1&skipStats=1&page=${page}&limit=${limit}`
+        const batchSize = 5
+        const pages = Array.from({ length: batchSize }, (_, i) => currentPage + i)
+        const responses = await Promise.all(
+          pages.map((p) => fetch(`/api/spl?lite=1&skipStats=1&page=${p}&limit=${limit}`))
         )
-        if (!response.ok) {
-          throw new Error("Gagal mengambil data SPL")
+
+        const batchItems = await Promise.all(
+          responses.map(async (res) => {
+            if (!res.ok) return []
+            const payload = await res.json()
+            return (Array.isArray(payload) ? payload : payload?.data || []) as Spl[]
+          })
+        )
+
+        const allBatchItems = batchItems.flat()
+        if (allBatchItems.length > 0) {
+          setSpls((prev) => [...prev, ...allBatchItems])
         }
 
-        const payload = await response.json()
-        const items = Array.isArray(payload) ? payload : payload?.data || []
+        // Cek apakah ada halaman yang < limit (berarti sudah habis)
+        const lastNonEmptyBatch = batchItems.findLastIndex((b) => b.length > 0)
+        const anyShortPage = batchItems.some((b) => b.length < limit)
+        if (anyShortPage || lastNonEmptyBatch < 0) break
 
-        if (!loadedAny) {
-          setSpls(items)
-          setIsLoading(false)
-          loadedAny = true
-        } else if (items.length > 0) {
-          setSpls((prev) => [...prev, ...items])
-        }
-
-        if (items.length < limit) break
-        page += 1
+        currentPage += batchSize
       }
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
       setIsLoading(false)
+    } finally {
       setIsFetchingMore(false)
-      return
     }
-
-    setIsFetchingMore(false)
-  }
+  }, [])
 
   const handleOpenDetail = (spl: Spl) => {
     setSelectedSpl(spl)
@@ -85,7 +102,15 @@ export default function HRViewPage() {
 
   useEffect(() => {
     fetchSpls()
-  }, [])
+  }, [fetchSpls])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const filteredSpls = useMemo(() => {
     let filtered = spls
@@ -1079,14 +1104,17 @@ export default function HRViewPage() {
             </div>
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Ketik nama karyawan atau PIN..."
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm"
             />
-            {searchQuery && (
+            {searchInput && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchInput("")
+                  setSearchQuery("")
+                }}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
