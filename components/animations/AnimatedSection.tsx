@@ -84,7 +84,6 @@ export function AnimatedHeader({
         duration: 0.6,
         delay,
     })
-
     return (
         <div ref={ref} className={className}>
             {children}

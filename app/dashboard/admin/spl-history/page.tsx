@@ -276,6 +276,33 @@ export default function SplHistoryPage() {
     return `${hours} jam ${minutes} menit`
   }
 
+  const paginationControls = (
+    <div className="flex flex-col gap-3 px-4 py-3 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm text-gray-600">
+        Menampilkan {spls.length} dari {total} data
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          disabled={page <= 1 || loading}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Sebelumnya
+        </button>
+        <span className="text-sm text-gray-600">
+          Hal {page} / {totalPages}
+        </span>
+        <button
+          onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={page >= totalPages || loading}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Berikutnya
+        </button>
+      </div>
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -351,8 +378,81 @@ export default function SplHistoryPage() {
         </div>
       </div>
 
-      {/* SPL Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Mobile Cards */}
+      {spls.length > 0 && (
+        <div className="space-y-4 md:hidden">
+          {spls.map((spl) => (
+            <div
+              key={spl.id}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  {new Date(spl.date).toLocaleDateString("id-ID", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </div>
+                {getStatusBadge(spl.status)}
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">{spl.requester.name}</div>
+                <div className="text-xs text-gray-500">
+                  {(spl.requester.department?.name || spl.requester.departmentName || "-")} â€¢ {spl.requester.position || "-"}
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                {spl.startTime} - {spl.endTime}
+              </div>
+              <div className="text-sm font-medium text-gray-900">
+                {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
+              </div>
+              <div className="text-sm text-gray-600 line-clamp-2">
+                {spl.reason}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {spl.isManualEntry && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                    Manual
+                  </span>
+                )}
+                {isMorningOvertime(spl) && (
+                  <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded">
+                    Lembur Pagi
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => openEdit(spl)}
+                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Edit Data"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDelete(spl.id, spl.requester.name, spl.date)}
+                  className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Hapus Permanen"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {paginationControls}
+          </div>
+        </div>
+      )}
+
+      {/* SPL Table (Desktop) */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-[1000px] w-full whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -436,30 +536,7 @@ export default function SplHistoryPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-3 px-4 py-3 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-gray-600">
-            Menampilkan {spls.length} dari {total} data
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page <= 1 || loading}
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Sebelumnya
-            </button>
-            <span className="text-sm text-gray-600">
-              Hal {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page >= totalPages || loading}
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Berikutnya
-            </button>
-          </div>
-        </div>
+        {paginationControls}
       </div>
 
       {spls.length === 0 && (
