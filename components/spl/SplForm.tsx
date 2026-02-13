@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import Image from "next/image"
+import NextImage from "next/image"
 import Input from "@/components/ui/Input"
 import Button from "@/components/ui/Button"
 import SignaturePad from "@/components/spl/SignaturePad"
@@ -205,7 +205,7 @@ export default function SplForm() {
 
       const loadImage = (imageFile: File) =>
         new Promise<HTMLImageElement>((resolve, reject) => {
-          const img = new Image()
+          const img = new window.Image()
           const objectUrl = URL.createObjectURL(imageFile)
           img.onload = () => {
             URL.revokeObjectURL(objectUrl)
@@ -798,7 +798,7 @@ export default function SplForm() {
                   ) : (
                     <div className="relative">
                       <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                        <Image
+                        <NextImage
                           src={imagePreview}
                           alt="Preview"
                           width={1200}
