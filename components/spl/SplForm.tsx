@@ -180,7 +180,6 @@ export default function SplForm() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validasi tipe file
     if (!file.type.startsWith("image/")) {
       await Swal.fire({
         icon: "error",
@@ -190,24 +189,86 @@ export default function SplForm() {
       return
     }
 
-    // Validasi ukuran file (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 8 * 1024 * 1024) {
       await Swal.fire({
         icon: "error",
         title: "Ukuran File Terlalu Besar",
-        text: "Ukuran file maksimal 5MB",
+        text: "Ukuran file maksimal 8MB",
       })
       return
     }
 
-    // Convert ke base64
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
+    try {
+      const MAX_DIMENSION = 1280
+      const JPEG_QUALITY = 0.7
+      const MAX_UPLOAD_BYTES = 2.5 * 1024 * 1024
+
+      const loadImage = (imageFile: File) =>
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image()
+          const objectUrl = URL.createObjectURL(imageFile)
+          img.onload = () => {
+            URL.revokeObjectURL(objectUrl)
+            resolve(img)
+          }
+          img.onerror = () => {
+            URL.revokeObjectURL(objectUrl)
+            reject(new Error("Gagal memuat gambar"))
+          }
+          img.src = objectUrl
+        })
+
+      const toDataUrl = (blob: Blob) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = () => reject(new Error("Gagal memproses gambar"))
+          reader.readAsDataURL(blob)
+        })
+
+      const image = await loadImage(file)
+      const scale = Math.min(
+        1,
+        MAX_DIMENSION / Math.max(image.width, image.height)
+      )
+      const targetWidth = Math.max(1, Math.round(image.width * scale))
+      const targetHeight = Math.max(1, Math.round(image.height * scale))
+
+      const canvas = document.createElement("canvas")
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        throw new Error("Gagal memproses gambar")
+      }
+      ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
+      })
+      if (!blob) {
+        throw new Error("Gagal mengompres gambar")
+      }
+
+      if (blob.size > MAX_UPLOAD_BYTES) {
+        await Swal.fire({
+          icon: "error",
+          title: "Ukuran Foto Masih Terlalu Besar",
+          text: "Coba ulangi dengan foto yang lebih kecil atau potong area foto.",
+        })
+        return
+      }
+
+      const base64String = await toDataUrl(blob)
       setFormData({ ...formData, proofImage: base64String })
       setImagePreview(base64String)
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal memproses foto",
+        text: error?.message || "Terjadi kesalahan saat mengompres gambar.",
+      })
     }
-    reader.readAsDataURL(file)
   }
 
   const handleRemoveImage = () => {
