@@ -77,7 +77,7 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
     if (value === null || value === undefined) return "-"
     if (!Number.isFinite(value)) return "-"
     const totalMinutes = Math.round(value * 60)
-    if (totalMinutes <= 30) return "0 menit"
+    if (totalMinutes < 30) return "0 menit"
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
     if (hours === 0) return `${minutes} menit`
