@@ -40,8 +40,8 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     const numericValue = typeof value === "number" ? value : Number(value)
     if (!Number.isFinite(numericValue)) return "-"
     const totalMinutes = Math.round(numericValue * 60)
-    // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
-    if (totalMinutes <= 30) return "0 menit"
+    // Jika durasi kurang dari 30 menit, tidak dihitung
+    if (totalMinutes < 30) return "0 menit"
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
     if (hours === 0) return `${minutes} menit`

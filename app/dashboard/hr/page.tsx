@@ -334,10 +334,11 @@ export default function HRViewPage() {
     { wch: 12 },
   ]
 
-  const roundHoursFromMinutes = (minutes: number | null) => {
+  const roundHoursFromMinutes = (minutes: number | null): number | string | null => {
     if (minutes === null || !Number.isFinite(minutes)) return null
-    // Jika durasi kurang dari atau sama dengan 30 menit, tidak dihitung
-    if (minutes <= 30) return 0
+    // Jika durasi kurang dari 30 menit, tidak dihitung
+    if (minutes < 30) return 0
+    if (minutes === 30) return "30 menit"
     const hours = Math.floor(minutes / 60)
     const remainder = minutes % 60
     // Hanya bulatkan ke atas jika sisa LEBIH dari 30 menit
