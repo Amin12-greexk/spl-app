@@ -73,6 +73,7 @@ export default function DashboardPage() {
   const [minOvertime, setMinOvertime] = useState("16:30")
   const [isSavingMin, setIsSavingMin] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
+  const [historyMonthFilter, setHistoryMonthFilter] = useState("ALL")
   const [managerName, setManagerName] = useState<string | null>(null)
   const [supervisorName, setSupervisorName] = useState<string | null>(null)
   const [supervisorLabel, setSupervisorLabel] = useState<string | null>(null)
@@ -303,7 +304,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setHistoryPage(1)
-  }, [userSpls.length])
+  }, [userSpls.length, historyMonthFilter])
 
   const historyItemsPerPage = 10
   const sortedHistory = useMemo(
@@ -313,9 +314,45 @@ export default function DashboardPage() {
       ),
     [userSpls]
   )
+  const historyMonthOptions = useMemo(() => {
+    const monthMap = new Map<string, string>()
+    sortedHistory.forEach((spl) => {
+      const date = new Date(spl.date)
+      if (Number.isNaN(date.getTime())) return
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      if (!monthMap.has(key)) {
+        monthMap.set(
+          key,
+          date.toLocaleDateString("id-ID", {
+            month: "long",
+            year: "numeric",
+          })
+        )
+      }
+    })
+    return Array.from(monthMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([value, label]) => ({ value, label }))
+  }, [sortedHistory])
+  const filteredHistory = useMemo(() => {
+    if (historyMonthFilter === "ALL") return sortedHistory
+    return sortedHistory.filter((spl) => {
+      const date = new Date(spl.date)
+      if (Number.isNaN(date.getTime())) return false
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      return key === historyMonthFilter
+    })
+  }, [sortedHistory, historyMonthFilter])
+  useEffect(() => {
+    if (historyMonthFilter === "ALL") return
+    const exists = historyMonthOptions.some((option) => option.value === historyMonthFilter)
+    if (!exists) {
+      setHistoryMonthFilter("ALL")
+    }
+  }, [historyMonthFilter, historyMonthOptions])
   const totalHistoryPages = useMemo(
-    () => Math.max(1, Math.ceil(sortedHistory.length / historyItemsPerPage)),
-    [sortedHistory.length, historyItemsPerPage]
+    () => Math.max(1, Math.ceil(filteredHistory.length / historyItemsPerPage)),
+    [filteredHistory.length, historyItemsPerPage]
   )
   const currentHistoryPage = useMemo(
     () => Math.min(historyPage, totalHistoryPages),
@@ -326,8 +363,8 @@ export default function DashboardPage() {
     [currentHistoryPage, historyItemsPerPage]
   )
   const historyItems = useMemo(
-    () => sortedHistory.slice(historyStartIndex, historyStartIndex + historyItemsPerPage),
-    [sortedHistory, historyStartIndex, historyItemsPerPage]
+    () => filteredHistory.slice(historyStartIndex, historyStartIndex + historyItemsPerPage),
+    [filteredHistory, historyStartIndex, historyItemsPerPage]
   )
   const showHistoryTable = useMemo(
     () => userRole !== "SUPER_ADMIN" && !isProductionHead,
@@ -845,8 +882,22 @@ export default function DashboardPage() {
                     Riwayat Lembur Saya
                   </h2>
                 </div>
-                <div className="text-sm text-gray-500">
-                  Total: {sortedHistory.length}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={historyMonthFilter}
+                    onChange={(e) => setHistoryMonthFilter(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
+                  >
+                    <option value="ALL">Semua Bulan</option>
+                    {historyMonthOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-sm text-gray-500">
+                    Total: {filteredHistory.length}
+                  </div>
                 </div>
               </div>
 
@@ -887,7 +938,7 @@ export default function DashboardPage() {
                           className="px-4 py-6 text-center text-gray-500"
                           colSpan={8}
                         >
-                          Belum ada riwayat lembur
+                          Belum ada riwayat lembur pada periode ini
                         </td>
                       </tr>
                     ) : (
@@ -959,15 +1010,15 @@ export default function DashboardPage() {
                 </table>
               </div>
 
-              {sortedHistory.length > 0 && (
+              {filteredHistory.length > 0 && (
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
                   <span>
                     Menampilkan {historyStartIndex + 1}-
                     {Math.min(
                       historyStartIndex + historyItemsPerPage,
-                      sortedHistory.length
+                      filteredHistory.length
                     )}{" "}
-                    dari {sortedHistory.length}
+                    dari {filteredHistory.length}
                   </span>
                   {totalHistoryPages > 1 && (
                     <div className="flex items-center gap-2">
