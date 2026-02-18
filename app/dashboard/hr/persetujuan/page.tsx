@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
@@ -23,27 +23,47 @@ export default function PersetujuanPage() {
   const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
 
   // Pagination state
+  const [totalItems, setTotalItems] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
 
-  const fetchPendingSpls = async () => {
-    setIsLoading(true)
+  const fetchPendingSpls = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true)
+    }
     try {
-      const response = await fetch(
-        "/api/spl?status=PENDING_MANAGER,IN_PROGRESS,DONE"
-      )
+      const params = new URLSearchParams({
+        status: "PENDING_MANAGER,IN_PROGRESS,DONE",
+        lite: "1",
+        page: String(currentPage),
+        limit: String(itemsPerPage),
+      })
+      const response = await fetch(`/api/spl?${params.toString()}`)
       if (!response.ok) {
         throw new Error("Gagal mengambil data SPL")
       }
 
-      const data = await response.json()
-      setSpls(data)
+      const payload = await response.json()
+      const items = Array.isArray(payload) ? payload : payload?.data || []
+      const total = Array.isArray(payload)
+        ? items.length
+        : Number(payload?.pagination?.total ?? items.length)
+
+      setSpls(items)
+      setTotalItems(total)
+
+      const totalPages = Math.max(1, Math.ceil(total / itemsPerPage))
+      if (currentPage > totalPages) {
+        setCurrentPage(totalPages)
+      }
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
-  }
+  }, [currentPage, itemsPerPage])
 
   useEffect(() => {
     if (!session?.user?.role) {
@@ -55,7 +75,7 @@ export default function PersetujuanPage() {
       return
     }
     fetchPendingSpls()
-  }, [session, router])
+  }, [session?.user?.role, router, fetchPendingSpls])
 
   const handleApprove = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menyetujui pengajuan SPL ini?")) {
@@ -80,7 +100,7 @@ export default function PersetujuanPage() {
       }
 
       toast.success("SPL berhasil disetujui")
-      fetchPendingSpls()
+      await fetchPendingSpls(false)
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
@@ -123,7 +143,7 @@ export default function PersetujuanPage() {
       setIsRejectModalOpen(false)
       setRejectionReason("")
       setSelectedSpl(null)
-      fetchPendingSpls()
+      await fetchPendingSpls(false)
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
@@ -131,9 +151,18 @@ export default function PersetujuanPage() {
     }
   }
 
-  const handleOpenDetail = (spl: Spl) => {
+  const handleOpenDetail = async (spl: Spl) => {
     setDetailSpl(spl)
     setShowDetailModal(true)
+
+    try {
+      const response = await fetch(`/api/spl/${spl.id}`)
+      if (!response.ok) return
+      const detailData = await response.json()
+      setDetailSpl(detailData)
+    } catch {
+      // fallback ke data list jika detail gagal diambil
+    }
   }
 
   const handleCloseDetail = () => {
@@ -142,15 +171,10 @@ export default function PersetujuanPage() {
   }
 
   // Calculate pagination
-  const totalPages = Math.ceil(spls.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentSpls = spls.slice(startIndex, endIndex)
-
-  // Reset to page 1 when spls change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [spls.length])
+  const endIndex = Math.min(startIndex + spls.length, totalItems)
+  const currentSpls = spls
 
   if (isLoading) {
     return (
@@ -171,15 +195,15 @@ export default function PersetujuanPage() {
             Kelola pengajuan SPL yang menunggu persetujuan
           </p>
         </div>
-        {spls.length > 0 && (
+        {totalItems > 0 && (
           <div className="text-sm sm:text-base text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
-            Total: <span className="font-semibold text-blue-700">{spls.length}</span> pengajuan
+            Total: <span className="font-semibold text-blue-700">{totalItems}</span> pengajuan
           </div>
         )}
       </div>
 
       {/* Items per page selector */}
-      {spls.length > 0 && (
+      {totalItems > 0 && (
         <div className="flex items-center gap-2 text-sm">
           <label className="text-gray-600">Tampilkan per halaman:</label>
           <select
@@ -198,7 +222,7 @@ export default function PersetujuanPage() {
         </div>
       )}
 
-      {spls.length === 0 ? (
+      {totalItems === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <p className="text-gray-500 text-lg mb-2">
             Tidak ada pengajuan SPL yang menunggu persetujuan
@@ -266,8 +290,8 @@ export default function PersetujuanPage() {
                 <div>
                   <p className="text-sm text-gray-700">
                     Menampilkan <span className="font-medium">{startIndex + 1}</span> sampai{" "}
-                    <span className="font-medium">{Math.min(endIndex, spls.length)}</span> dari{" "}
-                    <span className="font-medium">{spls.length}</span> hasil
+                    <span className="font-medium">{endIndex}</span> dari{" "}
+                    <span className="font-medium">{totalItems}</span> hasil
                   </p>
                 </div>
                 <div>

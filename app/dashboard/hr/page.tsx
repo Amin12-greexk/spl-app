@@ -10,6 +10,7 @@ import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale" // Import locale Indonesia
 import { getEffectiveHours, getEffectiveMinutes } from "@/lib/spl-hours"
+import { isMorningOvertime } from "@/lib/spl-labels"
 
 interface AttendanceRecord {
   pin?: string | null
@@ -17,6 +18,10 @@ interface AttendanceRecord {
 }
 
 type ExportRow = Record<string, string | number>
+type ExportContext = {
+  resolvePin: (spl: Spl) => string
+  attendanceByPin: Map<string, AttendanceRecord[]>
+}
 
 export default function HRViewPage() {
   const [spls, setSpls] = useState<Spl[]>([])
@@ -405,11 +410,7 @@ export default function HRViewPage() {
     })
   }
 
-  const buildExportRows = async (): Promise<ExportRow[]> => {
-    const sortedSpls = sortSplsForExport(filteredSpls)
-    const exportableSpls = sortedSpls.filter(isExportEligible)
-    if (exportableSpls.length === 0) return []
-
+  const buildExportContext = async (exportableSpls: Spl[]): Promise<ExportContext> => {
     const needsPinLookup = exportableSpls.some(
       (spl) => !(spl.requester.pin || "").toString().trim()
     )
@@ -469,7 +470,12 @@ export default function HRViewPage() {
       )
     }
 
-    return exportableSpls.map((spl, index) => {
+    return { resolvePin, attendanceByPin }
+  }
+
+  const buildRowsFromSpls = (items: Spl[], context: ExportContext): ExportRow[] => {
+    return items.map((spl, index) => {
+      const { resolvePin, attendanceByPin } = context
       const supervisorLabels = getSupervisorApprovalLabels(spl)
       const resolvedPin = resolvePin(spl)
       const dateValue = new Date(spl.date)
@@ -514,14 +520,30 @@ export default function HRViewPage() {
     })
   }
 
+  const buildExportRows = async (sourceSpls: Spl[] = filteredSpls): Promise<ExportRow[]> => {
+    const sortedSpls = sortSplsForExport(sourceSpls)
+    const exportableSpls = sortedSpls.filter(isExportEligible)
+    if (exportableSpls.length === 0) return []
+
+    const exportContext = await buildExportContext(exportableSpls)
+    return buildRowsFromSpls(exportableSpls, exportContext)
+  }
+
   const exportToExcel = async () => {
     try {
       const XLSX = await import("xlsx")
-      const exportData = await buildExportRows()
-      if (exportData.length === 0) {
+      const sortedSpls = sortSplsForExport(filteredSpls)
+      const exportableSpls = sortedSpls.filter(isExportEligible)
+
+      if (exportableSpls.length === 0) {
         toast.error("Tidak ada data untuk diexport")
         return
       }
+
+      const exportContext = await buildExportContext(exportableSpls)
+      const exportData = buildRowsFromSpls(exportableSpls, exportContext)
+      const morningSpls = exportableSpls.filter((spl) => isMorningOvertime(spl))
+      const morningExportData = buildRowsFromSpls(morningSpls, exportContext)
 
       const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders })
       const wb = XLSX.utils.book_new()
@@ -529,6 +551,20 @@ export default function HRViewPage() {
       ws["!cols"] = exportColWidths
 
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
+
+      if (morningExportData.length > 0) {
+        const wsMorning = XLSX.utils.json_to_sheet(morningExportData, {
+          header: exportHeaders,
+        })
+        wsMorning["!cols"] = exportColWidths
+        XLSX.utils.book_append_sheet(wb, wsMorning, "Lembur Pagi")
+      } else {
+        const wsMorning = XLSX.utils.json_to_sheet([
+          { Keterangan: "Tidak ada data lembur pagi pada filter saat ini" },
+        ], { header: ["Keterangan"] })
+        wsMorning["!cols"] = [{ wch: 52 }]
+        XLSX.utils.book_append_sheet(wb, wsMorning, "Lembur Pagi")
+      }
 
       const periodText = dateFilter === "ALL" ? "Semua_Periode" :
         dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
