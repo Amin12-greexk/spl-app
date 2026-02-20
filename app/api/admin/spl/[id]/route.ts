@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import {
   getMinutesDiff,
   JAKARTA_TIME_ZONE,
+  makeWindowWithOffset,
   makeWindow,
   parseDateOnly,
   parseTimeToMinutes,
@@ -88,6 +89,8 @@ export async function PATCH(
       actualEndTime,
       reason,
       projectName,
+      endDayOffset,
+      actualEndDayOffset,
     } = body
 
     if (!date || !startTime || !endTime || !reason) {
@@ -136,7 +139,24 @@ export async function PATCH(
       return NextResponse.json({ error: "SPL tidak ditemukan" }, { status: 404 })
     }
 
-    let plannedWindow = makeWindow(requestedDate, startTime, endTime)
+    const rawEndDayOffset = endDayOffset
+    const plannedEndDayOffset =
+      rawEndDayOffset === undefined || rawEndDayOffset === null
+        ? 0
+        : Number(rawEndDayOffset)
+    if (!Number.isFinite(plannedEndDayOffset) || (plannedEndDayOffset !== 0 && plannedEndDayOffset !== 1)) {
+      return NextResponse.json(
+        { error: "Durasi hari lembur tidak valid" },
+        { status: 400 }
+      )
+    }
+
+    let plannedWindow = makeWindowWithOffset(
+      requestedDate,
+      startTime,
+      endTime,
+      plannedEndDayOffset
+    )
     if (!plannedWindow) {
       return NextResponse.json(
         { error: "Waktu lembur tidak valid" },
@@ -202,7 +222,24 @@ export async function PATCH(
         )
       }
 
-      const actualWindow = makeWindow(requestedDate, actualStartTime, actualEndTime)
+      const rawActualDayOffset = actualEndDayOffset
+      const resolvedActualDayOffset =
+        rawActualDayOffset === undefined || rawActualDayOffset === null
+          ? 0
+          : Number(rawActualDayOffset)
+      if (!Number.isFinite(resolvedActualDayOffset) || (resolvedActualDayOffset !== 0 && resolvedActualDayOffset !== 1)) {
+        return NextResponse.json(
+          { error: "Durasi hari realisasi tidak valid" },
+          { status: 400 }
+        )
+      }
+
+      const actualWindow = makeWindowWithOffset(
+        requestedDate,
+        actualStartTime,
+        actualEndTime,
+        resolvedActualDayOffset
+      )
       if (!actualWindow) {
         return NextResponse.json(
           { error: "Waktu realisasi tidak valid" },

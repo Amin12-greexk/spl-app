@@ -83,6 +83,7 @@ export default function DashboardPage() {
   const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
   const [realizationStartTime, setRealizationStartTime] = useState("")
   const [realizationEndTime, setRealizationEndTime] = useState("")
+  const [realizationEndDayOffset, setRealizationEndDayOffset] = useState(0)
   const [realizationNote, setRealizationNote] = useState("")
   const [overrunReason, setOverrunReason] = useState("")
   const [hasPromptedLegacy, setHasPromptedLegacy] = useState(false)
@@ -421,7 +422,12 @@ export default function DashboardPage() {
     [getDepartmentKey]
   )
 
-  const getManualWindow = useCallback((spl: Spl, startTime: string, endTime: string) => {
+  const getManualWindow = useCallback((
+    spl: Spl,
+    startTime: string,
+    endTime: string,
+    endDayOffset = 0
+  ) => {
     const startMinutes = parseTimeToMinutes(startTime)
     const endMinutes = parseTimeToMinutes(endTime)
     if (startMinutes === null || endMinutes === null) return null
@@ -437,7 +443,9 @@ export default function DashboardPage() {
 
     const end = new Date(baseDay)
     end.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0)
-    if (end <= start) {
+    if (endDayOffset > 0) {
+      end.setDate(end.getDate() + endDayOffset)
+    } else if (end <= start) {
       end.setDate(end.getDate() + 1)
     }
 
@@ -515,6 +523,14 @@ export default function DashboardPage() {
     setSelectedSpl(spl)
     setRealizationStartTime(spl.startTime)
     setRealizationEndTime(spl.endTime)
+    const plannedWindow = getPlannedWindow(spl)
+    const plannedDayOffset =
+      plannedWindow &&
+      plannedWindow.plannedEnd.getTime() - plannedWindow.plannedStart.getTime() >=
+        24 * 60 * 60 * 1000
+        ? 1
+        : 0
+    setRealizationEndDayOffset(plannedDayOffset)
     setRealizationNote("")
     setOverrunReason("")
     setShowFinishModal(true)
@@ -535,7 +551,8 @@ export default function DashboardPage() {
     const manualWindow = getManualWindow(
       selectedSpl,
       realizationStartTime,
-      realizationEndTime
+      realizationEndTime,
+      realizationEndDayOffset
     )
     if (!manualWindow) {
       await Swal.fire({
@@ -573,6 +590,7 @@ export default function DashboardPage() {
           body: JSON.stringify({
             startTime: realizationStartTime,
             endTime: realizationEndTime,
+            endDayOffset: realizationEndDayOffset,
             note: realizationNote.trim(),
             overrunReason: overrunReason.trim() || null,
           }),
@@ -591,6 +609,7 @@ export default function DashboardPage() {
       setSelectedSpl(null)
       setRealizationStartTime("")
       setRealizationEndTime("")
+      setRealizationEndDayOffset(0)
       await Promise.allSettled([fetchUserSpls(), fetchStats()])
     } catch (error: any) {
       await Swal.fire({
@@ -736,7 +755,12 @@ export default function DashboardPage() {
 
   const selectedManualWindow =
     selectedSpl && realizationStartTime && realizationEndTime
-      ? getManualWindow(selectedSpl, realizationStartTime, realizationEndTime)
+      ? getManualWindow(
+          selectedSpl,
+          realizationStartTime,
+          realizationEndTime,
+          realizationEndDayOffset
+        )
       : null
   const selectedActualMinutes = selectedManualWindow
     ? Math.floor(
@@ -1276,6 +1300,7 @@ export default function DashboardPage() {
             setSelectedSpl(null)
             setRealizationStartTime("")
             setRealizationEndTime("")
+            setRealizationEndDayOffset(0)
           }}
           title="Input Realisasi"
           footer={
@@ -1287,6 +1312,7 @@ export default function DashboardPage() {
                   setSelectedSpl(null)
                   setRealizationStartTime("")
                   setRealizationEndTime("")
+                  setRealizationEndDayOffset(0)
                 }}
                 disabled={isFinishing}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -1342,6 +1368,33 @@ export default function DashboardPage() {
                 required
                 showWib
               />
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Durasi Realisasi
+              </label>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="realization-duration-days"
+                    checked={realizationEndDayOffset === 0}
+                    onChange={() => setRealizationEndDayOffset(0)}
+                    className="h-4 w-4 text-blue-600 border-blue-200"
+                  />
+                  1 Hari
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="realization-duration-days"
+                    checked={realizationEndDayOffset === 1}
+                    onChange={() => setRealizationEndDayOffset(1)}
+                    className="h-4 w-4 text-blue-600 border-blue-200"
+                  />
+                  2 Hari (Selesai Besok)
+                </label>
+              </div>
             </div>
 
             <div>

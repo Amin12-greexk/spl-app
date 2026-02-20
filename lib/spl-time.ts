@@ -109,6 +109,24 @@ export const makeWindow = (baseDay: Date, startTime: string, endTime: string) =>
   return { start, end }
 }
 
+export const makeWindowWithOffset = (
+  baseDay: Date,
+  startTime: string,
+  endTime: string,
+  endDayOffset = 0
+) => {
+  const start = setTimeOnDate(baseDay, startTime)
+  const endBase = setTimeOnDate(baseDay, endTime)
+  if (!start || !endBase) return null
+  let end = endBase
+  if (endDayOffset > 0) {
+    end = addDays(end, endDayOffset)
+  } else if (end <= start) {
+    end = addDays(end, 1)
+  }
+  return { start, end }
+}
+
 export const buildOvertimeWindowFromTimes = (
   regularEndAt: Date,
   startTime: string,

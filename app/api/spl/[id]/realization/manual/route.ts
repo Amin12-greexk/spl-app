@@ -7,6 +7,7 @@ import {
   clampRealizationMinutes,
   JAKARTA_TIME_ZONE,
   makeWindow,
+  makeWindowWithOffset,
   startOfDay,
 } from "@/lib/spl-time"
 
@@ -43,10 +44,11 @@ const resolvePlannedWindow = (spl: {
 const buildActualWindow = (
   baseDate: Date,
   startTime: string,
-  endTime: string
+  endTime: string,
+  endDayOffset = 0
 ) => {
   const baseDay = startOfDay(baseDate)
-  return makeWindow(baseDay, startTime, endTime)
+  return makeWindowWithOffset(baseDay, startTime, endTime, endDayOffset)
 }
 
 export async function POST(
@@ -70,6 +72,18 @@ export async function POST(
     if (!startTime || !endTime) {
       return NextResponse.json(
         { error: "Jam mulai dan jam selesai realisasi wajib diisi" },
+        { status: 400 }
+      )
+    }
+
+    const rawEndDayOffset = body?.endDayOffset
+    const endDayOffset =
+      rawEndDayOffset === undefined || rawEndDayOffset === null
+        ? 0
+        : Number(rawEndDayOffset)
+    if (!Number.isFinite(endDayOffset) || (endDayOffset !== 0 && endDayOffset !== 1)) {
+      return NextResponse.json(
+        { error: "Durasi hari realisasi tidak valid" },
         { status: 400 }
       )
     }
@@ -147,7 +161,12 @@ export async function POST(
     }
 
     const anchorDate = spl.plannedStartAt ?? spl.date
-    const actualWindow = buildActualWindow(new Date(anchorDate), startTime, endTime)
+    const actualWindow = buildActualWindow(
+      new Date(anchorDate),
+      startTime,
+      endTime,
+      endDayOffset
+    )
     if (!actualWindow) {
       return NextResponse.json(
         { error: "Jam realisasi tidak valid" },
