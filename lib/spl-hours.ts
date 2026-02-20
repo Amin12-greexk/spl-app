@@ -8,6 +8,8 @@ export interface SplHoursInput {
   totalHours: number;
   actualStartAt?: string | Date | null;
   actualEndAt?: string | Date | null;
+  plannedStartAt?: string | Date | null;
+  plannedEndAt?: string | Date | null;
   realizedMinutes?: number | null;
   actualTotalHours?: number | null;
   realizationCounted?: boolean | null;
@@ -48,6 +50,17 @@ export function getRealizationMinutes(spl: SplHoursInput): number | null {
 }
 
 export function getPlannedMinutes(spl: SplHoursInput): number | null {
+  if (spl.plannedStartAt && spl.plannedEndAt) {
+    const start = new Date(spl.plannedStartAt);
+    const end = new Date(spl.plannedEndAt);
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+      const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+      if (Number.isFinite(minutes) && minutes >= 0) {
+        return minutes;
+      }
+    }
+  }
+
   const startMinutes = parseTimeToMinutes(spl.startTime);
   const endMinutes = parseTimeToMinutes(spl.endTime);
   if (startMinutes === null || endMinutes === null) {

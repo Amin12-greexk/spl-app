@@ -70,8 +70,10 @@ export default function SplHistoryPage() {
     date: "",
     startTime: "",
     endTime: "",
+    endDayOffset: 0,
     actualStartTime: "",
     actualEndTime: "",
+    actualEndDayOffset: 0,
     reason: "",
     projectName: "",
   })
@@ -145,16 +147,42 @@ export default function SplHistoryPage() {
     }).format(date)
   }
 
+  const getDayOffsetFromWindow = (
+    start?: Date | string | null,
+    end?: Date | string | null
+  ) => {
+    if (!start || !end) return 0
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return 0
+    }
+    const diffMinutes = Math.round(
+      (endDate.getTime() - startDate.getTime()) / 60000
+    )
+    return diffMinutes >= 24 * 60 ? 1 : 0
+  }
+
   const openEdit = (spl: Spl) => {
     setEditingSpl(spl)
+    const plannedDayOffset = getDayOffsetFromWindow(
+      spl.plannedStartAt,
+      spl.plannedEndAt
+    )
+    const actualDayOffset =
+      spl.actualStartAt && spl.actualEndAt
+        ? getDayOffsetFromWindow(spl.actualStartAt, spl.actualEndAt)
+        : plannedDayOffset
     const actualStartTime = formatTimeInJakarta(spl.actualStartAt) || spl.startTime
     const actualEndTime = formatTimeInJakarta(spl.actualEndAt) || spl.endTime
     setEditForm({
       date: formatDateInput(spl.date),
       startTime: spl.startTime,
       endTime: spl.endTime,
+      endDayOffset: plannedDayOffset,
       actualStartTime,
       actualEndTime,
+      actualEndDayOffset: actualDayOffset,
       reason: spl.reason,
       projectName: spl.projectName || "",
     })
@@ -185,8 +213,10 @@ export default function SplHistoryPage() {
           date: editForm.date,
           startTime: editForm.startTime,
           endTime: editForm.endTime,
+          endDayOffset: editForm.endDayOffset,
           actualStartTime: editForm.actualStartTime || null,
           actualEndTime: editForm.actualEndTime || null,
+          actualEndDayOffset: editForm.actualEndDayOffset,
           reason: editForm.reason,
           projectName: editForm.projectName || null,
         }),
@@ -611,6 +641,37 @@ export default function SplHistoryPage() {
               />
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Durasi Lembur
+            </label>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="edit-duration-days"
+                  checked={editForm.endDayOffset === 0}
+                  onChange={() =>
+                    setEditForm((prev) => ({ ...prev, endDayOffset: 0 }))
+                  }
+                  className="h-4 w-4 text-red-600 border-gray-300"
+                />
+                1 Hari
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="edit-duration-days"
+                  checked={editForm.endDayOffset === 1}
+                  onChange={() =>
+                    setEditForm((prev) => ({ ...prev, endDayOffset: 1 }))
+                  }
+                  className="h-4 w-4 text-red-600 border-gray-300"
+                />
+                2 Hari (Selesai Besok)
+              </label>
+            </div>
+          </div>
           <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
             <p className="text-xs font-semibold text-emerald-800 mb-2">
               Realisasi (prefill dari jam pengajuan)
@@ -645,6 +706,37 @@ export default function SplHistoryPage() {
                   className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   placeholder="HH:mm"
                 />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Durasi Realisasi
+              </label>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="edit-actual-duration-days"
+                    checked={editForm.actualEndDayOffset === 0}
+                    onChange={() =>
+                      setEditForm((prev) => ({ ...prev, actualEndDayOffset: 0 }))
+                    }
+                    className="h-4 w-4 text-emerald-600 border-emerald-200"
+                  />
+                  1 Hari
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="edit-actual-duration-days"
+                    checked={editForm.actualEndDayOffset === 1}
+                    onChange={() =>
+                      setEditForm((prev) => ({ ...prev, actualEndDayOffset: 1 }))
+                    }
+                    className="h-4 w-4 text-emerald-600 border-emerald-200"
+                  />
+                  2 Hari (Selesai Besok)
+                </label>
               </div>
             </div>
           </div>

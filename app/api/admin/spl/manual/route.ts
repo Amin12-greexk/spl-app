@@ -7,6 +7,7 @@ import { sendNotificationToUser } from "@/lib/notification-utils"
 import {
   getJakartaDayOfWeek,
   JAKARTA_TIME_ZONE,
+  makeWindowWithOffset,
   makeWindow,
   parseDateOnly,
   parseTimeToMinutes,
@@ -86,6 +87,18 @@ export async function POST(req: NextRequest) {
     if (startMinutes === endMinutes) {
       return NextResponse.json(
         { error: "Jam lembur akhir harus > jam lembur mulai" },
+        { status: 400 }
+      )
+    }
+
+    const rawEndDayOffset = body?.endDayOffset
+    const endDayOffset =
+      rawEndDayOffset === undefined || rawEndDayOffset === null
+        ? 0
+        : Number(rawEndDayOffset)
+    if (!Number.isFinite(endDayOffset) || (endDayOffset !== 0 && endDayOffset !== 1)) {
+      return NextResponse.json(
+        { error: "Durasi hari lembur tidak valid" },
         { status: 400 }
       )
     }
@@ -223,7 +236,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plannedWindow = makeWindow(requestedDate, startTime, endTime)
+    const plannedWindow = makeWindowWithOffset(
+      requestedDate,
+      startTime,
+      endTime,
+      endDayOffset
+    )
     if (!plannedWindow) {
       return NextResponse.json(
         { error: "Waktu lembur tidak valid" },
