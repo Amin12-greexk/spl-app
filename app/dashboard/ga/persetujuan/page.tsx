@@ -52,7 +52,7 @@ export default function GAApprovalPage() {
 
   // Check authorization
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD"].includes(session.user.role)) {
+    if (session && !["GA", "DEPARTMENT_HEAD", "SUPER_ADMIN"].includes(session.user.role)) {
       toast.error("Akses ditolak!")
       router.push("/dashboard")
     }
@@ -63,7 +63,8 @@ export default function GAApprovalPage() {
     setIsLoading(true)
     try {
       const response = await fetch(
-        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50"
+        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50",
+        { cache: "no-store" }
       )
       if (!response.ok) throw new Error("Gagal mengambil data")
 
@@ -78,7 +79,11 @@ export default function GAApprovalPage() {
   }
 
   useEffect(() => {
-    if (session?.user.role === "GA" || session?.user.role === "DEPARTMENT_HEAD") {
+    if (
+      session?.user.role === "GA" ||
+      session?.user.role === "DEPARTMENT_HEAD" ||
+      session?.user.role === "SUPER_ADMIN"
+    ) {
       fetchPendingSpls()
     }
   }, [session])

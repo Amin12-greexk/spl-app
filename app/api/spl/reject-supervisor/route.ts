@@ -13,10 +13,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Only GA or DEPARTMENT_HEAD can reject as supervisor
-    if (!["GA", "DEPARTMENT_HEAD"].includes(session.user.role)) {
+    const isSuperAdmin = session.user.role === "SUPER_ADMIN"
+    const canRejectAsSupervisor = ["GA", "DEPARTMENT_HEAD"].includes(session.user.role)
+
+    // Only GA, DEPARTMENT_HEAD, or SUPER_ADMIN can reject as supervisor
+    if (!canRejectAsSupervisor && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Hanya GA atau Kepala Departemen yang dapat menolak SPL di level supervisor" },
+        { error: "Hanya GA, Kepala Departemen, atau Super Admin yang dapat menolak SPL di level supervisor" },
         { status: 403 }
       )
     }
@@ -64,19 +67,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate: Current user must be the supervisor of the requester
-    if (spl.requester.supervisorId !== session.user.id) {
+    // Determine assigned supervisor for proxy rejection by Super Admin
+    const assignedSupervisorId = spl.supervisorId || spl.requester.supervisorId || null
+
+    // Validate: Non-super-admin must be the supervisor of the requester
+    if (!isSuperAdmin && spl.requester.supervisorId !== session.user.id && spl.supervisorId !== session.user.id) {
       return NextResponse.json(
         { error: "Anda bukan atasan dari karyawan ini" },
         { status: 403 }
       )
     }
 
+    if (isSuperAdmin && !assignedSupervisorId) {
+      return NextResponse.json(
+        { error: "Supervisor untuk SPL ini tidak ditemukan. Assign supervisor terlebih dahulu." },
+        { status: 400 }
+      )
+    }
+
+    const effectiveSupervisorId = isSuperAdmin ? assignedSupervisorId : session.user.id
+
     // Update SPL: Reject by supervisor
     const updatedSpl = await prisma.spl.update({
       where: { id: splId },
       data: {
-        supervisorId: session.user.id,
+        supervisorId: effectiveSupervisorId,
         supervisorApprovalDate: new Date(),
         supervisorRejectionReason: rejectionReason,
         status: "REJECTED_BY_SUPERVISOR",
@@ -111,10 +126,14 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       })
 
+      const supervisorActor = isSuperAdmin
+        ? `${updatedSpl.supervisor?.name || "Supervisor"} (diwakili Super Admin ${session.user.name || "-"})`
+        : session.user.name || updatedSpl.supervisor?.name || "Supervisor"
+
       await sendNotificationToUser(
         updatedSpl.requesterId,
         "SPL Ditolak Supervisor",
-        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) ditolak oleh ${session.user.name}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
+        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) ditolak oleh ${supervisorActor}. Alasan: ${updatedSpl.supervisorRejectionReason}`,
         { splId: updatedSpl.id, click_action: "/dashboard/staff" }
       )
       console.log("Notifikasi supervisor rejection telah dikirim")

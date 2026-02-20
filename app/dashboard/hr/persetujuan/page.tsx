@@ -38,7 +38,9 @@ export default function PersetujuanPage() {
         page: String(currentPage),
         limit: String(itemsPerPage),
       })
-      const response = await fetch(`/api/spl?${params.toString()}`)
+      const response = await fetch(`/api/spl?${params.toString()}`, {
+        cache: "no-store",
+      })
       if (!response.ok) {
         throw new Error("Gagal mengambil data SPL")
       }
@@ -69,9 +71,9 @@ export default function PersetujuanPage() {
     if (!session?.user?.role) {
       return
     }
-    if (session.user.role !== "MANAGER") {
-      toast.error("Hanya Manager yang dapat menyetujui SPL")
-      router.push("/dashboard/hr")
+    if (!["MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
+      toast.error("Hanya Manager atau Super Admin yang dapat menyetujui SPL")
+      router.push("/dashboard")
       return
     }
     fetchPendingSpls()
