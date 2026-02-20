@@ -80,7 +80,7 @@ export async function GET(
 /**
  * PATCH /api/spl/[id]
  * Mengubah status SPL (Approve/Reject).
- * - Hanya untuk HR/MANAGER.
+ * - Hanya untuk MANAGER/SUPER_ADMIN.
  * - Mengirim notifikasi balasan ke staff yang mengajukan.
  */
 export async function PATCH(
@@ -91,23 +91,31 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     const userRole = session?.user?.role as Role;
 
-    if (!session || !["MANAGER"].includes(userRole)) {
+    if (!session || !["MANAGER", "SUPER_ADMIN"].includes(userRole)) {
       return NextResponse.json(
-        { error: "Hanya Manager yang bisa mengubah status SPL" },
+        { error: "Hanya Manager atau Super Admin yang bisa mengubah status SPL" },
         { status: 403 }
       );
     }
 
     const body: UpdateSplStatusInput = await req.json();
+    const normalizedStatus: SplStatus | null =
+      body.status === "REJECTED" ? "REJECTED_BY_MANAGER" : body.status
 
     // Validasi input
-    if (!body.status || ((body.status === "REJECTED" || body.status === "REJECTED_BY_MANAGER") && !body.rejectionReason)) {
-        return NextResponse.json({ error: "Status dan alasan penolakan (jika ditolak) wajib diisi." }, { status: 400 });
+    if (!normalizedStatus || !["APPROVED", "REJECTED_BY_MANAGER"].includes(normalizedStatus)) {
+        return NextResponse.json({ error: "Status tidak valid untuk approval manager." }, { status: 400 });
+    }
+    if (normalizedStatus === "REJECTED_BY_MANAGER" && !body.rejectionReason) {
+        return NextResponse.json({ error: "Alasan penolakan wajib diisi." }, { status: 400 });
     }
 
     const existingSpl = await prisma.spl.findUnique({
       where: { id: params.id },
       select: {
+        status: true,
+        approverId: true,
+        approvalDate: true,
         isManualEntry: true,
         requesterSignedAt: true,
         source: true,
@@ -127,7 +135,25 @@ export async function PATCH(
       );
     }
 
-    if (body.status === "APPROVED" && (!existingSpl.actualStartAt || !existingSpl.actualEndAt)) {
+    if (!["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(existingSpl.status)) {
+      // Idempotent guard: SPL already processed at manager level
+      if (
+        (existingSpl.status === "APPROVED" || existingSpl.status === "REJECTED_BY_MANAGER") &&
+        existingSpl.approverId &&
+        existingSpl.approvalDate
+      ) {
+        return NextResponse.json(
+          { error: "SPL ini sudah diproses oleh manager sebelumnya" },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: `Status SPL saat ini (${existingSpl.status}) tidak dapat diproses manager` },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedStatus === "APPROVED" && (!existingSpl.actualStartAt || !existingSpl.actualEndAt)) {
       return NextResponse.json(
         { error: "Realisasi belum diinput oleh pemohon" },
         { status: 400 }
@@ -139,10 +165,10 @@ export async function PATCH(
         id: params.id,
       },
       data: {
-        status: body.status,
+        status: normalizedStatus,
         approverId: session.user.id, // Catat siapa yang memproses
         approvalDate: new Date(),
-        rejectionReason: (body.status === "REJECTED" || body.status === "REJECTED_BY_MANAGER") ? body.rejectionReason : null,
+        rejectionReason: normalizedStatus === "REJECTED_BY_MANAGER" ? body.rejectionReason : null,
       },
       include: {
         requester: {
@@ -165,7 +191,7 @@ export async function PATCH(
         timeZone: JAKARTA_TIME_ZONE,
       });
 
-      const statusText = spl.status === "APPROVED" ? "Disetujui" : "Ditolak";
+      const statusText = normalizedStatus === "APPROVED" ? "Disetujui" : "Ditolak";
       const notificationTitle = `Pengajuan SPL Anda ${statusText}`;
       const notificationBody = `SPL tanggal ${formattedDate} (${spl.startTime}-${spl.endTime}) telah ${statusText.toLowerCase()} oleh ${session.user.name}.`;
 

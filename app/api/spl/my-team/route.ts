@@ -11,13 +11,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Only GA, DEPARTMENT_HEAD, or MANAGER can view team SPLs
-    if (!["GA", "DEPARTMENT_HEAD", "MANAGER"].includes(session.user.role)) {
+    // Only GA, DEPARTMENT_HEAD, MANAGER, or SUPER_ADMIN can view team SPLs
+    if (!["GA", "DEPARTMENT_HEAD", "MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
       return NextResponse.json(
-        { error: "Hanya GA, Kepala Departemen, atau Manager yang dapat melihat SPL tim" },
+        { error: "Hanya GA, Kepala Departemen, Manager, atau Super Admin yang dapat melihat SPL tim" },
         { status: 403 }
       )
     }
+
+    const isSuperAdmin = session.user.role === "SUPER_ADMIN"
 
     // Get all SPLs from subordinates (users who have this user as supervisor)
     const andFilters: any[] = [
@@ -48,13 +50,17 @@ export async function GET(req: NextRequest) {
       Number.isFinite(limitParam) &&
       limitParam > 0
 
-    const where: any = {
-      OR: [
-        { supervisorId: session.user.id },
-        { supervisorId: null, requester: { supervisorId: session.user.id } },
-      ],
-      AND: [...andFilters],
-    }
+    const where: any = isSuperAdmin
+      ? {
+          AND: [...andFilters],
+        }
+      : {
+          OR: [
+            { supervisorId: session.user.id },
+            { supervisorId: null, requester: { supervisorId: session.user.id } },
+          ],
+          AND: [...andFilters],
+        }
 
     if (statusParam) {
       const statusList = statusParam
