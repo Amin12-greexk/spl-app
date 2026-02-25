@@ -1,421 +1,374 @@
+import * as bcrypt from "bcryptjs"
 import { PrismaClient } from "@prisma/client"
-import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
 
+const JAKARTA_OFFSET_MINUTES = 7 * 60
+const MINUTES_PER_DAY = 24 * 60
+
+type GanesSplInput = {
+  date: string
+  jamMasuk: string
+  jamMulaiLembur: string
+  jamPulang: string
+  alasan: string
+}
+
+const GANES_SPL_DATA: GanesSplInput[] = [
+  {
+    date: "2026-01-21",
+    jamMasuk: "09:23",
+    jamMulaiLembur: "16:00",
+    jamPulang: "19:28",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-22",
+    jamMasuk: "06:34",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:43",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-23",
+    jamMasuk: "07:48",
+    jamMulaiLembur: "16:00",
+    jamPulang: "19:58",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-24",
+    jamMasuk: "07:46",
+    jamMulaiLembur: "13:00",
+    jamPulang: "17:30",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-26",
+    jamMasuk: "07:49",
+    jamMulaiLembur: "16:00",
+    jamPulang: "20:40",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-27",
+    jamMasuk: "10:33",
+    jamMulaiLembur: "16:00",
+    jamPulang: "21:54",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-29",
+    jamMasuk: "07:48",
+    jamMulaiLembur: "16:00",
+    jamPulang: "17:26",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-01-30",
+    jamMasuk: "07:52",
+    jamMulaiLembur: "16:00",
+    jamPulang: "22:00",
+    alasan: "TUGAS KUNJUNGAN KE SUB TEMANGGUNG",
+  },
+  {
+    date: "2026-01-31",
+    jamMasuk: "07:43",
+    jamMulaiLembur: "13:00",
+    jamPulang: "20:51",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-02-02",
+    jamMasuk: "07:46",
+    jamMulaiLembur: "16:00",
+    jamPulang: "23:07",
+    alasan: "PERSIAPAN AUDIT",
+  },
+  {
+    date: "2026-02-03",
+    jamMasuk: "10:12",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:24",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-02-04",
+    jamMasuk: "07:44",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:12",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-02-05",
+    jamMasuk: "07:58",
+    jamMulaiLembur: "16:00",
+    jamPulang: "19:32",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-02-06",
+    jamMasuk: "07:50",
+    jamMulaiLembur: "16:00",
+    jamPulang: "17:38",
+    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+  },
+  {
+    date: "2026-02-07",
+    jamMasuk: "07:54",
+    jamMulaiLembur: "13:00",
+    jamPulang: "19:45",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-09",
+    jamMasuk: "08:45",
+    jamMulaiLembur: "16:00",
+    jamPulang: "21:01",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-10",
+    jamMasuk: "07:54",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:31",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-11",
+    jamMasuk: "07:49",
+    jamMulaiLembur: "16:00",
+    jamPulang: "19:54",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-12",
+    jamMasuk: "07:43",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:50",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-13",
+    jamMasuk: "07:41",
+    jamMulaiLembur: "16:00",
+    jamPulang: "20:27",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-14",
+    jamMasuk: "09:55",
+    jamMulaiLembur: "13:00",
+    jamPulang: "18:13",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+  {
+    date: "2026-02-18",
+    jamMasuk: "07:48",
+    jamMulaiLembur: "16:00",
+    jamPulang: "18:32",
+    alasan:
+      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+  },
+]
+
+const parseTime = (value: string) => {
+  const [hours, minutes] = value.split(":").map(Number)
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    throw new Error(`Format jam tidak valid: ${value}`)
+  }
+  return { hours, minutes }
+}
+
+const makeJakartaDate = (dateValue: string, timeValue: string) => {
+  const [year, month, day] = dateValue.split("-").map(Number)
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day)
+  ) {
+    throw new Error(`Format tanggal tidak valid: ${dateValue}`)
+  }
+
+  const { hours, minutes } = parseTime(timeValue)
+  const utcMs =
+    Date.UTC(year, month - 1, day, hours, minutes, 0, 0) -
+    JAKARTA_OFFSET_MINUTES * 60_000
+  return new Date(utcMs)
+}
+
+const toMinutes = (value: string) => {
+  const { hours, minutes } = parseTime(value)
+  return hours * 60 + minutes
+}
+
+const getDurationMinutes = (startTime: string, endTime: string) => {
+  const start = toMinutes(startTime)
+  const end = toMinutes(endTime)
+  const diff = end - start
+  return diff >= 0 ? diff : diff + MINUTES_PER_DAY
+}
+
+const addDay = (value: Date) => {
+  return new Date(value.getTime() + 24 * 60 * 60 * 1000)
+}
+
 async function main() {
-  console.log("🌱 Starting seed...")
+  console.log("Mulai tambah data SPL Ganes tanpa reset database...")
 
-  // Hash password: password123
-  const hashedPassword = await bcrypt.hash("password123", 10)
-  const defaultRegularHours = {
-    regularStartTime: "08:00",
-    regularEndTime: "16:30",
-  }
+  const defaultPassword = await bcrypt.hash("12345678", 10)
 
-  const applyDefaultRegularHours = async (userId: string) => {
-    await prisma.user.updateMany({
-      where: {
-        id: userId,
-        regularStartTime: null,
-        regularEndTime: null,
-      },
-      data: defaultRegularHours,
-    })
-  }
-
-  const departments = [
-    { name: "System", supervised: false, approvalMode: "DIRECT" },
-    { name: "Management", supervised: false, approvalMode: "DIRECT" },
-    { name: "General Affair", supervised: false, approvalMode: "DIRECT" },
-    { name: "HR", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
-    { name: "Produksi", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
-    { name: "IT", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
-    { name: "Lab", supervised: true, approvalMode: "DEPARTMENT_HEAD" },
-    { name: "Admin", supervised: false, approvalMode: "DIRECT" },
-    { name: "Teknik", supervised: true, approvalMode: "GA" },
-    { name: "Driver", supervised: true, approvalMode: "GA" },
-    { name: "Security", supervised: true, approvalMode: "GA" },
-  ]
-
-  for (const department of departments) {
-    await prisma.department.upsert({
-      where: { name: department.name },
-      update: {
-        supervised: department.supervised,
-        approvalMode: department.approvalMode,
-      },
-      create: department,
-    })
-  }
-  console.log("Departments seeded")
-
-  const departmentRecords = await prisma.department.findMany({
-    select: { id: true, name: true },
-  })
-  const departmentIdByName = new Map(
-    departmentRecords.map((dept) => [dept.name, dept.id])
-  )
-
-  // 1. Create Super Admin
-  const superAdmin = await prisma.user.upsert({
-    where: { email: "admin@tunasestaindonesia.com" },
+  const produksiDepartment = await prisma.department.upsert({
+    where: { name: "Produksi" },
     update: {},
     create: {
-      email: "admin@tunasestaindonesia.com",
-      name: "Super Administrator",
-      password: hashedPassword,
-      pin: "000000",
-      role: "SUPER_ADMIN",
-      departmentName: "System",
-      departmentId: departmentIdByName.get("System") || null,
-      position: "Super Admin",
+      name: "Produksi",
+      supervised: true,
+      approvalMode: "DIRECT",
     },
   })
-  console.log("✅ Super Admin created")
 
-  // 2. Create Manager
   const manager = await prisma.user.upsert({
-    where: { email: "tiyas@tunasestaindonesia.com" },
+    where: { email: "tiyas.indah.setyowuri@tunasestaindonesia.com" },
     update: {},
     create: {
-      email: "tiyas@tunasestaindonesia.com",
+      email: "tiyas.indah.setyowuri@tunasestaindonesia.com",
+      password: defaultPassword,
+      pin: "001",
       name: "TIYAS INDAH SETYOWURI",
-      password: hashedPassword,
-      pin: "210",
       role: "MANAGER",
-      departmentName: "Management",
-      departmentId: departmentIdByName.get("Management") || null,
-      position: "General Manager",
+      departmentId: produksiDepartment.id,
+      departmentName: produksiDepartment.name,
+      position: "Manager",
+      regularStartTime: "08:00",
+      regularEndTime: "16:00",
     },
   })
-  console.log("✅ Manager created")
 
-  // 3. Create GA
-  const ga = await prisma.user.upsert({
-    where: { email: "nizar@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "nizar@tunasestaindonesia.com",
-      name: "NIZAR NAZARUDIN",
-      password: hashedPassword,
-      pin: "222",
-      role: "GA",
-      departmentName: "General Affair",
-      departmentId: departmentIdByName.get("General Affair") || null,
-      position: "GA Supervisor",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(ga.id)
-  console.log("✅ GA created")
-
-  // 3b. Create GA Test
-  const gaTest = await prisma.user.upsert({
-    where: { email: "gatest@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "gatest@tunasestaindonesia.com",
-      name: "GA TEST",
-      password: hashedPassword,
-      pin: "223",
-      role: "GA",
-      departmentName: "General Affair",
-      departmentId: departmentIdByName.get("General Affair") || null,
-      position: "GA Test",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(gaTest.id)
-  console.log("GA Test created")
-
-  // 4. Create HR
-  const hr = await prisma.user.upsert({
-    where: { email: "hayyu@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "hayyu@tunasestaindonesia.com",
-      name: "HAYYU SABRINA",
-      password: hashedPassword,
-      pin: "212",
-      role: "HR",
-      departmentName: "HR",
-      departmentId: departmentIdByName.get("HR") || null,
-      position: "HR Manager",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(hr.id)
-  console.log("✅ HR created")
-
-  // 4b. Create HR Zahila
-  const hrZahila = await prisma.user.upsert({
-    where: { email: "zahlila@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "zahlila@tunasestaindonesia.com",
-      name: "ZAHLILA",
-      password: hashedPassword,
-      pin: "202",
-      role: "HR",
-      departmentName: "HR",
-      departmentId: departmentIdByName.get("HR") || null,
-      position: "HR",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(hrZahila.id)
-  console.log("✅ HR Zahila created")
-
-  // 5. Create Production Supervisor
-  const productionSupervisor = await prisma.user.upsert({
+  const ganes = await prisma.user.upsert({
     where: { email: "ganes@tunasestaindonesia.com" },
     update: {},
     create: {
       email: "ganes@tunasestaindonesia.com",
-      name: "GANES TIRZA YEMIMA",
-      password: hashedPassword,
+      password: defaultPassword,
       pin: "137",
-      role: "PRODUCTION_SUPERVISOR",
-      departmentName: "Produksi",
-      departmentId: departmentIdByName.get("Produksi") || null,
-      position: "Pengawas Produksi",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(productionSupervisor.id)
-  console.log("✅ Production Supervisor created")
-  // 6. Create Production Department Head
-  const productionHead = await prisma.user.upsert({
-    where: { email: "aam@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "aam@tunasestaindonesia.com",
-      name: "AAM KHUSNUN NIAM",
-      password: hashedPassword,
-      pin: "220",
-      role: "DEPARTMENT_HEAD",
-      departmentName: "Produksi",
-      departmentId: departmentIdByName.get("Produksi") || null,
-      position: "Kepala Departemen Produksi",
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(productionHead.id)
-  console.log("Production Department Head created")
-
-  // 7. Create IT Staff (need to create IT Dept Head first if exists, or direct to manager)
-  const itStaff = await prisma.user.upsert({
-    where: { email: "amin@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "amin@tunasestaindonesia.com",
-      name: "ABDUL WAHID AMIN",
-      password: hashedPassword,
-      pin: "209",
+      name: "GANES TIRZA YEMIMA",
       role: "STAFF",
-      departmentName: "IT",
-      departmentId: departmentIdByName.get("IT") || null,
-      position: "IT Staff",
-      supervisorId: null, // Will be updated if IT Head exists
-      ...defaultRegularHours,
+      departmentId: produksiDepartment.id,
+      departmentName: produksiDepartment.name,
+      position: "Produksi",
+      regularStartTime: "08:00",
+      regularEndTime: "16:00",
+      supervisorId: manager.id,
     },
   })
-  await applyDefaultRegularHours(itStaff.id)
-  console.log("✅ IT Staff created")
 
-  // 8. Create Lab Staff
-  const labStaff = await prisma.user.upsert({
-    where: { email: "hajar@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "hajar@tunasestaindonesia.com",
-      name: "HAJAR ANNISA SEPTIARANI",
-      password: hashedPassword,
-      pin: "219",
-      role: "STAFF",
-      departmentName: "Lab",
-      departmentId: departmentIdByName.get("Lab") || null,
-      position: "Lab Analyst",
-      supervisorId: null, // Will be updated if Lab Head exists
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(labStaff.id)
-  console.log("✅ Lab Staff created")
+  let insertedCount = 0
+  let skippedCount = 0
 
-  // 9. Create Admin Staff (direct to manager)
-  const adminStaff = await prisma.user.upsert({
-    where: { email: "adinda.rahma.habibah@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "adinda.rahma.habibah@tunasestaindonesia.com",
-      name: "ADINDA RAHMA HABIBAH",
-      password: hashedPassword,
-      pin: "218",
-      role: "STAFF",
-      departmentName: "Admin",
-      departmentId: departmentIdByName.get("Admin") || null,
-      position: "Admin",
-      supervisorId: null,
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(adminStaff.id)
-  console.log("Admin Staff created")
+  for (const row of GANES_SPL_DATA) {
+    const date = makeJakartaDate(row.date, "00:00")
+    const regularStartAt = makeJakartaDate(row.date, row.jamMasuk)
+    const regularEndAt = makeJakartaDate(row.date, row.jamMulaiLembur)
+    const plannedStartAt = makeJakartaDate(row.date, row.jamMulaiLembur)
+    let plannedEndAt = makeJakartaDate(row.date, row.jamPulang)
 
-  // 10. Create Teknisi (supervised by GA)
-  const teknisi = await prisma.user.upsert({
-    where: { email: "pandu@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "pandu@tunasestaindonesia.com",
-      name: "PANDU BIRAWANTO",
-      password: hashedPassword,
-      pin: "221",
-      role: "TEKNISI",
-      departmentName: "Teknik",
-      departmentId: departmentIdByName.get("Teknik") || null,
-      position: "Teknisi",
-      supervisorId: ga.id,
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(teknisi.id)
-  console.log("✅ Teknisi created")
+    if (plannedEndAt <= plannedStartAt) {
+      plannedEndAt = addDay(plannedEndAt)
+    }
 
-  // 11. Create Driver (supervised by GA)
-  const driver = await prisma.user.upsert({
-    where: { email: "rico@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "rico@tunasestaindonesia.com",
-      name: "Rico effendy",
-      password: hashedPassword,
-      pin: "206",
-      role: "DRIVER",
-      departmentName: "Driver",
-      departmentId: departmentIdByName.get("Driver") || null,
-      position: "Driver",
-      supervisorId: ga.id,
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(driver.id)
-  console.log("✅ Driver created")
+    const totalMinutes = getDurationMinutes(row.jamMulaiLembur, row.jamPulang)
+    const totalHours = Number((totalMinutes / 60).toFixed(2))
 
-  // 12. Create Security Staff (supervised by GA)
-  const securityStaff = [
-    { email: "fina@tunasestaindonesia.com", name: "FINA OKTAVIANI", pin: "111" },
-    { email: "teguh@tunasestaindonesia.com", name: "TEGUH WIYONO", pin: "198" },
-    { email: "wahyu@tunasestaindonesia.com", name: "WAHYU SETYAWAHIDIN", pin: "199" },
-    { email: "bibit@tunasestaindonesia.com", name: "BIBIT MUHAMMAD ABDURROHMAN", pin: "207" },
-    { email: "david@tunasestaindonesia.com", name: "DAVID AIBI AMZAH", pin: "208" },
-    { email: "joko@tunasestaindonesia.com", name: "JOKO BUDIONO", pin: "170" },
-  ]
+    const existingSpl = await prisma.spl.findFirst({
+      where: {
+        requesterId: ganes.id,
+        date,
+        startTime: row.jamMulaiLembur,
+        endTime: row.jamPulang,
+        source: "MANUAL",
+        isManualEntry: true,
+      },
+      select: { id: true },
+    })
 
-  const securityUsers: Array<{ id: string; name: string }> = []
-  for (const staff of securityStaff) {
-    const securityUser = await prisma.user.upsert({
-      where: { email: staff.email },
-      update: {},
-      create: {
-        email: staff.email,
-        name: staff.name,
-        password: hashedPassword,
-        pin: staff.pin,
-        role: "STAFF",
-        departmentName: "Security",
-        departmentId: departmentIdByName.get("Security") || null,
-        position: "Security Guard",
-        supervisorId: ga.id,
-        ...defaultRegularHours,
+    if (existingSpl) {
+      skippedCount += 1
+      continue
+    }
+
+    await prisma.spl.create({
+      data: {
+      requesterId: ganes.id,
+      date,
+      startTime: row.jamMulaiLembur,
+      endTime: row.jamPulang,
+      totalHours,
+      reason: row.alasan,
+      projectName: null,
+      status: "PENDING_SUPERVISOR",
+      source: "MANUAL",
+      signature: null,
+      proofImage: null,
+      actualStartAt: null,
+      actualEndAt: null,
+      actualTotalHours: null,
+      realizationNote: null,
+      realizationProofImage: null,
+      overrunReason: null,
+      regularStartAt,
+      regularEndAt,
+      plannedStartAt,
+      plannedEndAt,
+      realizedMinutes: null,
+      realizationCounted: null,
+      realizationCancelReason: null,
+      supervisorId: manager.id,
+      supervisorApprovalDate: null,
+      supervisorSignature: null,
+      supervisorRejectionReason: null,
+      approverId: null,
+      approvalDate: null,
+      rejectionReason: null,
+      isManualEntry: true,
+      manualEntryBy: manager.id,
+      requesterSignedAt: null,
       },
     })
-    await applyDefaultRegularHours(securityUser.id)
-    securityUsers.push({ id: securityUser.id, name: securityUser.name })
+
+    insertedCount += 1
   }
-  console.log("✅ Security Staff created (6 users)")
 
-  // 13. Create Security Test (supervised by GA Test)
-  const securityTest = await prisma.user.upsert({
-    where: { email: "securitytest@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "securitytest@tunasestaindonesia.com",
-      name: "SECURITY TEST",
-      password: hashedPassword,
-      pin: "224",
-      role: "STAFF",
-      departmentName: "Security",
-      departmentId: departmentIdByName.get("Security") || null,
-      position: "Security Guard",
-      supervisorId: gaTest.id,
-      ...defaultRegularHours,
-    },
-  })
-  await applyDefaultRegularHours(securityTest.id)
-  console.log("Security Test created")
+  const [userCount, splCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.spl.count(),
+  ])
 
-  // Summary
-  console.log("\n" + "=".repeat(60))
-  console.log("✅ Seed completed successfully!")
-  console.log("=".repeat(60))
-  console.log("\n📊 Users Created:")
-  console.log("━".repeat(60))
-  console.log("1. Super Admin       : admin@tunasestaindonesia.com")
-  console.log("2. Manager           : tiyas@tunasestaindonesia.com")
-  console.log("3. GA                : nizar@tunasestaindonesia.com")
-  console.log("4. HR                : hayyu@tunasestaindonesia.com")
-  console.log("5. Production Spv    : ganes@tunasestaindonesia.com")
-  console.log("6. Production Head   : aam@tunasestaindonesia.com")
-  console.log("7. IT Staff          : amin@tunasestaindonesia.com")
-  console.log("8. Lab Staff         : hajar@tunasestaindonesia.com")
-  console.log("9. Admin Staff       : adinda.rahma.habibah@tunasestaindonesia.com")
-  console.log("10. Teknisi           : pandu@tunasestaindonesia.com")
-  console.log("11. Driver           : rico@tunasestaindonesia.com")
-  console.log("12-17. Security      : fina, teguh, wahyu, bibit, david, joko")
-  console.log("18. GA Test          : gatest@tunasestaindonesia.com")
-  console.log("19. Security Test    : securitytest@tunasestaindonesia.com")
-  console.log("━".repeat(60))
-  console.log("\n🔑 Credentials:")
-  console.log("━".repeat(60))
-  console.log("Password (ALL)       : password123")
-  console.log("PIN                  : Sesuai data (lihat tabel di atas)")
-  console.log("━".repeat(60))
-  console.log("\n🔄 Supervisor Hierarchy:")
-  console.log("━".repeat(60))
-  console.log("Manager (Tiyas)      : No supervisor")
-  console.log("GA (Nizar)           : No supervisor")
-  console.log("GA Test (GA TEST)    : No supervisor")
-  console.log("HR (Hayyu)           : No supervisor")
-  console.log("Production Spv       : No supervisor (langsung ke Manager)")
-  console.log("├─ Security (6)      : Supervised by GA (Nizar)")
-  console.log("├─ Teknisi (1)       : Supervised by GA (Nizar)")
-  console.log("└─ Driver (1)        : Supervised by GA (Nizar)")
-  console.log("IT Staff             : No supervisor (langsung ke Manager)")
-  console.log("Lab Staff            : No supervisor (langsung ke Manager)")
-  console.log("Admin Staff          : No supervisor (langsung ke Manager)")
-  console.log("Security Test        : Supervised by GA Test")
-  console.log("━".repeat(60))
-  console.log("\n💡 Next Steps:")
-  console.log("━".repeat(60))
-  console.log("1. npm run dev")
-  console.log("2. Login dengan salah satu akun di atas")
-  console.log("3. Password: password123")
-  console.log("4. Mulai gunakan sistem SPL")
-  console.log("━".repeat(60))
-  console.log("\n")
+  console.log(
+    `Selesai. SPL baru ditambahkan: ${insertedCount}, dilewati (sudah ada): ${skippedCount}`
+  )
+  console.log(`Total user saat ini: ${userCount}, total SPL saat ini: ${splCount}`)
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Seed failed:", e)
+  .catch((error) => {
+    console.error("Seed gagal:", error)
     process.exit(1)
   })
   .finally(async () => {
     await prisma.$disconnect()
   })
-
-
-

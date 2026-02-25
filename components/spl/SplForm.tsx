@@ -559,7 +559,7 @@ export default function SplForm() {
         <form onSubmit={handleSubmit} className="p-4 sm:p-6">
           <div className="space-y-6">
             {/* Basic Info - Compact Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div id="spl-tanggal" className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tanggal */}
               <Input
                 label="Tanggal Lembur"
@@ -684,7 +684,7 @@ export default function SplForm() {
             )}
 
             {/* Waktu Lembur - Compact */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div id="spl-waktu" className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <TimePicker
                 label="Waktu Mulai Lembur"
                 value={formData.startTime}
@@ -736,7 +736,7 @@ export default function SplForm() {
             )}
 
             {/* Alasan Lembur - Compact */}
-            <div>
+            <div id="spl-alasan">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Alasan Lembur <span className="text-red-500">*</span>
               </label>
@@ -750,7 +750,7 @@ export default function SplForm() {
             </div>
 
             {/* Foto Bukti - Collapsible */}
-            <div className="border border-gray-200 rounded-lg overflow-visible">
+            <div id="spl-foto" className="border border-gray-200 rounded-lg overflow-visible">
               <button
                 type="button"
                 onClick={() => setShowPhotoSection(!showPhotoSection)}
@@ -825,7 +825,7 @@ export default function SplForm() {
             </div>
 
             {/* Tanda Tangan */}
-            <div>
+            <div id="spl-ttd">
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />

@@ -132,7 +132,7 @@ export default function TelatInputPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 text-white shadow-lg">
+      <div id="telat-header" className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 text-white shadow-lg">
         <h1 className="text-2xl font-bold">Telat Input SPL</h1>
         <p className="text-green-100 text-sm mt-1">
           SPL yang dibuat oleh Super Admin dan menunggu tanda tangan Anda
@@ -140,7 +140,7 @@ export default function TelatInputPage() {
       </div>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div id="telat-info" className="bg-blue-50 border border-blue-200 rounded-xl p-4">
         <div className="flex items-start">
           <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

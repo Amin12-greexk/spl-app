@@ -429,7 +429,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   href={item.href}
                   data-animate
                   onClick={() => handleBadgeClick(item.badgeKey)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] ${isActive
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
                     ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
                     : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
                     }`}
@@ -485,7 +485,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                     handleBadgeClick(item.badgeKey)
                     onClose?.()
                   }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] ${isActive
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
                     ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
                     : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
                     }`}

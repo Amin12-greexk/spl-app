@@ -7,11 +7,12 @@ import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
 import { Spl, Role } from "@/types"
 import Swal from "sweetalert2"
-import Link from "next/link" // <-- TAMBAHAN: Import Link
+import Link from "next/link"
 import TimePicker from "@/components/ui/TimePicker"
 import Modal from "@/components/ui/Modal"
 import Image from "next/image"
 import { isMorningOvertime } from "@/lib/spl-labels"
+import ManagerAnalytics from "@/components/dashboard/ManagerAnalytics"
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
@@ -526,7 +527,7 @@ export default function DashboardPage() {
     const plannedWindow = getPlannedWindow(spl)
     const plannedDayOffset =
       plannedWindow &&
-      plannedWindow.plannedEnd.getTime() - plannedWindow.plannedStart.getTime() >=
+        plannedWindow.plannedEnd.getTime() - plannedWindow.plannedStart.getTime() >=
         24 * 60 * 60 * 1000
         ? 1
         : 0
@@ -567,9 +568,9 @@ export default function DashboardPage() {
     const overrunMinutes =
       plannedWindow && manualWindow.end > plannedWindow.plannedEnd
         ? Math.floor(
-            (manualWindow.end.getTime() - plannedWindow.plannedEnd.getTime()) /
-              60000
-          )
+          (manualWindow.end.getTime() - plannedWindow.plannedEnd.getTime()) /
+          60000
+        )
         : 0
     if (!overrunReason.trim()) {
       await Swal.fire({
@@ -756,17 +757,17 @@ export default function DashboardPage() {
   const selectedManualWindow =
     selectedSpl && realizationStartTime && realizationEndTime
       ? getManualWindow(
-          selectedSpl,
-          realizationStartTime,
-          realizationEndTime,
-          realizationEndDayOffset
-        )
+        selectedSpl,
+        realizationStartTime,
+        realizationEndTime,
+        realizationEndDayOffset
+      )
       : null
   const selectedActualMinutes = selectedManualWindow
     ? Math.floor(
-        (selectedManualWindow.end.getTime() - selectedManualWindow.start.getTime()) /
-          60000
-      )
+      (selectedManualWindow.end.getTime() - selectedManualWindow.start.getTime()) /
+      60000
+    )
     : null
   const selectedOverrunMinutes = (() => {
     if (!selectedSpl || !selectedManualWindow) return null
@@ -775,7 +776,7 @@ export default function DashboardPage() {
     if (selectedManualWindow.end <= plannedWindow.plannedEnd) return 0
     return Math.floor(
       (selectedManualWindow.end.getTime() - plannedWindow.plannedEnd.getTime()) /
-        60000
+      60000
     )
   })()
 
@@ -797,6 +798,7 @@ export default function DashboardPage() {
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto">
       {/* Enhanced Header Section */}
       <div
+        id="dash-header"
         className={`relative bg-gradient-to-br ${getHeaderGradient()} rounded-2xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden`}
       >
         {/* Background Pattern */}
@@ -873,18 +875,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Enhanced Two Column Layout */}
-      <div
-        className={
-          showManagerWidgets
-            ? "grid grid-cols-1 xl:grid-cols-3 gap-6"
-            : "grid grid-cols-1 gap-6"
-        }
-      >
-        {/* Left Column - Actions & Profile */}
-        <div className={showManagerWidgets ? "xl:col-span-2 space-y-6" : "space-y-6"}>
+      {/* Content Layout */}
+      {showManagerWidgets ? (
+        /* Manager: Full-width Analytics */
+        <div className="space-y-6">
+          <ManagerAnalytics />
+          <NotificationToggle />
+        </div>
+      ) : (
+        /* Non-Manager: History Table */
+        <div className="space-y-6">
           {showHistoryTable && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div id="dash-history" className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div className="flex items-center">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
@@ -1023,8 +1025,8 @@ export default function DashboardPage() {
                               )}
                               {!canInputRealization(spl) &&
                                 !isGaApprovalBlocked(spl) && (
-                                <span className="text-xs text-gray-400">-</span>
-                              )}
+                                  <span className="text-xs text-gray-400">-</span>
+                                )}
                             </div>
                           </td>
                         </tr>
@@ -1077,220 +1079,9 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-
-          {/* Quick Actions */}
-          {showManagerWidgets && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg
-                    className="w-5 h-5 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                </div>
-                Aksi Cepat
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white border border-gray-200 rounded-xl p-6">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                      <svg
-                        className="w-5 h-5 text-purple-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900">
-                        Batas Waktu Pengajuan
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        Pengajuan setelah jam ini akan ditolak
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <TimePicker
-                      value={minOvertime}
-                      onChange={(value) => setMinOvertime(value)}
-                      showWib
-                      selectClassName="focus:ring-purple-200 focus:border-purple-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={saveMinOvertime}
-                      disabled={isSavingMin}
-                      className="w-full px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
-                    >
-                      {isSavingMin ? "Menyimpan..." : "Simpan Perubahan"}
-                    </button>
-                  </div>
-                </div>
-
-                <Link
-                  href="/dashboard/hr/persetujuan"
-                  className="block bg-white border border-gray-200 rounded-xl p-6 hover:border-purple-300 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                        <svg
-                          className="w-5 h-5 text-purple-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-base font-bold text-gray-900">
-                          Persetujuan SPL
-                        </h3>
-                        <p className="text-gray-600 text-sm">
-                          Review pengajuan lembur
-                        </p>
-                      </div>
-                    </div>
-                    {stats.pending > 0 && (
-                      <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                        {stats.pending}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-
-                <Link
-                  href="/dashboard/hr"
-                  className="block bg-white border border-gray-200 rounded-xl p-6 hover:border-blue-300 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                      <svg
-                        className="w-5 h-5 text-blue-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900">
-                        Data & Laporan
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        Lihat data SPL tim
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* Notification Settings */}
           <NotificationToggle />
         </div>
-
-        {/* Right Column - Profile */}
-        {showManagerWidgets && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="flex items-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 bg-purple-100">
-                  <svg
-                    className="w-6 h-6 text-purple-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Informasi Akun
-                </h2>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-purple-600 to-purple-700">
-                    {session?.user?.name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">
-                      {session?.user?.name}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {session?.user?.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 font-medium">Role:</span>
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                      Manager
-                    </span>
-                  </div>
-
-                  {session?.user?.department && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium">
-                        Departemen:
-                      </span>
-                      <span className="text-gray-900 font-medium">
-                        {session.user.department}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
       {showFinishModal && selectedSpl && (
         <Modal
           isOpen={showFinishModal}

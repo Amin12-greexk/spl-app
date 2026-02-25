@@ -171,7 +171,7 @@ export default function GADashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-xl">
+      <div id="ga-header" className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold mb-2">
@@ -188,7 +188,7 @@ export default function GADashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div id="ga-stats" className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
@@ -222,7 +222,7 @@ export default function GADashboardPage() {
       </div>
 
       {/* Filter & Search */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div id="ga-filter" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter & Pencarian</h3>
 
         {/* Search */}
@@ -271,19 +271,18 @@ export default function GADashboardPage() {
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  filterStatus === status
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterStatus === status
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {status === "ALL" ? "Semua" :
-                 status === "PENDING_SUPERVISOR" ? "Menunggu Anda" :
-                 status === "PENDING_MANAGER" ? "Di Manager" :
-                 status === "IN_PROGRESS" ? "Berjalan" :
-                 status === "DONE" ? "Selesai" :
-                 status === "APPROVED" ? "Disetujui" :
-                 status === "REJECTED_BY_SUPERVISOR" ? "Ditolak (Anda)" : "Ditolak (Manager)"}
+                  status === "PENDING_SUPERVISOR" ? "Menunggu Anda" :
+                    status === "PENDING_MANAGER" ? "Di Manager" :
+                      status === "IN_PROGRESS" ? "Berjalan" :
+                        status === "DONE" ? "Selesai" :
+                          status === "APPROVED" ? "Disetujui" :
+                            status === "REJECTED_BY_SUPERVISOR" ? "Ditolak (Anda)" : "Ditolak (Manager)"}
               </button>
             ))}
           </div>
@@ -303,11 +302,10 @@ export default function GADashboardPage() {
               <button
                 key={period.value}
                 onClick={() => setDateFilter(period.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  dateFilter === period.value
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${dateFilter === period.value
                     ? "bg-green-600 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {period.label}
               </button>
@@ -391,11 +389,10 @@ export default function GADashboardPage() {
                     <button
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
-                        currentPage === pageNumber
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg ${currentPage === pageNumber
                           ? "bg-blue-600 text-white"
                           : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {pageNumber}
                     </button>
@@ -417,7 +414,7 @@ export default function GADashboardPage() {
 
       {/* SPL List */}
       {currentItems.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
+        <div id="ga-spl-list" className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="flex flex-col items-center space-y-4">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
