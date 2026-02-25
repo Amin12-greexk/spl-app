@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import Header from "@/components/dashboard/Header"
 import Sidebar from "@/components/dashboard/Sidebar"
+import AppTour from "@/components/dashboard/AppTour"
 import NotificationProvider from "@/components/notifications/Notificationprovider"
 import Image from "next/image"
 
@@ -76,12 +77,13 @@ export default function DashboardLayout({
 
         {/* Header */}
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        
+        <AppTour />
+
         {/* Main Layout */}
         <div className="flex">
           {/* Sidebar */}
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          
+
           {/* Main Content */}
           <main className="flex-1 lg:ml-64 transition-all duration-200">
             <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">

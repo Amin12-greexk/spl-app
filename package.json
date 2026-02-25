@@ -9,7 +9,8 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:clear": "npx tsx prisma/clear-data.ts",
-    "db:seed": "npx prisma db push && npx tsx prisma/seed.ts"
+    "db:push": "npx prisma db push",
+    "db:seed": "npx tsx prisma/seed.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -33,7 +34,9 @@
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
+    "react-joyride": "^2.9.3",
     "react-signature-canvas": "^1.1.0-alpha.2",
+    "recharts": "^3.7.0",
     "sharp": "^0.34.5",
     "sweetalert2": "^11.10.0",
     "tailwind-merge": "^3.3.1",
