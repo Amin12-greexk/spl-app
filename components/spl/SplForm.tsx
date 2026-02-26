@@ -670,7 +670,7 @@ export default function SplForm() {
                     </div>
                     {isSecurityDepartment && (
                       <p className="mt-2 text-xs text-blue-600">
-                        <strong>Khusus Security:</strong> Pilih shift P1/P2/M1/M2 atau isi manual. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 16:00 - 04:00).
+                        <strong>Khusus Security:</strong> Pilih shift P1/P2/M1/M2 atau isi manual. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 16:00 - 04:00). Jika Sabtu tidak ada shift, hari tersebut dianggap libur.
                       </p>
                     )}
                     {!regularHoursLoading && !isSecurityDepartment && (!regularHours?.start || !regularHours?.end) && (

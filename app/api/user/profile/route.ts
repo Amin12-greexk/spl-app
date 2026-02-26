@@ -3,7 +3,13 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { getJakartaDayOfWeek, parseDateOnly, startOfDay } from "@/lib/spl-time"
+import {
+  getJakartaDayOfWeek,
+  parseDateOnly,
+  SECURITY_SHIFT_DEFINITIONS,
+  SecurityShiftCode,
+  startOfDay,
+} from "@/lib/spl-time"
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
 
 const normalizeTimeValue = (value: unknown) => {
@@ -63,19 +69,55 @@ export async function GET(request: NextRequest) {
     let effectiveRegularStartTime = user.regularStartTime
     let effectiveRegularEndTime = user.regularEndTime
     let overrideDayOfWeek: number | null = null
+    const departmentName = user.department?.name || user.departmentName || ""
+    const isSecurityDepartment = departmentName.toLowerCase() === "security"
 
     if (targetDate) {
       const dayOfWeek = getJakartaDayOfWeek(targetDate)
       overrideDayOfWeek = dayOfWeek
-      const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)
-      const overrideSetting = await prisma.setting.findUnique({
-        where: { key: overrideKey },
-        select: { value: true },
-      })
-      const overrideValue = parseRegularOverrideValue(overrideSetting?.value)
-      if (overrideValue) {
-        effectiveRegularStartTime = overrideValue.startTime
-        effectiveRegularEndTime = overrideValue.endTime
+
+      if (isSecurityDepartment) {
+        const shiftAssignment = await prisma.securityShiftAssignment.findUnique({
+          where: {
+            userId_workDate: {
+              userId: user.id,
+              workDate: targetDate,
+            },
+          },
+          select: { shiftCode: true },
+        })
+
+        if (shiftAssignment?.shiftCode) {
+          const shiftDefinition =
+            SECURITY_SHIFT_DEFINITIONS[
+              shiftAssignment.shiftCode as SecurityShiftCode
+            ]
+
+          if (!shiftDefinition) {
+            return NextResponse.json(
+              { error: "Shift security tidak valid" },
+              { status: 400 }
+            )
+          }
+
+          effectiveRegularStartTime = shiftDefinition.start
+          effectiveRegularEndTime = shiftDefinition.end
+        } else if (dayOfWeek === 6) {
+          // Security 5-day rule: Saturday without assigned shift is treated as holiday.
+          effectiveRegularStartTime = null
+          effectiveRegularEndTime = null
+        }
+      } else {
+        const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)
+        const overrideSetting = await prisma.setting.findUnique({
+          where: { key: overrideKey },
+          select: { value: true },
+        })
+        const overrideValue = parseRegularOverrideValue(overrideSetting?.value)
+        if (overrideValue) {
+          effectiveRegularStartTime = overrideValue.startTime
+          effectiveRegularEndTime = overrideValue.endTime
+        }
       }
     } else {
       // Keep behavior unchanged when no date is provided.
