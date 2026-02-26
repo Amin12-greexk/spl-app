@@ -470,8 +470,10 @@ export async function POST(req: NextRequest) {
 
     let regularStartAt: Date | null = null
     let regularEndAt: Date | null = null
+    let isSecurityWeeklyHoliday = false
 
     if (isSecurityDepartment) {
+      const dayOfWeek = getJakartaDayOfWeek(requestedDate)
       const shiftAssignment = await prisma.securityShiftAssignment.findUnique({
         where: {
           userId_workDate: {
@@ -506,6 +508,9 @@ export async function POST(req: NextRequest) {
         }
         regularStartAt = regularWindow.start
         regularEndAt = regularWindow.end
+      } else if (dayOfWeek === 6) {
+        // Security 5-day rule: Saturday without assigned shift is treated as weekly holiday.
+        isSecurityWeeklyHoliday = true
       } else if (userRecord.regularStartTime && userRecord.regularEndTime) {
         const regularStartMinutes = parseTimeToMinutes(
           userRecord.regularStartTime
@@ -593,7 +598,9 @@ export async function POST(req: NextRequest) {
       regularEndAt = regularWindow.end
     }
 
-    if (!regularStartAt || !regularEndAt) {
+    const hasRegularWindow = Boolean(regularStartAt && regularEndAt)
+
+    if (!hasRegularWindow && !isSecurityWeeklyHoliday) {
       return NextResponse.json(
         { error: "Jam reguler tidak valid. Hubungi Super Admin." },
         { status: 400 }
@@ -616,22 +623,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (plannedEndAt <= regularStartAt) {
-      return NextResponse.json(
-        { error: "Lembur pagi hanya bisa diajukan oleh Super Admin" },
-        { status: 400 }
-      )
-    }
+    if (hasRegularWindow) {
+      if (plannedEndAt <= regularStartAt!) {
+        return NextResponse.json(
+          { error: "Lembur pagi hanya bisa diajukan oleh Super Admin" },
+          { status: 400 }
+        )
+      }
 
-    const overlapsRegular = windowsOverlap(
-      { start: regularStartAt, end: regularEndAt },
-      { start: plannedStartAt, end: plannedEndAt }
-    )
-    if (overlapsRegular) {
-      return NextResponse.json(
-        { error: "Jam lembur tidak boleh bentrok dengan jam reguler" },
-        { status: 400 }
+      const overlapsRegular = windowsOverlap(
+        { start: regularStartAt!, end: regularEndAt! },
+        { start: plannedStartAt, end: plannedEndAt }
       )
+      if (overlapsRegular) {
+        return NextResponse.json(
+          { error: "Jam lembur tidak boleh bentrok dengan jam reguler" },
+          { status: 400 }
+        )
+      }
     }
 
     const overlap = await prisma.spl.findFirst({
