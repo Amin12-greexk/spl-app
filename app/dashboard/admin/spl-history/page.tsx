@@ -87,6 +87,7 @@ export default function SplHistoryPage() {
       const params = new URLSearchParams()
       params.set("page", String(page))
       params.set("limit", String(PAGE_SIZE))
+      params.set("skipStats", "1")
       if (searchQuery.trim()) {
         params.set("search", searchQuery.trim())
       }
@@ -109,12 +110,14 @@ export default function SplHistoryPage() {
         } else {
           setSpls(data.data || [])
           setTotal(data.pagination?.total || 0)
-          setStats({
-            total: data.stats?.total || 0,
-            approved: data.stats?.approved || 0,
-            pending: data.stats?.pending || 0,
-            rejected: data.stats?.rejected || 0,
-          })
+          if (data.stats) {
+            setStats({
+              total: data.stats.total || 0,
+              approved: data.stats.approved || 0,
+              pending: data.stats.pending || 0,
+              rejected: data.stats.rejected || 0,
+            })
+          }
         }
       }
     } catch (error) {
@@ -124,6 +127,22 @@ export default function SplHistoryPage() {
       setIsInitialLoading(false)
     }
   }, [PAGE_SIZE, page, searchQuery, filterStatus])
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch("/api/spl/stats")
+      if (!response.ok) return
+      const data = await response.json()
+      setStats({
+        total: data.total || 0,
+        approved: data.approved || 0,
+        pending: data.pending || 0,
+        rejected: data.rejected || 0,
+      })
+    } catch (error) {
+      console.error("Error fetching SPL stats:", error)
+    }
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -142,6 +161,12 @@ export default function SplHistoryPage() {
       fetchSpls()
     }
   }, [session, status, router, fetchSpls])
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role === "SUPER_ADMIN") {
+      fetchStats()
+    }
+  }, [session, status, fetchStats])
 
   const formatDateInput = (value: Date) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })
@@ -238,7 +263,7 @@ export default function SplHistoryPage() {
       }
       await Swal.fire("Berhasil!", "SPL berhasil diperbarui", "success")
       setEditingSpl(null)
-      await fetchSpls()
+      await Promise.all([fetchSpls(), fetchStats()])
     } catch (error: any) {
       await Swal.fire("Gagal!", error.message || "Terjadi kesalahan", "error")
     } finally {
@@ -275,7 +300,7 @@ export default function SplHistoryPage() {
 
         if (response.ok) {
           await Swal.fire("Berhasil!", "Riwayat SPL berhasil dihapus", "success")
-          fetchSpls()
+          await Promise.all([fetchSpls(), fetchStats()])
         } else {
           await Swal.fire("Gagal!", data.error, "error")
         }
