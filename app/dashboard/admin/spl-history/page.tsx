@@ -54,8 +54,10 @@ export default function SplHistoryPage() {
   const router = useRouter()
   const PAGE_SIZE = 10
   const [spls, setSpls] = useState<Spl[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
+  const [searchInput, setSearchInput] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -80,13 +82,13 @@ export default function SplHistoryPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const fetchSpls = useCallback(async () => {
-    setLoading(true)
+    setIsFetching(true)
     try {
       const params = new URLSearchParams()
       params.set("page", String(page))
       params.set("limit", String(PAGE_SIZE))
-      if (search.trim()) {
-        params.set("search", search.trim())
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim())
       }
       if (filterStatus !== "ALL") {
         params.set("status", filterStatus)
@@ -118,9 +120,18 @@ export default function SplHistoryPage() {
     } catch (error) {
       console.error("Error fetching SPLs:", error)
     } finally {
-      setLoading(false)
+      setIsFetching(false)
+      setIsInitialLoading(false)
     }
-  }, [PAGE_SIZE, page, search, filterStatus])
+  }, [PAGE_SIZE, page, searchQuery, filterStatus])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -314,7 +325,7 @@ export default function SplHistoryPage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-          disabled={page <= 1 || loading}
+          disabled={page <= 1 || isFetching}
           className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
           Sebelumnya
@@ -324,7 +335,7 @@ export default function SplHistoryPage() {
         </span>
         <button
           onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-          disabled={page >= totalPages || loading}
+          disabled={page >= totalPages || isFetching}
           className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
           Berikutnya
@@ -333,7 +344,7 @@ export default function SplHistoryPage() {
     </div>
   )
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-red-200 border-t-red-600"></div>
@@ -381,11 +392,8 @@ export default function SplHistoryPage() {
           <input
             type="text"
             placeholder="Cari user, email, atau alasan..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           <select
@@ -406,6 +414,9 @@ export default function SplHistoryPage() {
             <option value="REJECTED_BY_MANAGER">Rejected (Manager)</option>
           </select>
         </div>
+        {isFetching && (
+          <p className="text-xs text-gray-500">Memuat data terbaru...</p>
+        )}
       </div>
 
       {/* Mobile Cards */}
