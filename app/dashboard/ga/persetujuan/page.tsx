@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
@@ -9,8 +9,6 @@ import SplCard from "@/components/spl/SplCard"
 import SplDetailModal from "@/components/spl/SplDetailModal"
 import Button from "@/components/ui/Button"
 import toast from "react-hot-toast"
-import { format } from "date-fns"
-import { id } from "date-fns/locale"
 import SignatureCanvas from "react-signature-canvas"
 import Image from "next/image"
 
@@ -19,36 +17,19 @@ export default function GAApprovalPage() {
   const router = useRouter()
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
+  const [isLoadingSelectedSpl, setIsLoadingSelectedSpl] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
-  const [signatureRef, setSignatureRef] = useState<SignatureCanvas | null>(null)
+  const signatureRef = useRef<SignatureCanvas | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [previewTitle, setPreviewTitle] = useState("")
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailSpl, setDetailSpl] = useState<Spl | null>(null)
-
-  const formatRealizationTime = (value?: string | Date | null) => {
-    if (!value) return "-"
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return "-"
-    return format(date, "HH:mm", { locale: id })
-  }
-
-  const formatTotalHours = (value?: number | string | null) => {
-    if (value === null || value === undefined) return "-"
-    const numericValue = typeof value === "number" ? value : Number(value)
-    if (!Number.isFinite(numericValue)) return "-"
-    const totalMinutes = Math.round(numericValue * 60)
-    if (totalMinutes <= 0) return "0 menit"
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    if (hours === 0) return `${minutes} menit`
-    if (minutes === 0) return `${hours} jam`
-    return `${hours} jam ${minutes} menit`
-  }
+  const detailCacheRef = useRef<Record<string, Spl>>({})
 
   // Check authorization
   useEffect(() => {
@@ -58,12 +39,16 @@ export default function GAApprovalPage() {
     }
   }, [session, router])
 
-  // Fetch pending SPLs
-  const fetchPendingSpls = async () => {
-    setIsLoading(true)
+  const fetchPendingSpls = async (showLoader = true) => {
+    if (showLoader) {
+      setIsLoading(true)
+    } else {
+      setIsRefreshing(true)
+    }
+
     try {
       const response = await fetch(
-        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50",
+        "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=30",
         { cache: "no-store" }
       )
       if (!response.ok) throw new Error("Gagal mengambil data")
@@ -74,8 +59,30 @@ export default function GAApprovalPage() {
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
-      setIsLoading(false)
+      if (showLoader) {
+        setIsLoading(false)
+      } else {
+        setIsRefreshing(false)
+      }
     }
+  }
+
+  const fetchSplDetail = async (splId: string): Promise<Spl> => {
+    const cached = detailCacheRef.current[splId]
+    if (cached) {
+      return cached
+    }
+
+    const response = await fetch(`/api/spl/my-team/${splId}`, {
+      cache: "no-store",
+    })
+    if (!response.ok) {
+      throw new Error("Gagal mengambil detail SPL")
+    }
+
+    const detailData = (await response.json()) as Spl
+    detailCacheRef.current[splId] = detailData
+    return detailData
   }
 
   useEffect(() => {
@@ -88,20 +95,44 @@ export default function GAApprovalPage() {
     }
   }, [session])
 
-  const handleApprove = (spl: Spl) => {
-    setSelectedSpl(spl)
+  const handleApprove = async (spl: Spl) => {
+    const cached = detailCacheRef.current[spl.id]
+    setSelectedSpl(cached || spl)
     setShowApproveModal(true)
+
+    if (cached) return
+
+    setIsLoadingSelectedSpl(true)
+    try {
+      const detailData = await fetchSplDetail(spl.id)
+      setSelectedSpl(detailData)
+    } catch {
+      // fallback tetap pakai payload lite jika detail gagal
+    } finally {
+      setIsLoadingSelectedSpl(false)
+    }
   }
 
   const handleReject = (spl: Spl) => {
-    setSelectedSpl(spl)
+    const cached = detailCacheRef.current[spl.id]
+    setSelectedSpl(cached || spl)
     setRejectionReason("")
     setShowRejectModal(true)
   }
 
-  const handleOpenDetail = (spl: Spl) => {
-    setDetailSpl(spl)
+  const handleOpenDetail = async (spl: Spl) => {
+    const cached = detailCacheRef.current[spl.id]
+    setDetailSpl(cached || spl)
     setShowDetailModal(true)
+
+    if (cached) return
+
+    try {
+      const detailData = await fetchSplDetail(spl.id)
+      setDetailSpl(detailData)
+    } catch {
+      // fallback tetap pakai payload lite jika detail gagal
+    }
   }
 
   const handleCloseDetail = () => {
@@ -123,14 +154,14 @@ export default function GAApprovalPage() {
   const submitApproval = async () => {
     if (!selectedSpl) return
 
-    if (!signatureRef || signatureRef.isEmpty()) {
+    if (!signatureRef.current || signatureRef.current.isEmpty()) {
       toast.error("Tanda tangan diperlukan!")
       return
     }
 
     setIsSubmitting(true)
     try {
-      const signature = signatureRef.toDataURL()
+      const signature = signatureRef.current.toDataURL()
 
       const response = await fetch("/api/spl/approve-supervisor", {
         method: "POST",
@@ -144,10 +175,14 @@ export default function GAApprovalPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Gagal menyetujui")
 
+      const approvedId = selectedSpl.id
+      setSpls((prev) => prev.filter((item) => item.id !== approvedId))
+      delete detailCacheRef.current[approvedId]
       toast.success("SPL berhasil disetujui!")
       setShowApproveModal(false)
+      setIsLoadingSelectedSpl(false)
       setSelectedSpl(null)
-      fetchPendingSpls()
+      await fetchPendingSpls(false)
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
@@ -177,11 +212,14 @@ export default function GAApprovalPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Gagal menolak")
 
+      const rejectedId = selectedSpl.id
+      setSpls((prev) => prev.filter((item) => item.id !== rejectedId))
+      delete detailCacheRef.current[rejectedId]
       toast.success("SPL berhasil ditolak")
       setShowRejectModal(false)
       setSelectedSpl(null)
       setRejectionReason("")
-      fetchPendingSpls()
+      await fetchPendingSpls(false)
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan")
     } finally {
@@ -202,17 +240,14 @@ export default function GAApprovalPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-6 text-white shadow-xl">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-          ✅ Persetujuan SPL Tim
-        </h1>
-        <p className="text-green-100">
-          Review dan setujui pengajuan lembur dari tim Anda
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Persetujuan SPL Tim</h1>
+        <p className="text-green-100">Review dan setujui pengajuan lembur dari tim Anda</p>
+        {isRefreshing && (
+          <p className="text-xs text-green-100/90 mt-2">Memperbarui data...</p>
+        )}
       </div>
 
-      {/* SPL Cards */}
       {spls.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="flex flex-col items-center space-y-4">
@@ -222,12 +257,8 @@ export default function GAApprovalPage() {
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Semua SPL Sudah Diproses
-              </h3>
-              <p className="text-gray-500 text-sm">
-                Tidak ada SPL yang menunggu persetujuan Anda saat ini
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Semua SPL Sudah Diproses</h3>
+              <p className="text-gray-500 text-sm">Tidak ada SPL yang menunggu persetujuan Anda saat ini</p>
             </div>
           </div>
         </div>
@@ -235,7 +266,6 @@ export default function GAApprovalPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {spls.map((spl) => (
             <div key={spl.id} className="flex flex-col gap-2">
-              {/* Compact SPL Card - Click to view detail */}
               <div onClick={() => handleOpenDetail(spl)}>
                 <SplCard
                   spl={spl}
@@ -246,20 +276,21 @@ export default function GAApprovalPage() {
                 />
               </div>
 
-              {/* Action Buttons - Always visible for approval */}
               <div className="flex gap-2">
                 <Button
                   onClick={() => handleApprove(spl)}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2"
+                  disabled={isSubmitting || isRefreshing}
                 >
-                  ✓ Setujui
+                  Setujui
                 </Button>
                 <Button
                   onClick={() => handleReject(spl)}
                   variant="outline"
                   className="flex-1 border-red-600 text-red-600 hover:bg-red-50 text-xs py-2"
+                  disabled={isSubmitting || isRefreshing}
                 >
-                  ✗ Tolak
+                  Tolak
                 </Button>
               </div>
             </div>
@@ -293,12 +324,12 @@ export default function GAApprovalPage() {
         </Modal>
       )}
 
-      {/* Approve Modal */}
       {showApproveModal && selectedSpl && (
         <Modal
           isOpen={showApproveModal}
           onClose={() => {
             setShowApproveModal(false)
+            setIsLoadingSelectedSpl(false)
             setSelectedSpl(null)
           }}
           title="Setujui SPL"
@@ -313,7 +344,12 @@ export default function GAApprovalPage() {
               </p>
             </div>
 
-            {/* Show proof image in modal */}
+            {isLoadingSelectedSpl && !selectedSpl.proofImage && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                Memuat detail SPL...
+              </div>
+            )}
+
             {selectedSpl.proofImage && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -340,7 +376,9 @@ export default function GAApprovalPage() {
               </label>
               <div className="border-2 border-gray-300 rounded-lg bg-white">
                 <SignatureCanvas
-                  ref={(ref) => setSignatureRef(ref)}
+                  ref={(ref) => {
+                    signatureRef.current = ref
+                  }}
                   canvasProps={{
                     className: "w-full h-40 rounded-lg cursor-crosshair",
                   }}
@@ -349,10 +387,10 @@ export default function GAApprovalPage() {
               <div className="flex justify-end mt-2">
                 <button
                   type="button"
-                  onClick={() => signatureRef?.clear()}
+                  onClick={() => signatureRef.current?.clear()}
                   className="text-sm text-gray-600 hover:text-gray-800"
                 >
-                  🗑️ Hapus
+                  Hapus
                 </button>
               </div>
             </div>
@@ -361,6 +399,7 @@ export default function GAApprovalPage() {
               <Button
                 onClick={() => {
                   setShowApproveModal(false)
+                  setIsLoadingSelectedSpl(false)
                   setSelectedSpl(null)
                 }}
                 variant="outline"
@@ -372,7 +411,7 @@ export default function GAApprovalPage() {
               <Button
                 onClick={submitApproval}
                 className="flex-1 bg-green-600 hover:bg-green-700"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoadingSelectedSpl}
               >
                 {isSubmitting ? "Memproses..." : "Setujui SPL"}
               </Button>
@@ -381,7 +420,6 @@ export default function GAApprovalPage() {
         </Modal>
       )}
 
-      {/* Reject Modal */}
       {showRejectModal && selectedSpl && (
         <Modal
           isOpen={showRejectModal}
@@ -438,7 +476,6 @@ export default function GAApprovalPage() {
         </Modal>
       )}
 
-      {/* Detail Modal - Untuk melihat informasi lengkap SPL */}
       <SplDetailModal
         spl={detailSpl}
         isOpen={showDetailModal}
