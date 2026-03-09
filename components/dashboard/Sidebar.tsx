@@ -83,7 +83,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
     const countTeamPending = async () => {
       const response = await fetch(
-        "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=100"
+        "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=100"
       )
       if (!response.ok) return 0
       const data = await response.json()

@@ -244,7 +244,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         // 2. Fetch team SPL pending approval
         const teamData = normalizeSpls(
           await fetchJson(
-            "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=50"
+            "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=50"
           )
         )
         if (teamData) {

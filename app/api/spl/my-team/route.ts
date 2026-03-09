@@ -42,6 +42,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const statusParam = searchParams.get("status")
     const search = searchParams.get("search")?.trim()
+    const lite =
+      searchParams.get("lite") === "1" ||
+      searchParams.get("lite") === "true"
+    const skipCount =
+      searchParams.get("skipCount") === "1" ||
+      searchParams.get("skipCount") === "true"
     const pageParam = Number(searchParams.get("page"))
     const limitParam = Number(searchParams.get("limit"))
     const usePagination =
@@ -113,14 +119,59 @@ export async function GET(req: NextRequest) {
       },
     }
 
+    const liteSelect = {
+      id: true,
+      requesterId: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+      totalHours: true,
+      reason: true,
+      projectName: true,
+      actualStartAt: true,
+      actualEndAt: true,
+      actualTotalHours: true,
+      realizationNote: true,
+      overrunReason: true,
+      regularStartAt: true,
+      regularEndAt: true,
+      plannedStartAt: true,
+      plannedEndAt: true,
+      realizedMinutes: true,
+      realizationCounted: true,
+      status: true,
+      source: true,
+      isManualEntry: true,
+      requesterSignedAt: true,
+      supervisorId: true,
+      supervisorApprovalDate: true,
+      supervisorRejectionReason: true,
+      approverId: true,
+      approvalDate: true,
+      rejectionReason: true,
+      createdAt: true,
+      updatedAt: true,
+      requester: includeConfig.requester,
+      supervisor: includeConfig.supervisor,
+      approver: includeConfig.approver,
+    }
+
     if (!usePagination) {
-      const spls = await prisma.spl.findMany({
-        where,
-        include: includeConfig,
-        orderBy: {
-          createdAt: "desc",
-        },
-      })
+      const spls = lite
+        ? await prisma.spl.findMany({
+            where,
+            select: liteSelect,
+            orderBy: {
+              createdAt: "desc",
+            },
+          })
+        : await prisma.spl.findMany({
+            where,
+            include: includeConfig,
+            orderBy: {
+              createdAt: "desc",
+            },
+          })
       return NextResponse.json(spls)
     }
 
@@ -128,15 +179,55 @@ export async function GET(req: NextRequest) {
     const page = Math.floor(pageParam)
     const skip = (page - 1) * limit
 
+    if (skipCount) {
+      const rows = lite
+        ? await prisma.spl.findMany({
+            where,
+            select: liteSelect,
+            orderBy: { createdAt: "desc" },
+            take: limit + 1,
+            skip,
+          })
+        : await prisma.spl.findMany({
+            where,
+            include: includeConfig,
+            orderBy: { createdAt: "desc" },
+            take: limit + 1,
+            skip,
+          })
+
+      const hasMore = rows.length > limit
+      const data = hasMore ? rows.slice(0, limit) : rows
+
+      return NextResponse.json({
+        data,
+        pagination: {
+          page,
+          limit,
+          hasMore,
+          total: null,
+          totalPages: null,
+        },
+      })
+    }
+
     const [total, spls] = await prisma.$transaction([
       prisma.spl.count({ where }),
-      prisma.spl.findMany({
-        where,
-        include: includeConfig,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip,
-      }),
+      lite
+        ? prisma.spl.findMany({
+            where,
+            select: liteSelect,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            skip,
+          })
+        : prisma.spl.findMany({
+            where,
+            include: includeConfig,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            skip,
+          }),
     ])
 
     return NextResponse.json({

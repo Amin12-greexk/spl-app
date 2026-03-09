@@ -124,7 +124,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
         }
 
         const teamResponse = await fetch(
-          "/api/spl/my-team?status=PENDING_SUPERVISOR&page=1&limit=100"
+          "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=100"
         )
         if (teamResponse.ok) {
           const teamData = normalizeSpls(await teamResponse.json())
