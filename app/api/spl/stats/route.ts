@@ -58,16 +58,24 @@ export async function GET(req: NextRequest) {
     const grouped = await prisma.spl.groupBy({
       by: ["status"],
       where: baseWhere,
+      orderBy: { status: "asc" },
       _count: { _all: true },
     })
 
+    const getAllCount = (item: {
+      _count?: { _all?: number } | true
+    }) =>
+      typeof item._count === "object" && item._count
+        ? item._count._all || 0
+        : 0
+
     const statusMap = new Map(
-      grouped.map((item) => [item.status, item._count._all])
+      grouped.map((item) => [item.status, getAllCount(item)])
     )
     const sumStatuses = (statuses: string[]) =>
       statuses.reduce((acc, status) => acc + (statusMap.get(status) || 0), 0)
 
-    const total = grouped.reduce((acc, item) => acc + item._count._all, 0)
+    const total = grouped.reduce((acc, item) => acc + getAllCount(item), 0)
     const approved = statusMap.get("APPROVED") || 0
     const pending = sumStatuses([
       "PENDING_SUPERVISOR",
