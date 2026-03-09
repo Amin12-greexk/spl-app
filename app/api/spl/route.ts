@@ -209,8 +209,18 @@ export async function GET(req: NextRequest) {
     const page = Math.floor(pageParam);
     const skip = (page - 1) * limit;
     const toStatusCountMap = (
-      grouped: Array<{ status: string; _count: { _all: number } }>
-    ) => new Map(grouped.map((item) => [item.status, item._count._all]))
+      grouped: Array<{ status: string; _count?: { _all?: number } | true }>
+    ) => {
+      const map = new Map<string, number>()
+      for (const item of grouped) {
+        const count =
+          typeof item._count === "object" && item._count
+            ? item._count._all || 0
+            : 0
+        map.set(item.status, count)
+      }
+      return map
+    }
 
     const sumStatuses = (map: Map<string, number>, statuses: string[]) =>
       statuses.reduce((acc, status) => acc + (map.get(status) || 0), 0)
@@ -270,6 +280,7 @@ export async function GET(req: NextRequest) {
           prisma.spl.groupBy({
             by: ["status"],
             where: baseWhere,
+            orderBy: { status: "asc" },
             _count: { _all: true },
           }),
           prisma.spl.findMany({
@@ -288,7 +299,10 @@ export async function GET(req: NextRequest) {
         "REJECTED_BY_SUPERVISOR",
         "REJECTED_BY_MANAGER",
       ])
-      const totalAll = groupedStats.reduce((acc, item) => acc + item._count._all, 0)
+      const totalAll = Array.from(statusCount.values()).reduce(
+        (acc, count) => acc + count,
+        0
+      )
 
       return NextResponse.json({
         data: spls,
@@ -313,6 +327,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.groupBy({
           by: ["status"],
           where: baseWhere,
+          orderBy: { status: "asc" },
           _count: { _all: true },
         }),
         prisma.spl.findMany({
@@ -331,7 +346,10 @@ export async function GET(req: NextRequest) {
       "REJECTED_BY_SUPERVISOR",
       "REJECTED_BY_MANAGER",
     ])
-    const totalAll = groupedStats.reduce((acc, item) => acc + item._count._all, 0)
+    const totalAll = Array.from(statusCount.values()).reduce(
+      (acc, count) => acc + count,
+      0
+    )
 
     return NextResponse.json({
       data: spls,
