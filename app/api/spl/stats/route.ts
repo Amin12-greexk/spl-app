@@ -55,23 +55,31 @@ export async function GET(req: NextRequest) {
       baseWhere.requesterId = session.user.id
     }
 
-    const [total, approved, pending, rejected] = await prisma.$transaction([
-      prisma.spl.count({ where: baseWhere }),
-      prisma.spl.count({ where: { ...baseWhere, status: "APPROVED" } }),
-      prisma.spl.count({
-        where: {
-          ...baseWhere,
-          status: { in: ["PENDING_SUPERVISOR", "PENDING_MANAGER", "IN_PROGRESS", "DONE", "PENDING"] },
-        },
-      }),
-      prisma.spl.count({
-        where: {
-          ...baseWhere,
-          status: {
-            in: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
-          },
-        },
-      }),
+    const grouped = await prisma.spl.groupBy({
+      by: ["status"],
+      where: baseWhere,
+      _count: { _all: true },
+    })
+
+    const statusMap = new Map(
+      grouped.map((item) => [item.status, item._count._all])
+    )
+    const sumStatuses = (statuses: string[]) =>
+      statuses.reduce((acc, status) => acc + (statusMap.get(status) || 0), 0)
+
+    const total = grouped.reduce((acc, item) => acc + item._count._all, 0)
+    const approved = statusMap.get("APPROVED") || 0
+    const pending = sumStatuses([
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+      "IN_PROGRESS",
+      "DONE",
+      "PENDING",
+    ])
+    const rejected = sumStatuses([
+      "REJECTED",
+      "REJECTED_BY_SUPERVISOR",
+      "REJECTED_BY_MANAGER",
     ])
 
     return NextResponse.json({ total, pending, approved, rejected })

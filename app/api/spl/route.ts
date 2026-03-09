@@ -208,69 +208,70 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.floor(limitParam), 50);
     const page = Math.floor(pageParam);
     const skip = (page - 1) * limit;
+    const toStatusCountMap = (
+      grouped: Array<{ status: string; _count: { _all: number } }>
+    ) => new Map(grouped.map((item) => [item.status, item._count._all]))
+
+    const sumStatuses = (map: Map<string, number>, statuses: string[]) =>
+      statuses.reduce((acc, status) => acc + (map.get(status) || 0), 0)
 
     if (usePagination && skipStats) {
       if (lite) {
-        const spls = await prisma.spl.findMany({
-          where,
-          select: liteSelect,
-          orderBy: { createdAt: "desc" },
-          take: limit,
-          skip,
-        })
+        const [total, spls] = await prisma.$transaction([
+          prisma.spl.count({ where }),
+          prisma.spl.findMany({
+            where,
+            select: liteSelect,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            skip,
+          }),
+        ])
+
         return NextResponse.json({
           data: spls,
           pagination: {
             page,
             limit,
-            total: null,
-            totalPages: null,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
           },
           stats: null,
         })
       }
 
-      const spls = await prisma.spl.findMany({
-        where,
-        include: includeConfig,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip,
-      })
+      const [total, spls] = await prisma.$transaction([
+        prisma.spl.count({ where }),
+        prisma.spl.findMany({
+          where,
+          include: includeConfig,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip,
+        }),
+      ])
+
       return NextResponse.json({
         data: spls,
         pagination: {
           page,
           limit,
-          total: null,
-          totalPages: null,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
         },
         stats: null,
       })
     }
 
     if (lite) {
-      const [total, approved, pending, rejected, totalAll, spls] =
+      const [total, groupedStats, spls] =
         await prisma.$transaction([
           prisma.spl.count({ where }),
-          prisma.spl.count({
-            where: { ...baseWhere, status: "APPROVED" },
+          prisma.spl.groupBy({
+            by: ["status"],
+            where: baseWhere,
+            _count: { _all: true },
           }),
-          prisma.spl.count({
-            where: {
-              ...baseWhere,
-              status: { in: ["PENDING_SUPERVISOR", "PENDING_MANAGER"] },
-            },
-          }),
-          prisma.spl.count({
-            where: {
-              ...baseWhere,
-              status: {
-                in: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
-              },
-            },
-          }),
-          prisma.spl.count({ where: baseWhere }),
           prisma.spl.findMany({
             where,
             select: liteSelect,
@@ -279,6 +280,15 @@ export async function GET(req: NextRequest) {
             skip,
           }),
         ]);
+      const statusCount = toStatusCountMap(groupedStats)
+      const approved = statusCount.get("APPROVED") || 0
+      const pending = sumStatuses(statusCount, ["PENDING_SUPERVISOR", "PENDING_MANAGER"])
+      const rejected = sumStatuses(statusCount, [
+        "REJECTED",
+        "REJECTED_BY_SUPERVISOR",
+        "REJECTED_BY_MANAGER",
+      ])
+      const totalAll = groupedStats.reduce((acc, item) => acc + item._count._all, 0)
 
       return NextResponse.json({
         data: spls,
@@ -297,27 +307,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const [total, approved, pending, rejected, totalAll, spls] =
+    const [total, groupedStats, spls] =
       await prisma.$transaction([
         prisma.spl.count({ where }),
-        prisma.spl.count({
-          where: { ...baseWhere, status: "APPROVED" },
+        prisma.spl.groupBy({
+          by: ["status"],
+          where: baseWhere,
+          _count: { _all: true },
         }),
-        prisma.spl.count({
-          where: {
-            ...baseWhere,
-            status: { in: ["PENDING_SUPERVISOR", "PENDING_MANAGER"] },
-          },
-        }),
-        prisma.spl.count({
-          where: {
-            ...baseWhere,
-            status: {
-              in: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
-            },
-          },
-        }),
-        prisma.spl.count({ where: baseWhere }),
         prisma.spl.findMany({
           where,
           include: includeConfig,
@@ -326,6 +323,15 @@ export async function GET(req: NextRequest) {
           skip,
         }),
       ]);
+    const statusCount = toStatusCountMap(groupedStats)
+    const approved = statusCount.get("APPROVED") || 0
+    const pending = sumStatuses(statusCount, ["PENDING_SUPERVISOR", "PENDING_MANAGER"])
+    const rejected = sumStatuses(statusCount, [
+      "REJECTED",
+      "REJECTED_BY_SUPERVISOR",
+      "REJECTED_BY_MANAGER",
+    ])
+    const totalAll = groupedStats.reduce((acc, item) => acc + item._count._all, 0)
 
     return NextResponse.json({
       data: spls,
