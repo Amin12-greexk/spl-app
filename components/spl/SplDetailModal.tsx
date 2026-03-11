@@ -242,8 +242,11 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
           </div>
           <div className="flex flex-col items-end gap-2">
             {(spl.source === "MANUAL" || spl.isManualEntry) && (
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-red-50 text-red-700 border-red-200">
-                Telat Input
+              <span
+                className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200 cursor-help"
+                title="SPL diinput telat oleh IT melalui akun Super Admin"
+              >
+                ⚠️ Telat Input
               </span>
             )}
             {spl.source === "LEGACY" && (
@@ -259,6 +262,22 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
             {getStatusBadge()}
           </div>
         </div>
+
+        {/* Warning box untuk SPL telat input */}
+        {(spl.source === "MANUAL" || spl.isManualEntry) && (
+          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-orange-500 text-base mt-0.5">⚠️</span>
+              <div className="text-sm">
+                <p className="font-semibold text-orange-800">SPL Telat Input</p>
+                <p className="text-orange-700 mt-0.5">
+                  SPL ini dibuat secara manual oleh IT melalui akun Super Admin karena karyawan melewati batas waktu pengajuan normal.
+                  Karyawan telah menandatangani SPL ini sebagai konfirmasi.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Approval Flow Progress */}
         {!["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (

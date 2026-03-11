@@ -258,8 +258,11 @@ function SplCard({
 
   const isManualSource = spl.source === "MANUAL" || spl.isManualEntry
   const manualBadge = isManualSource ? (
-    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-red-50 text-red-700 border-red-200">
-      Telat Input
+    <span
+      className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200 cursor-help"
+      title="SPL ini diinput telat oleh IT melalui akun Super Admin karena melewati batas waktu pengajuan"
+    >
+      ⚠️ Telat Input
     </span>
   ) : null
   const legacyBadge = spl.source === "LEGACY" ? (

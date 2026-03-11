@@ -238,8 +238,20 @@ export default function PersetujuanPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {currentSpls.map((spl) => {
               const hasRealization = Boolean(spl.actualEndAt)
+              const isLateInput = Boolean(spl.source === "MANUAL" || spl.isManualEntry)
+              // SPL telat input bisa di-acc langsung (overtime sudah terjadi di masa lalu)
+              const canApprove = hasRealization || isLateInput
               return (
                 <div key={spl.id} className="flex flex-col gap-2">
+                  {/* Badge untuk SPL telat input (diinput IT via Super Admin) */}
+                  {(spl.source === "MANUAL" || spl.isManualEntry) && (
+                    <div className="px-2 py-1 bg-orange-50 border border-orange-200 rounded-lg text-center">
+                      <p className="text-[10px] text-orange-700 font-semibold">
+                        ⚠️ Telat Input — diinput oleh IT via Super Admin
+                      </p>
+                    </div>
+                  )}
+
                   {/* Badge untuk SPL yang belum realisasi - untuk keperluan audit */}
                   {!hasRealization && (
                     <div className="px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg text-center">
@@ -264,15 +276,15 @@ export default function PersetujuanPage() {
                   <div className="flex gap-2">
                     <div
                       className="flex-1"
-                      title={!hasRealization ? "Pemohon belum menginput realisasi lembur" : ""}
+                      title={!canApprove ? "Pemohon belum menginput realisasi lembur" : ""}
                     >
                       <Button
                         onClick={() => handleApprove(spl.id)}
-                        className={`w-full text-xs py-2 ${hasRealization
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        className={`w-full text-xs py-2 ${canApprove
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
                           }`}
-                        disabled={isProcessing || !hasRealization}
+                        disabled={isProcessing || !canApprove}
                       >
                         ✓ Setujui
                       </Button>
@@ -341,8 +353,8 @@ export default function PersetujuanPage() {
                             key={page}
                             onClick={() => setCurrentPage(page)}
                             className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === page
-                                ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-                                : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                              ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                              : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
                               }`}
                           >
                             {page}

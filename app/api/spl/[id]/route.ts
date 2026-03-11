@@ -104,10 +104,10 @@ export async function PATCH(
 
     // Validasi input
     if (!normalizedStatus || !["APPROVED", "REJECTED_BY_MANAGER"].includes(normalizedStatus)) {
-        return NextResponse.json({ error: "Status tidak valid untuk approval manager." }, { status: 400 });
+      return NextResponse.json({ error: "Status tidak valid untuk approval manager." }, { status: 400 });
     }
     if (normalizedStatus === "REJECTED_BY_MANAGER" && !body.rejectionReason) {
-        return NextResponse.json({ error: "Alasan penolakan wajib diisi." }, { status: 400 });
+      return NextResponse.json({ error: "Alasan penolakan wajib diisi." }, { status: 400 });
     }
 
     const existingSpl = await prisma.spl.findUnique({
@@ -154,10 +154,15 @@ export async function PATCH(
     }
 
     if (normalizedStatus === "APPROVED" && (!existingSpl.actualStartAt || !existingSpl.actualEndAt)) {
-      return NextResponse.json(
-        { error: "Realisasi belum diinput oleh pemohon" },
-        { status: 400 }
-      );
+      // SPL telat input (diinput manual oleh superadmin) tidak wajib punya realisasi
+      // karena overtime sudah terjadi di masa lalu
+      const isLateInput = existingSpl.isManualEntry || existingSpl.source === "MANUAL"
+      if (!isLateInput) {
+        return NextResponse.json(
+          { error: "Realisasi belum diinput oleh pemohon" },
+          { status: 400 }
+        )
+      }
     }
 
     const spl = await prisma.spl.update({
