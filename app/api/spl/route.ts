@@ -64,7 +64,6 @@ export async function GET(req: NextRequest) {
     ];
     const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"];
     const hideUnsignedManual = !["SUPER_ADMIN", "HR"].includes(userRole);
-    const hideUnrealizedForManager = userRole === "MANAGER";
     const notConditions: any[] = [];
 
     if (hideUnsignedManual) {
@@ -72,10 +71,6 @@ export async function GET(req: NextRequest) {
         { isManualEntry: true, requesterSignedAt: null },
         { source: "LEGACY", requesterSignedAt: null }
       );
-    }
-
-    if (hideUnrealizedForManager) {
-      notConditions.push({ status: "PENDING_MANAGER", actualEndAt: null });
     }
 
     if (notConditions.length > 0) {
@@ -101,9 +96,9 @@ export async function GET(req: NextRequest) {
 
     const statusList = statusParam
       ? statusParam
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
       : [];
     if (statusList.length === 1) {
       where.status = statusList[0];
@@ -396,7 +391,7 @@ export async function POST(req: NextRequest) {
 
     // Validasi input dasar
     if (!body.date || !body.startTime || !body.endTime || !body.reason || !body.signature) {
-        return NextResponse.json({ error: "Semua field wajib diisi termasuk tanda tangan" }, { status: 400 });
+      return NextResponse.json({ error: "Semua field wajib diisi termasuk tanda tangan" }, { status: 400 });
     }
 
     if (typeof body.signature !== "string" || body.signature.trim().length < 30) {
@@ -511,7 +506,7 @@ export async function POST(req: NextRequest) {
       if (shiftAssignment?.shiftCode) {
         const shiftDefinition =
           SECURITY_SHIFT_DEFINITIONS[
-            shiftAssignment.shiftCode as SecurityShiftCode
+          shiftAssignment.shiftCode as SecurityShiftCode
           ]
         if (!shiftDefinition) {
           return NextResponse.json(
@@ -795,7 +790,7 @@ export async function POST(req: NextRequest) {
       console.log("Notifikasi telah dikirim");
 
     } catch (notificationError) {
-        console.error("Gagal mengirim notifikasi:", notificationError);
+      console.error("Gagal mengirim notifikasi:", notificationError);
     }
     // ---------------------------------------------------------
 

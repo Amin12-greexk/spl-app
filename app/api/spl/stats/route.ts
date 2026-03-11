@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
     ]
     const canViewAllRoles: Role[] = ["HR", "MANAGER", "SUPER_ADMIN"]
     const hideUnsignedManual = !["SUPER_ADMIN", "HR"].includes(userRole)
-    const hideUnrealizedForManager = userRole === "MANAGER"
     const notConditions: any[] = []
 
     if (hideUnsignedManual) {
@@ -33,10 +32,6 @@ export async function GET(req: NextRequest) {
         { isManualEntry: true, requesterSignedAt: null },
         { source: "LEGACY", requesterSignedAt: null }
       )
-    }
-
-    if (hideUnrealizedForManager) {
-      notConditions.push({ status: "PENDING_MANAGER", actualEndAt: null })
     }
 
     const baseWhere: any = {}

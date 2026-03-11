@@ -236,37 +236,58 @@ export default function PersetujuanPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {currentSpls.map((spl) => (
-              <div key={spl.id} className="flex flex-col gap-2">
-                {/* Compact SPL Card - Click to view detail */}
-                <div onClick={() => handleOpenDetail(spl)}>
-                  <SplCard
-                    spl={spl}
-                    userRole={session?.user?.role}
-                    showActions={false}
-                    mini={true}
-                    showExpiredBadge
-                  />
-                </div>
+            {currentSpls.map((spl) => {
+              const hasRealization = Boolean(spl.actualEndAt)
+              return (
+                <div key={spl.id} className="flex flex-col gap-2">
+                  {/* Badge untuk SPL yang belum realisasi - untuk keperluan audit */}
+                  {!hasRealization && (
+                    <div className="px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                      <p className="text-[10px] text-amber-700 font-semibold">
+                        ⏳ Menunggu input realisasi dari pemohon
+                      </p>
+                    </div>
+                  )}
 
-                {/* Action Buttons - Always visible for approval */}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleApprove(spl.id)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2"
-                  >
-                    ✓ Setujui
-                  </Button>
-                  <Button
-                    onClick={() => handleRejectClick(spl.id)}
-                    variant="outline"
-                    className="flex-1 border-red-600 text-red-600 hover:bg-red-50 text-xs py-2"
-                  >
-                    ✗ Tolak
-                  </Button>
+                  {/* Compact SPL Card - Click to view detail */}
+                  <div onClick={() => handleOpenDetail(spl)}>
+                    <SplCard
+                      spl={spl}
+                      userRole={session?.user?.role}
+                      showActions={false}
+                      mini={true}
+                      showExpiredBadge
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <div
+                      className="flex-1"
+                      title={!hasRealization ? "Pemohon belum menginput realisasi lembur" : ""}
+                    >
+                      <Button
+                        onClick={() => handleApprove(spl.id)}
+                        className={`w-full text-xs py-2 ${hasRealization
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          }`}
+                        disabled={isProcessing || !hasRealization}
+                      >
+                        ✓ Setujui
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={() => handleRejectClick(spl.id)}
+                      variant="outline"
+                      className="flex-1 border-red-600 text-red-600 hover:bg-red-50 text-xs py-2"
+                    >
+                      ✗ Tolak
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Pagination */}
@@ -310,7 +331,6 @@ export default function PersetujuanPage() {
                     </button>
 
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                      // Show first page, last page, current page, and pages around current
                       if (
                         page === 1 ||
                         page === totalPages ||
@@ -320,11 +340,10 @@ export default function PersetujuanPage() {
                           <button
                             key={page}
                             onClick={() => setCurrentPage(page)}
-                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                              currentPage === page
+                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === page
                                 ? "z-10 bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
                                 : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                            }`}
+                              }`}
                           >
                             {page}
                           </button>
@@ -391,8 +410,8 @@ export default function PersetujuanPage() {
             Alasan Penolakan <span className="text-red-500">*</span>
           </label>
           <textarea
-          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-          placeholder="Jelaskan alasan penolakan secara detail..."
+            className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+            placeholder="Jelaskan alasan penolakan secara detail..."
             value={rejectionReason}
             onChange={(e) => setRejectionReason(e.target.value)}
             disabled={isProcessing}
