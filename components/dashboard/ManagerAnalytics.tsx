@@ -7,6 +7,7 @@ import {
     BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
+import ManagerAttendancePanel from "@/components/dashboard/ManagerAttendancePanel"
 
 interface AnalyticsData {
     monthlyTrend: { month: string; count: number }[]
@@ -67,6 +68,10 @@ export default function ManagerAnalytics() {
                 <SummaryCard icon="👥" label="Karyawan Lembur" value={summary.totalEmployees} accent="blue" />
                 <SummaryCard icon="⏱️" label="Rata-rata Jam" value={`${summary.avgHours} jam`} accent="green" />
                 <SummaryCard icon="⏳" label="SPL Pending" value={summary.pendingSpl} accent="amber" />
+            </div>
+
+            <div id="manager-attendance">
+                <ManagerAttendancePanel />
             </div>
 
             {/* ── Charts Grid ──────────────────────────────────────────────── */}

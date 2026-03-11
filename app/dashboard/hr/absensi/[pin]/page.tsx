@@ -114,7 +114,7 @@ export default function AbsensiDetailPage() {
       return
     }
 
-    if (session?.user?.role !== "HR") {
+    if (!["HR", "MANAGER"].includes(session?.user?.role || "")) {
       router.push("/dashboard")
     }
   }, [session, status, router])

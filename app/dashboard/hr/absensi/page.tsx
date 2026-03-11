@@ -33,11 +33,11 @@ export default function CekAbsensiPage() {
       return
     }
 
-    if (session?.user?.role !== "HR") {
+    if (!["HR", "MANAGER"].includes(session?.user?.role || "")) {
       Swal.fire({
         icon: "error",
         title: "Akses Ditolak",
-        text: "Anda tidak memiliki akses ke halaman ini",
+        text: "Halaman ini hanya untuk HR atau Manager",
       }).then(() => {
         router.push("/dashboard")
       })
@@ -64,7 +64,7 @@ export default function CekAbsensiPage() {
   }, [])
 
   useEffect(() => {
-    if (session?.user?.role === "HR") {
+    if (session?.user?.role === "HR" || session?.user?.role === "MANAGER") {
       fetchAttendanceUsers()
     }
   }, [session?.user?.role, fetchAttendanceUsers])
