@@ -28,7 +28,7 @@ function CustomTooltip({
     return (
         <div
             {...tooltipProps}
-            style={{ animation: "tourFadeSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 380, width: "100%" }}
+            style={{ animation: "tourFadeSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 380, width: "calc(100vw - 32px)" }}
         >
             <style>{`
         @keyframes tourFadeSlideIn {
@@ -43,6 +43,18 @@ function CustomTooltip({
         .tour-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(22,163,74,0.35); }
         .tour-btn-secondary:hover { background: #f0fdf4; }
         .tour-btn-skip:hover { color: #374151; }
+        
+        /* Mobile-friendly specific overrides for Joyride */
+        @media (max-width: 640px) {
+            .react-joyride__spotlight {
+                max-width: calc(100vw - 16px) !important;
+                left: 8px !important;
+                border-radius: 8px !important;
+            }
+            .react-joyride__overlay {
+                width: 100vw !important;
+            }
+        }
       `}</style>
 
             <div style={{
@@ -294,6 +306,13 @@ export default function AppTour() {
     // ── Core: start a phase ───────────────────────────────────────────────────
     const doStartPhase = (phase: PhaseKey, delay = 600) => {
         if (isTransitioningRef.current) return
+
+        // Skip sidebar phase on mobile since it's hidden under hamburger menu
+        if (phase === "sidebar" && typeof window !== "undefined" && window.innerWidth < 1024) {
+            transitionTo("dashboard", "/dashboard")
+            return
+        }
+
         isTransitioningRef.current = true
 
         const phaseSteps = getStepsByPhase(phase, userRole, sidebarKey)
@@ -439,22 +458,25 @@ export default function AppTour() {
 
     return (
         <>
-            {/* CSS fix: sidebar uses position:fixed — override spotlight to match viewport coords */}
-            {tourPhase === "sidebar" && (
-                <style>{`
-                    .__floater { position: fixed !important; }
-                    .react-joyride__spotlight {
-                        position: fixed !important;
-                    }
-                    .react-joyride__overlay {
-                        position: fixed !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                    }
-                `}</style>
-            )}
+            {/* Always inject fixed-position override so overlay covers the full viewport on all pages/devices */}
+            <style>{`
+                .react-joyride__overlay {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    z-index: 9998 !important;
+                }
+                .react-joyride__spotlight {
+                    position: fixed !important;
+                    z-index: 9999 !important;
+                    box-sizing: border-box !important;
+                }
+                .__floater {
+                    z-index: 10000 !important;
+                }
+            `}</style>
             <Joyride
                 {...joyrideProps}
                 steps={steps}

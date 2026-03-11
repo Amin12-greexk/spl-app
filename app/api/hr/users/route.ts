@@ -18,6 +18,7 @@ export async function GET() {
         pin: true,
         role: true,
         position: true,
+        regularStartTime: true,
         departmentName: true,
         department: { select: { name: true } },
       },

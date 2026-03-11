@@ -186,135 +186,344 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="w-full max-w-lg lg:max-w-2xl">
-        {/* Logo dan Branding */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 mb-4 relative">
-            <Image
-              src="/logo.png"
-              alt="Logo PT Tunas Esta Indonesia"
-              fill
-              sizes="80px"
-              className="object-contain drop-shadow-md"
-              priority
-            />
+    <div
+      className={`w-full max-w-6xl overflow-hidden rounded-[22px] border border-green-100 bg-white shadow-[0_16px_46px_rgba(21,128,61,0.16)] ${hasError ? "motion-safe:animate-shake" : ""}`}
+    >
+      <div className="grid min-h-[640px] grid-cols-1 lg:grid-cols-2">
+        <section className="relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-green-600 via-green-600 to-emerald-500 px-6 py-10 text-white sm:px-10 lg:px-12">
+          <div className="absolute inset-0 opacity-25">
+            <div className="absolute -left-24 -top-16 h-56 w-56 rounded-full bg-white/25 blur-2xl" />
+            <div className="absolute -right-20 bottom-10 h-72 w-72 rounded-full bg-emerald-200/20 blur-2xl" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            PT Tunas Esta Indonesia
-          </h1>
-          <p className="text-gray-600 text-sm">Bergabung dengan Sistem SPL</p>
-        </div>
 
-        {/* Register Card */}
-        <div className={`bg-white shadow-xl rounded-2xl p-8 border border-green-100 ${hasError ? 'motion-safe:animate-shake' : ''}`}>
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              Buat Akun Baru
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Isi formulir di bawah untuk mendaftar
+          <div className="relative z-10 w-full max-w-sm text-center lg:text-left">
+            <p className="mb-3 inline-flex rounded-full border border-white/35 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.06em] text-white/95">
+              SPL TUNAS ESTA INDONESIA
             </p>
-          </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* PIN */}
-            <div>
+            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-white/15 p-2.5 backdrop-blur-sm lg:mx-0">
+              <div className="relative h-full w-full">
+                <Image
+                  src="/logo.png"
+                  alt="Logo PT Tunas Esta Indonesia"
+                  fill
+                  sizes="64px"
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
+
+            <h1 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              Daftar Akun
+            </h1>
+
+            <p className="mb-6 text-sm leading-7 text-white/95 sm:text-base">
+              Bergabung dengan sistem pengajuan lembur PT Tunas Esta Indonesia untuk proses SPL yang lebih cepat dan rapi.
+            </p>
+
+            <div className="space-y-2.5 text-left text-sm text-white/90">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />
+                Pendaftaran terhubung ke PIN karyawan
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />
+                Alur persetujuan mengikuti struktur departemen
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />
+                Riwayat SPL tersimpan otomatis di dashboard
+              </div>
+            </div>
+
+            <a
+              href="/login"
+              className="mt-7 inline-flex h-11 min-w-[190px] items-center justify-center rounded-full border border-white/90 px-6 text-xs font-bold tracking-[0.14em] text-white transition-colors hover:bg-white hover:text-green-700"
+            >
+              MASUK AKUN
+            </a>
+          </div>
+        </section>
+
+        <section className="bg-[#f8faf8] px-6 py-8 sm:px-10 lg:px-12">
+          <div className="mx-auto w-full max-w-xl lg:max-h-[82vh] lg:overflow-y-auto lg:pr-2">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+              Form Registrasi
+            </h2>
+            <p className="mb-6 mt-1 text-sm text-gray-600">
+              Isi data berikut untuk membuat akun baru.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <Input
+                  label="PIN Karyawan"
+                  type="text"
+                  placeholder="Masukkan PIN"
+                  value={formData.pin}
+                  onChange={(e) => {
+                    setFormData({ ...formData, pin: e.target.value })
+                  }}
+                  className="border-gray-200 focus:border-green-500 focus:ring-green-500"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  PIN karyawan Anda sesuai data HRD
+                </p>
+              </div>
+
               <Input
-                label="PIN Karyawan"
+                label="Nama Lengkap"
                 type="text"
-                placeholder="Masukkan PIN "
-                value={formData.pin}
-                onChange={(e) => {
-                  setFormData({ ...formData, pin: e.target.value })
-                }}
+                placeholder="Masukkan nama lengkap"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="border-gray-200 focus:border-green-500 focus:ring-green-500"
                 required
               />
-              <p className="mt-1 text-xs text-gray-500">
-                PIN karyawan Anda sesuai data HRD
-              </p>
-            </div>
 
-            {/* Nama Lengkap */}
-            <Input
-              label="Nama Lengkap"
-              type="text"
-              placeholder="Masukkan nama lengkap"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="border-gray-200 focus:border-green-500 focus:ring-green-500"
-              required
-            />
-
-            {/* Email */}
-            <Input
-              label="Alamat Email"
-              type="email"
-              placeholder="nama@tunasestaindonesia.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="border-gray-200 focus:border-green-500 focus:ring-green-500"
-              required
-            />
-
-            {/* Departemen (dropdown) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Departemen <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.departmentId || formData.departmentName}
-                onChange={(e) => {
-                  const value = e.target.value
-                  const selected = departments.find(
-                    (dept) => dept.id === value || dept.name === value
-                  )
-                  setFormData({
-                    ...formData,
-                    departmentId: selected?.id || "",
-                    departmentName: selected?.name || "",
-                  })
-                }}
-                className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+              <Input
+                label="Alamat Email"
+                type="email"
+                placeholder="nama@tunasestaindonesia.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="border-gray-200 focus:border-green-500 focus:ring-green-500"
                 required
-                disabled={isLoadingDepartments}
+              />
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Departemen <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.departmentId || formData.departmentName}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    const selected = departments.find(
+                      (dept) => dept.id === value || dept.name === value
+                    )
+                    setFormData({
+                      ...formData,
+                      departmentId: selected?.id || "",
+                      departmentName: selected?.name || "",
+                    })
+                  }}
+                  className="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-gray-900 transition-all duration-200 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                  disabled={isLoadingDepartments}
+                >
+                  <option value="">Pilih Departemen</option>
+                  {departments.map((department) => (
+                    <option key={department.id || department.name} value={department.id || department.name}>
+                      {getDepartmentLabel(department)}
+                    </option>
+                  ))}
+                </select>
+
+                {isLoadingDepartments && (
+                  <div className="mt-2 flex items-center text-sm text-gray-500">
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-green-500 border-t-transparent"></div>
+                    Memuat daftar departemen...
+                  </div>
+                )}
+
+                {isLoadingSupervisor && (
+                  <div className="mt-2 flex items-center text-sm text-gray-500">
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-green-500 border-t-transparent"></div>
+                    Memeriksa atasan untuk department ini...
+                  </div>
+                )}
+
+                {supervisorInfo && !isLoadingSupervisor && (
+                  <div
+                    className={`mt-3 rounded-lg border p-3 ${
+                      supervisorInfo.hasSupervisor
+                        ? "border-blue-200 bg-blue-50"
+                        : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-start">
+                      <svg
+                        className={`mr-2 mt-0.5 h-5 w-5 flex-shrink-0 ${
+                          supervisorInfo.hasSupervisor ? "text-blue-600" : "text-gray-600"
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div className="flex-1">
+                        <p
+                          className={`text-sm font-medium ${
+                            supervisorInfo.hasSupervisor ? "text-blue-900" : "text-gray-900"
+                          }`}
+                        >
+                          {supervisorInfo.message}
+                        </p>
+
+                        {supervisorInfo.warning && (
+                          <p className="mt-1 text-xs text-orange-700">
+                            Perhatian: {supervisorInfo.warning}
+                          </p>
+                        )}
+
+                        <div className="mt-2">
+                          <p className="mb-1 text-xs font-medium text-gray-700">
+                            Alur Persetujuan SPL:
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {supervisorInfo.approvalFlow.map((step, index) => (
+                              <div key={index} className="flex items-center">
+                                <span
+                                  className={`rounded px-2 py-1 text-xs ${
+                                    index === 0
+                                      ? "bg-green-100 font-medium text-green-800"
+                                      : index === supervisorInfo.approvalFlow.length - 1
+                                      ? "bg-purple-100 font-medium text-purple-800"
+                                      : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {step}
+                                </span>
+                                {index < supervisorInfo.approvalFlow.length - 1 && (
+                                  <svg
+                                    className="mx-1 h-4 w-4 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Kata Sandi
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Masukkan kata sandi"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 pr-10 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? (
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Konfirmasi Kata Sandi
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Ulangi kata sandi"
+                    value={formData.confirmPassword}
+                    onChange={(e) =>
+                      setFormData({ ...formData, confirmPassword: e.target.value })
+                    }
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 pr-10 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? (
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                <h4 className="mb-2 text-sm font-medium text-green-800">
+                  Persyaratan Pendaftaran:
+                </h4>
+                <ul className="space-y-1 text-xs text-green-700">
+                  <li className="flex items-center">
+                    <svg className="mr-2 h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    PIN harus sesuai data HRD
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="mr-2 h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Password minimal 6 karakter
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="mr-2 h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Pastikan email aktif untuk login
+                  </li>
+                </ul>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full rounded-full bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl"
+                disabled={isLoading}
               >
-                <option value="">Pilih Departemen</option>
-                {departments.map((department) => (
-                  <option key={department.id || department.name} value={department.id || department.name}>
-                    {getDepartmentLabel(department)}
-                  </option>
-                ))}
-              </select>
-
-              {isLoadingDepartments && (
-                <div className="mt-2 flex items-center text-sm text-gray-500">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-500 border-t-transparent mr-2"></div>
-                  Memuat daftar departemen...
-                </div>
-              )}
-
-              {/* Supervisor Info */}
-              {isLoadingSupervisor && (
-                <div className="mt-2 flex items-center text-sm text-gray-500">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-500 border-t-transparent mr-2"></div>
-                  Memeriksa atasan untuk department ini...
-                </div>
-              )}
-
-              {supervisorInfo && !isLoadingSupervisor && (
-                <div className={`mt-3 p-3 rounded-lg border ${
-                  supervisorInfo.hasSupervisor
-                    ? 'bg-blue-50 border-blue-200'
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-start">
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Sedang Mendaftar...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
                     <svg
-                      className={`w-5 h-5 mt-0.5 mr-2 flex-shrink-0 ${
-                        supervisorInfo.hasSupervisor ? 'text-blue-600' : 'text-gray-600'
-                      }`}
+                      className="mr-2 h-5 w-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -323,246 +532,26 @@ export default function RegisterForm() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
                       />
                     </svg>
-                    <div className="flex-1">
-                      <p className={`text-sm font-medium ${
-                        supervisorInfo.hasSupervisor ? 'text-blue-900' : 'text-gray-900'
-                      }`}>
-                        {supervisorInfo.message}
-                      </p>
-
-                      {supervisorInfo.warning && (
-                        <p className="text-xs text-orange-700 mt-1">
-                          ⚠️ {supervisorInfo.warning}
-                        </p>
-                      )}
-
-                      {/* Approval Flow */}
-                      <div className="mt-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">
-                          Alur Persetujuan SPL:
-                        </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {supervisorInfo.approvalFlow.map((step, index) => (
-                            <div key={index} className="flex items-center">
-                              <span className={`text-xs px-2 py-1 rounded ${
-                                index === 0
-                                  ? 'bg-green-100 text-green-800 font-medium'
-                                  : index === supervisorInfo.approvalFlow.length - 1
-                                  ? 'bg-purple-100 text-purple-800 font-medium'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {step}
-                              </span>
-                              {index < supervisorInfo.approvalFlow.length - 1 && (
-                                <svg
-                                  className="w-4 h-4 mx-1 text-gray-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
-                                  />
-                                </svg>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                    Daftar Akun Baru
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </Button>
+            </form>
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kata Sandi
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder=".........."
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Konfirmasi Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Konfirmasi Kata Sandi
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Ulangi kata sandi"
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Requirements Info */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <h4 className="text-sm font-medium text-green-800 mb-2">
-                Persyaratan Pendaftaran:
-              </h4>
-              <ul className="text-xs text-green-700 space-y-1">
-                <li className="flex items-center">
-                  <svg
-                    className="w-3 h-3 mr-2 text-green-600"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  PIN harus sesuai, kalau tidak tahu silakan hubungi HRD
-                </li>
-                <li className="flex items-center">
-                  <svg
-                    className="w-3 h-3 mr-2 text-green-600"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Password minimal 6 karakter
-                </li>
-                <li className="flex items-center">
-                  <svg
-                    className="w-3 h-3 mr-2 text-green-600"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  
-                </li>
-              </ul>
-            </div>
-
-            {/* Register Button */}
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                  Sedang Mendaftar...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                    />
-                  </svg>
-                  Daftar Akun Baru
-                </div>
-              )}
-            </Button>
-          </form>
-
-          {/* Divider */}
-          <div className="my-6 flex items-center">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="px-4 text-gray-500 text-sm">atau</span>
-            <div className="flex-grow border-t border-gray-200"></div>
-          </div>
-
-          {/* Login Link */}
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-3">Sudah memiliki akun?</p>
-            <a
-              href="/login"
-              className="inline-flex items-center justify-center w-full px-4 py-3 border-2 border-green-600 text-green-600 font-medium rounded-xl hover:bg-green-50 transition-micro motion-safe:hover:scale-[1.01]"
-            >
-              <svg
-                className="w-5 h-5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="mt-6 text-center lg:hidden">
+              <p className="mb-3 text-sm text-gray-600">Sudah memiliki akun?</p>
+              <a
+                href="/login"
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl border-2 border-green-600 px-4 text-sm font-medium text-green-600 transition-micro hover:bg-green-50 motion-safe:hover:scale-[1.01]"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-                />
-              </svg>
-              Masuk ke Akun
-            </a>
+                Masuk ke Akun
+              </a>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   )

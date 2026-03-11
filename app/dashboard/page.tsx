@@ -105,6 +105,9 @@ export default function DashboardPage() {
   const fetchUserSpls = useCallback(
     async (showLoading = false) => {
       if (!session?.user?.id) {
+        if (showLoading) {
+          setIsLoading(false)
+        }
         return
       }
 
@@ -927,7 +930,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="w-full overflow-x-auto rounded-lg border border-gray-100">
                 <table className="min-w-[900px] w-full text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
