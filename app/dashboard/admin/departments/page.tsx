@@ -21,6 +21,7 @@ export default function AdminDepartmentsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
   const [formData, setFormData] = useState({
     name: "",
@@ -29,6 +30,7 @@ export default function AdminDepartmentsPage() {
   })
 
   useEffect(() => {
+    setMounted(true)
     if (status === "unauthenticated") {
       router.push("/login")
     } else if (session?.user?.role !== "SUPER_ADMIN") {
@@ -165,7 +167,7 @@ export default function AdminDepartmentsPage() {
     return "Supervised (Kepala Dept)"
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-red-200 border-t-red-600"></div>

@@ -35,8 +35,10 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     if (status === "unauthenticated") {
       router.push("/login")
     } else if (session?.user?.role !== "SUPER_ADMIN") {
@@ -117,7 +119,7 @@ export default function AdminUsersPage() {
     return `px-2 py-1 text-xs font-medium rounded-full ${c.bg} ${c.text}`
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-red-200 border-t-red-600"></div>
