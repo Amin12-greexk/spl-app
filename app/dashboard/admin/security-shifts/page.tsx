@@ -28,10 +28,15 @@ const getTodayDateValue = () => new Date().toLocaleDateString("en-CA")
 export default function SecurityShiftsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [selectedDate, setSelectedDate] = useState(getTodayDateValue)
+  const [selectedDate, setSelectedDate] = useState("")
   const [users, setUsers] = useState<SecurityShiftUser[]>([])
   const [loading, setLoading] = useState(false)
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Set initial date only on client to avoid hydration mismatch
+    setSelectedDate(getTodayDateValue())
+  }, [])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -68,7 +73,7 @@ export default function SecurityShiftsPage() {
   }, [])
 
   useEffect(() => {
-    if (session?.user?.role === "SUPER_ADMIN") {
+    if (session?.user?.role === "SUPER_ADMIN" && selectedDate) {
       fetchAssignments(selectedDate)
     }
   }, [session?.user?.role, selectedDate, fetchAssignments])

@@ -45,6 +45,7 @@ export default function RegularHoursPage() {
   const [users, setUsers] = useState<RegularHoursUser[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [formData, setFormData] = useState({
     userId: "",
     regularStartTime: "",
@@ -54,6 +55,7 @@ export default function RegularHoursPage() {
   })
 
   useEffect(() => {
+    setMounted(true)
     if (status === "unauthenticated") {
       router.push("/login")
       return
@@ -250,7 +252,7 @@ export default function RegularHoursPage() {
   ).toLowerCase()
   const isSelectedSecurity = selectedDepartmentName === "security"
 
-  if (status === "loading" || session?.user?.role !== "SUPER_ADMIN") {
+  if (!mounted || status === "loading" || session?.user?.role !== "SUPER_ADMIN") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
