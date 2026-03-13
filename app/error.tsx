@@ -101,11 +101,13 @@ export default function Error({
             <p className="text-gray-600 text-base sm:text-lg max-w-md mx-auto mb-4">
               {errorDetails.description}
             </p>
+          </div>
 
-            {/* Error Details (for development) */}
-            {process.env.NODE_ENV === "development" && (
-              <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 font-medium">
+          {/* Error Details (for development) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="mb-8">
+              <details className="text-left">
+                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 font-medium list-item">
                   Detail Error (Development Mode)
                 </summary>
                 <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -119,8 +121,8 @@ export default function Error({
                   )}
                 </div>
               </details>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
