@@ -25,20 +25,6 @@ export default function DashboardLayout({
     }
   }, [status, router])
 
-  useEffect(() => {
-    // Register service worker untuk Firebase Messaging
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/firebase-messaging-sw.js")
-        .then((registration) => {
-          console.log("✅ Service Worker registered successfully:", registration.scope)
-        })
-        .catch((error) => {
-          console.error("❌ Service Worker registration failed:", error)
-        })
-    }
-  }, [])
-
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-white">
