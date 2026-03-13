@@ -152,7 +152,47 @@ export default function SecurityShiftsPage() {
           />
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View */}
+        <div className="block md:hidden space-y-3">
+          {users.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-500 text-sm border border-gray-100 rounded-lg">
+              Tidak ada user security.
+            </div>
+          )}
+          {users.map((user) => (
+            <div key={user.id} className="p-4 border border-gray-100 rounded-lg space-y-3">
+              <div>
+                <div className="font-medium text-gray-900">{user.name}</div>
+                <div className="text-xs text-gray-500">{user.email} • {user.role}</div>
+              </div>
+              <div className="pt-2 border-t border-gray-50">
+                <label className="block text-xs text-gray-500 mb-1">Pilih Shift</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={user.shiftCode || ""}
+                    onChange={(e) => handleShiftChange(user.id, e.target.value)}
+                    disabled={savingUserId === user.id}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                  >
+                    {SHIFT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {savingUserId === user.id && (
+                    <span className="text-xs text-blue-600">Menyimpan...</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="text-center py-4 text-sm text-gray-500">Memuat data...</div>
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-[700px] w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>

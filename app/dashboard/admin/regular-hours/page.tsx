@@ -216,12 +216,12 @@ export default function RegularHoursPage() {
         prev.map((user) =>
           user.id === data.user.id
             ? {
-                ...user,
-                regularStartTime: data.user.regularStartTime,
-                regularEndTime: data.user.regularEndTime,
-                saturdayStartTime: data.user.saturdayStartTime,
-                saturdayEndTime: data.user.saturdayEndTime,
-              }
+              ...user,
+              regularStartTime: data.user.regularStartTime,
+              regularEndTime: data.user.regularEndTime,
+              saturdayStartTime: data.user.saturdayStartTime,
+              saturdayEndTime: data.user.saturdayEndTime,
+            }
             : user
         )
       )
@@ -471,7 +471,59 @@ export default function RegularHoursPage() {
             <span className="text-sm text-gray-500">Memuat data...</span>
           )}
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile View */}
+        <div className="block md:hidden mt-4 space-y-3">
+          {users.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-500 text-sm border border-slate-100 rounded-lg">
+              Tidak ada data user.
+            </div>
+          )}
+          {users.map((user) => (
+            <div key={user.id} className="p-4 border border-gray-100 rounded-lg space-y-3">
+              <div>
+                <div className="font-medium text-gray-900">{user.name}</div>
+                <div className="text-xs text-gray-500">{user.email}</div>
+                <div className="text-xs text-gray-500 mt-1">{user.role} • {user.department?.name || user.departmentName || "-"}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 text-sm">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Jam Reguler</div>
+                  {user.regularStartTime && user.regularEndTime ? (
+                    <div className="flex flex-col gap-1 text-gray-900">
+                      <span>{user.regularStartTime} - {user.regularEndTime}</span>
+                      {(() => {
+                        const start = parseTimeToMinutes(user.regularStartTime)
+                        const end = parseTimeToMinutes(user.regularEndTime)
+                        if (start !== null && end !== null && end < start) {
+                          return (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded w-fit">
+                              Shift Malam
+                            </span>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Belum diatur</span>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Jam Sabtu</div>
+                  <div className="text-gray-900">
+                    {user.saturdayStartTime && user.saturdayEndTime
+                      ? `${user.saturdayStartTime} - ${user.saturdayEndTime}`
+                      : <span className="text-gray-400">-</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-[800px] w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>

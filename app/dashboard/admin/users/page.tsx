@@ -154,7 +154,64 @@ export default function AdminUsersPage() {
 
       {/* Users Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View */}
+        <div className="block md:hidden">
+          {filteredUsers.map((user) => {
+            const departmentLabel = user.department?.name || user.departmentName || "-"
+            return (
+              <div key={user.id} className="p-4 border-b border-gray-100 last:border-b-0 space-y-3 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-medium text-gray-900">{user.name}</div>
+                    <div className="text-xs text-gray-500">{user.position || "-"}</div>
+                  </div>
+                  <span className={getRoleBadge(user.role)}>{user.role}</span>
+                </div>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email:</span>
+                    <span className="truncate ml-2">{user.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Dept:</span>
+                    <span className="text-right ml-2">{departmentLabel}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Supervisor:</span>
+                    <span className="text-right ml-2">{user.supervisor ? user.supervisor.name : "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">SPL:</span>
+                    <span className="font-medium">{user._count.splRequests}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100/50">
+                  <Link
+                    href={`/dashboard/admin/users/${user.id}`}
+                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit User"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(user.id, user.name)}
+                    className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={user._count.subordinates > 0}
+                    title={user._count.subordinates > 0 ? "Tidak bisa hapus user yang memiliki bawahan" : "Hapus User"}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-[900px] w-full whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
