@@ -46,7 +46,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
     if (!session) return
 
     const lastViewedKey = `notif_last_viewed_${session.user.id}`
-    localStorage.setItem(lastViewedKey, new Date().toISOString())
+    try {
+      localStorage.setItem(lastViewedKey, new Date().toISOString())
+    } catch (e) {
+      // Safe fallback
+    }
     setNotificationCount(0)
   }, [session])
 
