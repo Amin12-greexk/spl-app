@@ -158,7 +158,7 @@ export default function Error({
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-500">
-              Butuh bantuan? Hubungi IT Support
+              Butuh bantuan? Hubungi tim IT
             </p>
           </div>
         </div>

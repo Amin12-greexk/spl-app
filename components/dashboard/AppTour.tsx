@@ -273,6 +273,21 @@ const PENGAJUAN_HREF: Record<string, string> = {
 const TOUR_SEEN_KEY = (id: string) => `spl_tour_seen_${id}`
 const TOUR_PHASE_KEY = (id: string) => `spl_tour_phase_${id}`
 
+const safeStorage = {
+    getItem: (key: string) => {
+        if (typeof window === "undefined") return null
+        try { return window.localStorage.getItem(key) } catch (e) { return null }
+    },
+    setItem: (key: string, value: string) => {
+        if (typeof window === "undefined") return
+        try { window.localStorage.setItem(key, value) } catch (e) { }
+    },
+    removeItem: (key: string) => {
+        if (typeof window === "undefined") return
+        try { window.localStorage.removeItem(key) } catch (e) { }
+    }
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function AppTour() {
     const { data: session } = useSession()
@@ -343,7 +358,7 @@ export default function AppTour() {
         } else {
             // Navigate first; pathname useEffect will start the phase on arrival
             pendingPhaseRef.current = next
-            if (userId) localStorage.setItem(TOUR_PHASE_KEY(userId), next)
+            if (userId) safeStorage.setItem(TOUR_PHASE_KEY(userId), next)
             router.push(targetPath)
         }
     }
@@ -352,9 +367,9 @@ export default function AppTour() {
     useEffect(() => {
         if (!userId) return
         if (hasStartedRef.current) return
-        if (localStorage.getItem(TOUR_SEEN_KEY(userId))) return
+        if (safeStorage.getItem(TOUR_SEEN_KEY(userId))) return
 
-        const savedPhase = localStorage.getItem(TOUR_PHASE_KEY(userId)) as PhaseKey | null
+        const savedPhase = safeStorage.getItem(TOUR_PHASE_KEY(userId)) as PhaseKey | null
 
         hasStartedRef.current = true
 
@@ -369,7 +384,7 @@ export default function AppTour() {
             // Brand new tour: always start from dashboard home for consistent order
             if (!isDashboardHome(pathname)) {
                 pendingPhaseRef.current = "sidebar"
-                localStorage.setItem(TOUR_PHASE_KEY(userId), "sidebar")
+                safeStorage.setItem(TOUR_PHASE_KEY(userId), "sidebar")
                 router.replace("/dashboard")
                 return
             }
@@ -382,7 +397,7 @@ export default function AppTour() {
     // ── Pathname change: start pending phase when on the right page ───────────
     useEffect(() => {
         if (!userId) return
-        if (localStorage.getItem(TOUR_SEEN_KEY(userId))) return
+        if (safeStorage.getItem(TOUR_SEEN_KEY(userId))) return
         if (run) return // A phase is already running
         if (!pendingPhaseRef.current) return
 
@@ -397,7 +412,7 @@ export default function AppTour() {
         if (!isMatch) return
 
         // We arrived at the right page — clear pending and start
-        if (userId) localStorage.removeItem(TOUR_PHASE_KEY(userId))
+        if (userId) safeStorage.removeItem(TOUR_PHASE_KEY(userId))
         doStartPhase(pending, 700)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname, run])
@@ -413,8 +428,8 @@ export default function AppTour() {
         if (status === STATUS.SKIPPED) {
             setRun(false)
             if (userId) {
-                localStorage.setItem(TOUR_SEEN_KEY(userId), "true")
-                localStorage.removeItem(TOUR_PHASE_KEY(userId))
+                safeStorage.setItem(TOUR_SEEN_KEY(userId), "true")
+                safeStorage.removeItem(TOUR_PHASE_KEY(userId))
             }
             return
         }
@@ -430,8 +445,8 @@ export default function AppTour() {
             // Manager has no pengajuan SPL step — end tour after dashboard
             if (userRole === "MANAGER") {
                 if (userId) {
-                    localStorage.setItem(TOUR_SEEN_KEY(userId), "true")
-                    localStorage.removeItem(TOUR_PHASE_KEY(userId))
+                    safeStorage.setItem(TOUR_SEEN_KEY(userId), "true")
+                    safeStorage.removeItem(TOUR_PHASE_KEY(userId))
                 }
                 return
             }
@@ -448,8 +463,8 @@ export default function AppTour() {
         } else if (phase === "telat") {
             // All done!
             if (userId) {
-                localStorage.setItem(TOUR_SEEN_KEY(userId), "true")
-                localStorage.removeItem(TOUR_PHASE_KEY(userId))
+                safeStorage.setItem(TOUR_SEEN_KEY(userId), "true")
+                safeStorage.removeItem(TOUR_PHASE_KEY(userId))
             }
         }
     }

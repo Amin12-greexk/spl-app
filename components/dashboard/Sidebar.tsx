@@ -63,7 +63,14 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     if (!session?.user?.id || !userRole) return
 
     const lastViewedKey = `notif_last_viewed_${session.user.id}`
-    const lastViewedStr = typeof window !== "undefined" ? localStorage.getItem(lastViewedKey) : null
+    let lastViewedStr: string | null = null
+    if (typeof window !== "undefined") {
+      try {
+        lastViewedStr = localStorage.getItem(lastViewedKey)
+      } catch (e) {
+        // Safe fallback in Safari Private mode
+      }
+    }
     const lastViewedTime = lastViewedStr ? new Date(lastViewedStr) : new Date(0)
     const normalizeSpls = (payload: any) => {
       if (!payload) return []

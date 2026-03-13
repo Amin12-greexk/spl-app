@@ -127,61 +127,61 @@ export default function Header({ onMenuClick }: HeaderProps) {
           return
         }
         const recentUpdates = data
-            .filter((spl: any) => {
-              // Filter harus sama dengan logic di NotificationProvider
-              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
-              const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-              const requesterId = spl.requesterId || spl.requester?.id
-              const isOwn = requesterId === sessionUserId
-              return isNotPending && isRecent && isOwn
-            })
-            .map((spl: any) => {
-              // Format tanggal dengan validasi
-              const formatDate = (dateString: string) => {
-                if (!dateString) return 'tanggal tidak tersedia'
-                try {
-                  const date = new Date(dateString)
-                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
-                  return date.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })
-                } catch {
-                  return 'tanggal tidak valid'
-                }
+          .filter((spl: any) => {
+            // Filter harus sama dengan logic di NotificationProvider
+            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            const requesterId = spl.requesterId || spl.requester?.id
+            const isOwn = requesterId === sessionUserId
+            return isNotPending && isRecent && isOwn
+          })
+          .map((spl: any) => {
+            // Format tanggal dengan validasi
+            const formatDate = (dateString: string) => {
+              if (!dateString) return 'tanggal tidak tersedia'
+              try {
+                const date = new Date(dateString)
+                if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                return date.toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })
+              } catch {
+                return 'tanggal tidak valid'
               }
+            }
 
-              // Format approval date dengan waktu
-              const formatApprovalDate = (dateString: string) => {
-                if (!dateString) return ''
-                try {
-                  const date = new Date(dateString)
-                  if (isNaN(date.getTime())) return ''
-                  return date.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })
-                } catch {
-                  return ''
-                }
+            // Format approval date dengan waktu
+            const formatApprovalDate = (dateString: string) => {
+              if (!dateString) return ''
+              try {
+                const date = new Date(dateString)
+                if (isNaN(date.getTime())) return ''
+                return date.toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              } catch {
+                return ''
               }
+            }
 
-              const statusText = spl.status === "APPROVED" ? "disetujui" : spl.status === "REJECTED" ? "ditolak" : "diupdate"
-              const approvalDateText = formatApprovalDate(spl.approvalDate)
+            const statusText = spl.status === "APPROVED" ? "disetujui" : spl.status === "REJECTED" ? "ditolak" : "diupdate"
+            const approvalDateText = formatApprovalDate(spl.approvalDate)
 
-              return {
-                id: spl.id,
-                title: `SPL ${spl.status === "APPROVED" ? "Disetujui" : spl.status === "REJECTED" ? "Ditolak" : "Diupdate"}`,
-                message: `SPL untuk tanggal ${formatDate(spl.date)} telah ${statusText}${approvalDateText ? ` pada ${approvalDateText}` : ''}`,
-                status: spl.status,
-                createdAt: spl.approvalDate || spl.updatedAt,
-              }
-            })
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            return {
+              id: spl.id,
+              title: `SPL ${spl.status === "APPROVED" ? "Disetujui" : spl.status === "REJECTED" ? "Ditolak" : "Diupdate"}`,
+              message: `SPL untuk tanggal ${formatDate(spl.date)} telah ${statusText}${approvalDateText ? ` pada ${approvalDateText}` : ''}`,
+              status: spl.status,
+              createdAt: spl.approvalDate || spl.updatedAt,
+            }
+          })
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         allNotifications.push(...recentUpdates)
 
         const manualData = await fetchJson("/api/spl/telat-input")
@@ -363,35 +363,35 @@ export default function Header({ onMenuClick }: HeaderProps) {
           return
         }
         const pendingNotifications = data
-            .map((spl: any) => {
-              const formatDate = (dateString: string) => {
-                if (!dateString) return 'tanggal tidak tersedia'
-                try {
-                  const date = new Date(dateString)
-                  if (isNaN(date.getTime())) return 'tanggal tidak valid'
-                  return date.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })
-                } catch {
-                  return 'tanggal tidak valid'
-                }
+          .map((spl: any) => {
+            const formatDate = (dateString: string) => {
+              if (!dateString) return 'tanggal tidak tersedia'
+              try {
+                const date = new Date(dateString)
+                if (isNaN(date.getTime())) return 'tanggal tidak valid'
+                return date.toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })
+              } catch {
+                return 'tanggal tidak valid'
               }
+            }
 
-              return {
-                id: spl.id,
-                title: "SPL Perlu Persetujuan",
-                message: `${spl.requester?.name || "Karyawan"} mengajukan SPL ${formatDate(spl.date)}`,
-                status: spl.status,
-                createdAt: spl.createdAt,
-                employeeName: spl.requester?.name,
-              }
-            })
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 10)
+            return {
+              id: spl.id,
+              title: "SPL Perlu Persetujuan",
+              message: `${spl.requester?.name || "Karyawan"} mengajukan SPL ${formatDate(spl.date)}`,
+              status: spl.status,
+              createdAt: spl.createdAt,
+              employeeName: spl.requester?.name,
+            }
+          })
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 10)
 
-          setNotifications(pendingNotifications)
+        setNotifications(pendingNotifications)
       }
     } catch (error) {
       setNotifications([])
@@ -459,6 +459,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
   // Format relative time
   const getRelativeTime = useCallback((dateString: string) => {
     const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "Waktu tidak tersedia"
+
     const now = new Date()
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
@@ -471,16 +473,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <>
-      <header 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 w-full ${
-          isScrolled 
-            ? "bg-white/85 backdrop-blur-md shadow-sm border-b border-gray-200/50 py-2" 
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 w-full ${isScrolled
+            ? "bg-white/85 backdrop-blur-md shadow-sm border-b border-gray-200/50 py-2"
             : "bg-white border-b border-gray-100 py-3"
-        }`}
+          }`}
       >
         <div className="px-4 sm:px-6 lg:px-8 w-full">
           <div className="flex items-center justify-between">
-            
+
             {/* --- LEFT: BRANDING --- */}
             <div className="flex items-center gap-4">
               {/* Mobile Toggle */}
@@ -506,7 +507,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
                 {/* Vertical Divider */}
                 <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
-                
+
                 <div className="hidden sm:block">
                   <h1 className="text-sm font-bold text-gray-900 leading-none mb-1">
                     PT Tunas Esta Indonesia
@@ -525,11 +526,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <div className="relative mr-1 sm:mr-2">
                 <button
                   onClick={handleNotificationClick}
-                  className={`p-2 sm:p-2.5 rounded-full transition-all duration-200 ${
-                    showNotificationMenu
+                  className={`p-2 sm:p-2.5 rounded-full transition-all duration-200 ${showNotificationMenu
                       ? "bg-green-50 text-green-600 ring-2 ring-green-100"
                       : "text-gray-500 hover:bg-gray-100 hover:text-green-600"
-                  }`}
+                    }`}
                 >
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -591,13 +591,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
                                 className="w-full p-3 sm:p-4 hover:bg-gray-50 transition-micro text-left group"
                               >
                                 <div className="flex items-start gap-2 sm:gap-3">
-                                  <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
-                                    notification.status === "APPROVED"
+                                  <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${notification.status === "APPROVED"
                                       ? "bg-green-100 text-green-600"
                                       : notification.status === "REJECTED"
-                                      ? "bg-red-100 text-red-600"
-                                      : "bg-blue-100 text-blue-600"
-                                  }`}>
+                                        ? "bg-red-100 text-red-600"
+                                        : "bg-blue-100 text-blue-600"
+                                    }`}>
                                     {notification.status === "APPROVED" ? (
                                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -664,16 +663,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     setShowNotificationMenu(false) // Close notification menu if open
                     setShowUserMenu(!showUserMenu)
                   }}
-                  className={`flex items-center gap-3 pl-1 pr-1 sm:pr-4 py-1 rounded-full border transition-all duration-200 group ${
-                    showUserMenu
+                  className={`flex items-center gap-3 pl-1 pr-1 sm:pr-4 py-1 rounded-full border transition-all duration-200 group ${showUserMenu
                       ? "bg-green-50/50 border-green-200 ring-2 ring-green-100"
                       : "bg-white border-gray-200 hover:border-green-200 hover:shadow-sm"
-                  }`}
+                    }`}
                 >
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white">
                     {session?.user?.name ? getInitials(session.user.name) : "U"}
                   </div>
-                  
+
                   <div className="hidden sm:flex flex-col items-start mr-1">
                     <span className="text-xs font-bold text-gray-700 group-hover:text-green-700 transition-colors">
                       {session?.user?.name?.split(" ")[0]}
@@ -684,10 +682,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
                         : ''}
                     </span>
                   </div>
-                  <svg 
-                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 hidden sm:block ${showUserMenu ? 'rotate-180 text-green-600' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 hidden sm:block ${showUserMenu ? 'rotate-180 text-green-600' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -701,21 +699,21 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {/* User Info Header */}
                       <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center gap-3 mb-3">
-                           <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg">
-                             {session?.user?.name ? getInitials(session.user.name) : "U"}
-                           </div>
-                           <div>
-                              <p className="text-sm font-bold text-gray-900 line-clamp-1">{session?.user?.name}</p>
-                              <p className="text-xs text-gray-500 line-clamp-1">{session?.user?.email}</p>
-                           </div>
+                          <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg">
+                            {session?.user?.name ? getInitials(session.user.name) : "U"}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900 line-clamp-1">{session?.user?.name}</p>
+                            <p className="text-xs text-gray-500 line-clamp-1">{session?.user?.email}</p>
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
                             {session?.user?.role
                               ? getRoleLabel(
-                                  session.user.role,
-                                  session?.user?.department
-                                )
+                                session.user.role,
+                                session?.user?.department
+                              )
                               : ''}
                           </span>
                           {session?.user?.pin && (
@@ -733,7 +731,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-green-50 hover:text-green-700 transition-all"
                         >
                           <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                           </svg>
                           Dashboard
                         </a>
