@@ -148,29 +148,29 @@ export const requestNotificationPermission = async (): Promise<string | null> =>
   }
 }
 
-export const onMessageListener = async (): Promise<any> => {
+export const onMessageListener = (callback: (payload: any) => void) => {
   const { messaging: currentMessaging } = initializeFirebase()
   
   if (!currentMessaging) {
-    throw new Error('Firebase messaging not initialized')
+    console.warn('Firebase messaging not initialized')
+    return () => {}
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      const unsubscribe = onMessage(currentMessaging, (payload) => {
-        console.log('📬 Foreground message received:', payload)
-        resolve(payload)
-      })
-      
-      // Simpan unsubscribe function untuk cleanup jika diperlukan
-      if (typeof window !== 'undefined') {
-        (window as any).__firebaseUnsubscribe = unsubscribe
-      }
-    } catch (error) {
-      console.error('❌ Error setting up message listener:', error)
-      reject(error)
+  try {
+    const unsubscribe = onMessage(currentMessaging, (payload) => {
+      console.log('📬 Foreground message received:', payload)
+      callback(payload)
+    })
+    
+    // Simpan unsubscribe function untuk cleanup jika diperlukan
+    if (typeof window !== 'undefined') {
+      (window as any).__firebaseUnsubscribe = unsubscribe
     }
-  })
+    return unsubscribe
+  } catch (error) {
+    console.error('❌ Error setting up message listener:', error)
+    return () => {}
+  }
 }
 
 // Utility function untuk check apakah Firebase siap

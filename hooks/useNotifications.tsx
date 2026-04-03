@@ -110,9 +110,7 @@ export function useNotifications() {
       const setupFirebaseListener = async () => {
         const { onMessageListener } = await import("@/lib/firebase")
         
-        const messagePromise = onMessageListener()
-        
-        messagePromise.then((payload: any) => {
+        const unsubscribeMsg = onMessageListener((payload: any) => {
           console.log("📬 Received foreground message:", payload)
           
           const title = payload.notification?.title || "Notifikasi Baru"
@@ -160,16 +158,18 @@ export function useNotifications() {
               position: 'top-right',
             }
           )
-        }).catch((err: any) => {
-          console.log("❌ Failed to receive foreground message:", err)
         })
+        
+        return unsubscribeMsg
       }
 
-      setupFirebaseListener()
+      let activeUnsubscribe = () => {}
+      setupFirebaseListener().then(unsub => { activeUnsubscribe = unsub || (() => {}) })
       
       // Return cleanup function
       return () => {
         console.log("🧹 Cleaning up notification listener")
+        activeUnsubscribe()
       }
     } catch (error) {
       console.log("Firebase not available, using fallback notification system")
