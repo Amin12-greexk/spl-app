@@ -252,9 +252,7 @@ export default function NotificationProvider({ children }: NotificationProviderP
         try {
           const { onMessageListener } = await import("@/lib/firebase")
 
-          const messagePromise = onMessageListener()
-
-          messagePromise.then((payload: any) => {
+          const unsubscribe = onMessageListener((payload: any) => {
             const title = payload.notification?.title || "Notifikasi Baru"
             const body = payload.notification?.body || ""
             const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
@@ -329,9 +327,13 @@ export default function NotificationProvider({ children }: NotificationProviderP
                 position: 'top-right',
               }
             )
-          }).catch((err: any) => {
-            // Failed to receive foreground message - silent fail
           })
+
+          // Cleanup listener on unmount
+          return () => {
+            if (unsubscribe) unsubscribe()
+          }
+
 
         } catch (err) {
           // Firebase message listener setup failed - silent fail
