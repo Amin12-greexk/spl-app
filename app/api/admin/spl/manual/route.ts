@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { userId, date, startTime, endTime, reason, projectName } = body
+    const bypassWorkSchedule = body?.bypassWorkSchedule === true
 
     // Validation
     if (!userId || !date || !startTime || !endTime || !reason) {
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     let regularEndAt: Date | null = null
     let isSecurityWeeklyHoliday = false
 
-    if (isSecurityDepartment) {
+    if (!bypassWorkSchedule && isSecurityDepartment) {
       const dayOfWeek = getJakartaDayOfWeek(requestedDate)
       const shiftAssignment = await prisma.securityShiftAssignment.findUnique({
         where: {
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
-    } else {
+    } else if (!bypassWorkSchedule) {
       const dayOfWeek = getJakartaDayOfWeek(requestedDate)
       const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)
       const overrideSetting = await prisma.setting.findUnique({
@@ -236,7 +237,7 @@ export async function POST(req: NextRequest) {
 
     const hasRegularWindow = Boolean(regularStartAt && regularEndAt)
 
-    if (!hasRegularWindow && !isSecurityWeeklyHoliday) {
+    if (!bypassWorkSchedule && !hasRegularWindow && !isSecurityWeeklyHoliday) {
       return NextResponse.json(
         { error: "Jam reguler tidak valid. Hubungi Super Admin." },
         { status: 400 }
@@ -264,7 +265,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (hasRegularWindow) {
+    if (!bypassWorkSchedule && hasRegularWindow) {
       const overlapsRegular = windowsOverlap(
         { start: regularStartAt!, end: regularEndAt! },
         { start: plannedStartAt, end: plannedEndAt }
