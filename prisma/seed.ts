@@ -1,373 +1,334 @@
-import * as bcrypt from "bcryptjs"
 import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
 const JAKARTA_OFFSET_MINUTES = 7 * 60
-const MINUTES_PER_DAY = 24 * 60
 
-type GanesSplInput = {
-  date: string
-  jamMasuk: string
-  jamMulaiLembur: string
-  jamPulang: string
-  alasan: string
+const LEGACY_DEPARTMENT_SUPERVISOR_MAPPING: Record<string, "GA" | "DEPARTMENT_HEAD"> = {
+  Security: "GA",
+  Teknik: "GA",
+  Driver: "GA",
+  HR: "DEPARTMENT_HEAD",
+  IT: "DEPARTMENT_HEAD",
+  Lab: "DEPARTMENT_HEAD",
 }
 
-const GANES_SPL_DATA: GanesSplInput[] = [
+type SeedEntry = {
+  date: string
+  startTime: string
+  endTime: string
+  reason: string
+}
+
+const TARGET_NAME = "FINA OKTAVIANI"
+const MANUAL_ENTRY_BY = "seed-fina-telat-input-20260407"
+const TARGET_ENTRIES: SeedEntry[] = [
   {
-    date: "2026-01-21",
-    jamMasuk: "09:23",
-    jamMulaiLembur: "16:00",
-    jamPulang: "19:28",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
+    date: "2026-04-03",
+    startTime: "07:00",
+    endTime: "18:00",
+    reason: "Cek body",
   },
   {
-    date: "2026-01-22",
-    jamMasuk: "06:34",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:43",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-23",
-    jamMasuk: "07:48",
-    jamMulaiLembur: "16:00",
-    jamPulang: "19:58",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-24",
-    jamMasuk: "07:46",
-    jamMulaiLembur: "13:00",
-    jamPulang: "17:30",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-26",
-    jamMasuk: "07:49",
-    jamMulaiLembur: "16:00",
-    jamPulang: "20:40",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-27",
-    jamMasuk: "10:33",
-    jamMulaiLembur: "16:00",
-    jamPulang: "21:54",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-29",
-    jamMasuk: "07:48",
-    jamMulaiLembur: "16:00",
-    jamPulang: "17:26",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-01-30",
-    jamMasuk: "07:52",
-    jamMulaiLembur: "16:00",
-    jamPulang: "22:00",
-    alasan: "TUGAS KUNJUNGAN KE SUB TEMANGGUNG",
-  },
-  {
-    date: "2026-01-31",
-    jamMasuk: "07:43",
-    jamMulaiLembur: "13:00",
-    jamPulang: "20:51",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-02-02",
-    jamMasuk: "07:46",
-    jamMulaiLembur: "16:00",
-    jamPulang: "23:07",
-    alasan: "PERSIAPAN AUDIT",
-  },
-  {
-    date: "2026-02-03",
-    jamMasuk: "10:12",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:24",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-02-04",
-    jamMasuk: "07:44",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:12",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-02-05",
-    jamMasuk: "07:58",
-    jamMulaiLembur: "16:00",
-    jamPulang: "19:32",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-02-06",
-    jamMasuk: "07:50",
-    jamMulaiLembur: "16:00",
-    jamPulang: "17:38",
-    alasan: "MENGAWASI PRODUKSI BAGIAN INDOMIE",
-  },
-  {
-    date: "2026-02-07",
-    jamMasuk: "07:54",
-    jamMulaiLembur: "13:00",
-    jamPulang: "19:45",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-09",
-    jamMasuk: "08:45",
-    jamMulaiLembur: "16:00",
-    jamPulang: "21:01",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-10",
-    jamMasuk: "07:54",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:31",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-11",
-    jamMasuk: "07:49",
-    jamMulaiLembur: "16:00",
-    jamPulang: "19:54",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-12",
-    jamMasuk: "07:43",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:50",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-13",
-    jamMasuk: "07:41",
-    jamMulaiLembur: "16:00",
-    jamPulang: "20:27",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-14",
-    jamMasuk: "09:55",
-    jamMulaiLembur: "13:00",
-    jamPulang: "18:13",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
-  },
-  {
-    date: "2026-02-18",
-    jamMasuk: "07:48",
-    jamMulaiLembur: "16:00",
-    jamPulang: "18:32",
-    alasan:
-      "MENGAWASI PRODUKSI BAGIAN INDOMIE DAN SUPPORT BAGIAN KOREKSI KERING",
+    date: "2026-04-04",
+    startTime: "07:30",
+    endTime: "15:30",
+    reason: "Backup ke Esta",
   },
 ]
 
-const parseTime = (value: string) => {
-  const [hours, minutes] = value.split(":").map(Number)
-  if (
-    !Number.isFinite(hours) ||
-    !Number.isFinite(minutes) ||
-    hours < 0 ||
-    hours > 23 ||
-    minutes < 0 ||
-    minutes > 59
-  ) {
+const makeJakartaDate = (
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0
+) =>
+  new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second) -
+      JAKARTA_OFFSET_MINUTES * 60000
+  )
+
+const getJakartaParts = (value: Date) => {
+  const adjusted = new Date(value.getTime() + JAKARTA_OFFSET_MINUTES * 60000)
+  return {
+    year: adjusted.getUTCFullYear(),
+    month: adjusted.getUTCMonth() + 1,
+    day: adjusted.getUTCDate(),
+  }
+}
+
+const parseDateOnly = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) {
+    throw new Error(`Format tanggal tidak valid: ${value}`)
+  }
+
+  return makeJakartaDate(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    0,
+    0,
+    0
+  )
+}
+
+const addDays = (value: Date, days: number) =>
+  new Date(value.getTime() + days * 24 * 60 * 60 * 1000)
+
+const parseTimeToMinutes = (value: string) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim())
+  if (!match) {
     throw new Error(`Format jam tidak valid: ${value}`)
   }
-  return { hours, minutes }
-}
 
-const makeJakartaDate = (dateValue: string, timeValue: string) => {
-  const [year, month, day] = dateValue.split("-").map(Number)
-  if (
-    !Number.isFinite(year) ||
-    !Number.isFinite(month) ||
-    !Number.isFinite(day)
-  ) {
-    throw new Error(`Format tanggal tidak valid: ${dateValue}`)
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    throw new Error(`Nilai jam tidak valid: ${value}`)
   }
 
-  const { hours, minutes } = parseTime(timeValue)
-  const utcMs =
-    Date.UTC(year, month - 1, day, hours, minutes, 0, 0) -
-    JAKARTA_OFFSET_MINUTES * 60_000
-  return new Date(utcMs)
+  return hour * 60 + minute
 }
 
-const toMinutes = (value: string) => {
-  const { hours, minutes } = parseTime(value)
-  return hours * 60 + minutes
+const setTimeOnDate = (baseDate: Date, timeValue: string) => {
+  const minutes = parseTimeToMinutes(timeValue)
+  const parts = getJakartaParts(baseDate)
+  return makeJakartaDate(
+    parts.year,
+    parts.month,
+    parts.day,
+    Math.floor(minutes / 60),
+    minutes % 60,
+    0
+  )
 }
 
-const getDurationMinutes = (startTime: string, endTime: string) => {
-  const start = toMinutes(startTime)
-  const end = toMinutes(endTime)
-  const diff = end - start
-  return diff >= 0 ? diff : diff + MINUTES_PER_DAY
+const makeWindow = (baseDay: Date, startTime: string, endTime: string) => {
+  const start = setTimeOnDate(baseDay, startTime)
+  let end = setTimeOnDate(baseDay, endTime)
+
+  if (end <= start) {
+    end = addDays(end, 1)
+  }
+
+  return { start, end }
 }
 
-const addDay = (value: Date) => {
-  return new Date(value.getTime() + 24 * 60 * 60 * 1000)
+const getSupervisorForDepartment = async (params: {
+  departmentId?: string | null
+  departmentName?: string | null
+}) => {
+  const departmentName = params.departmentName?.trim() || null
+  let approvalMode: "GA" | "DEPARTMENT_HEAD" | null = null
+
+  if (params.departmentId) {
+    const department = await prisma.department.findUnique({
+      where: { id: params.departmentId },
+      select: {
+        id: true,
+        name: true,
+        supervised: true,
+        approvalMode: true,
+      },
+    })
+
+    if (department?.supervised) {
+      if (department.approvalMode === "GA" || department.approvalMode === "DEPARTMENT_HEAD") {
+        approvalMode = department.approvalMode
+      }
+    }
+
+    if (department && approvalMode === null && departmentName) {
+      approvalMode = LEGACY_DEPARTMENT_SUPERVISOR_MAPPING[department.name] || null
+    }
+  }
+
+  if (!approvalMode && departmentName) {
+    approvalMode = LEGACY_DEPARTMENT_SUPERVISOR_MAPPING[departmentName] || null
+  }
+
+  if (!approvalMode) {
+    return null
+  }
+
+  if (approvalMode === "GA") {
+    return prisma.user.findFirst({
+      where: { role: "GA" },
+      select: { id: true },
+    })
+  }
+
+  return prisma.user.findFirst({
+    where: {
+      role: "DEPARTMENT_HEAD",
+      OR: [
+        params.departmentId ? { departmentId: params.departmentId } : undefined,
+        departmentName
+          ? {
+              departmentName: {
+                equals: departmentName,
+                mode: "insensitive",
+              },
+            }
+          : undefined,
+      ].filter(Boolean) as Array<Record<string, unknown>>,
+    },
+    select: { id: true },
+  })
 }
 
 async function main() {
-  console.log("Mulai tambah data SPL Ganes tanpa reset database...")
-
-  const defaultPassword = await bcrypt.hash("12345678", 10)
-
-  const produksiDepartment = await prisma.department.upsert({
-    where: { name: "Produksi" },
-    update: {},
-    create: {
-      name: "Produksi",
-      supervised: true,
-      approvalMode: "DIRECT",
-    },
-  })
-
-  const manager = await prisma.user.upsert({
-    where: { email: "tiyas.indah.setyowuri@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "tiyas.indah.setyowuri@tunasestaindonesia.com",
-      password: defaultPassword,
-      pin: "001",
-      name: "TIYAS INDAH SETYOWURI",
-      role: "MANAGER",
-      departmentId: produksiDepartment.id,
-      departmentName: produksiDepartment.name,
-      position: "Manager",
-      regularStartTime: "08:00",
-      regularEndTime: "16:00",
-    },
-  })
-
-  const ganes = await prisma.user.upsert({
-    where: { email: "ganes@tunasestaindonesia.com" },
-    update: {},
-    create: {
-      email: "ganes@tunasestaindonesia.com",
-      password: defaultPassword,
-      pin: "137",
-      name: "GANES TIRZA YEMIMA",
-      role: "STAFF",
-      departmentId: produksiDepartment.id,
-      departmentName: produksiDepartment.name,
-      position: "Produksi",
-      regularStartTime: "08:00",
-      regularEndTime: "16:00",
-      supervisorId: manager.id,
-    },
-  })
-
-  let insertedCount = 0
-  let skippedCount = 0
-
-  for (const row of GANES_SPL_DATA) {
-    const date = makeJakartaDate(row.date, "00:00")
-    const regularStartAt = makeJakartaDate(row.date, row.jamMasuk)
-    const regularEndAt = makeJakartaDate(row.date, row.jamMulaiLembur)
-    const plannedStartAt = makeJakartaDate(row.date, row.jamMulaiLembur)
-    let plannedEndAt = makeJakartaDate(row.date, row.jamPulang)
-
-    if (plannedEndAt <= plannedStartAt) {
-      plannedEndAt = addDay(plannedEndAt)
-    }
-
-    const totalMinutes = getDurationMinutes(row.jamMulaiLembur, row.jamPulang)
-    const totalHours = Number((totalMinutes / 60).toFixed(2))
-
-    const existingSpl = await prisma.spl.findFirst({
-      where: {
-        requesterId: ganes.id,
-        date,
-        startTime: row.jamMulaiLembur,
-        endTime: row.jamPulang,
-        source: "MANUAL",
-        isManualEntry: true,
+  const user = await prisma.user.findFirst({
+    where: {
+      name: {
+        equals: TARGET_NAME,
+        mode: "insensitive",
       },
-      select: { id: true },
-    })
-
-    if (existingSpl) {
-      skippedCount += 1
-      continue
-    }
-
-    await prisma.spl.create({
-      data: {
-      requesterId: ganes.id,
-      date,
-      startTime: row.jamMulaiLembur,
-      endTime: row.jamPulang,
-      totalHours,
-      reason: row.alasan,
-      projectName: null,
-      status: "PENDING_SUPERVISOR",
-      source: "MANUAL",
-      signature: null,
-      proofImage: null,
-      actualStartAt: null,
-      actualEndAt: null,
-      actualTotalHours: null,
-      realizationNote: null,
-      realizationProofImage: null,
-      overrunReason: null,
-      regularStartAt,
-      regularEndAt,
-      plannedStartAt,
-      plannedEndAt,
-      realizedMinutes: null,
-      realizationCounted: null,
-      realizationCancelReason: null,
-      supervisorId: manager.id,
-      supervisorApprovalDate: null,
-      supervisorSignature: null,
-      supervisorRejectionReason: null,
-      approverId: null,
-      approvalDate: null,
-      rejectionReason: null,
-      isManualEntry: true,
-      manualEntryBy: manager.id,
-      requesterSignedAt: null,
+    },
+    select: {
+      id: true,
+      name: true,
+      role: true,
+      email: true,
+      departmentId: true,
+      departmentName: true,
+      regularStartTime: true,
+      regularEndTime: true,
+      supervisorId: true,
+      department: {
+        select: {
+          id: true,
+          name: true,
+        },
       },
-    })
+    },
+  })
 
-    insertedCount += 1
+  if (!user) {
+    throw new Error(`User ${TARGET_NAME} tidak ditemukan`)
   }
 
-  const [userCount, splCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.spl.count(),
-  ])
+  let status = "PENDING_MANAGER"
+  let supervisorId: string | null = null
+  const routingDepartmentName = user.department?.name || user.departmentName || null
+
+  if (user.supervisorId) {
+    status = "PENDING_SUPERVISOR"
+    supervisorId = user.supervisorId
+  } else if (["STAFF", "TEKNISI", "DRIVER"].includes(user.role)) {
+    const supervisor = await getSupervisorForDepartment({
+      departmentId: user.departmentId,
+      departmentName: routingDepartmentName,
+    })
+
+    if (supervisor) {
+      status = "PENDING_SUPERVISOR"
+      supervisorId = supervisor.id
+    }
+  }
+
+  const createdRows = await prisma.$transaction(async (tx) => {
+    const rows = []
+
+    for (const entry of TARGET_ENTRIES) {
+      const requestedDate = parseDateOnly(entry.date)
+      const nextDate = addDays(requestedDate, 1)
+      const plannedWindow = makeWindow(requestedDate, entry.startTime, entry.endTime)
+      const totalHours = Number(
+        (
+          (plannedWindow.end.getTime() - plannedWindow.start.getTime()) /
+          (60 * 60 * 1000)
+        ).toFixed(2)
+      )
+
+      const regularStartAt =
+        user.regularStartTime && user.regularEndTime
+          ? setTimeOnDate(requestedDate, user.regularStartTime)
+          : null
+      const regularEndAt =
+        user.regularStartTime && user.regularEndTime
+          ? setTimeOnDate(requestedDate, user.regularEndTime)
+          : null
+
+      await tx.spl.deleteMany({
+        where: {
+          requesterId: user.id,
+          source: "MANUAL",
+          isManualEntry: true,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          date: {
+            gte: requestedDate,
+            lt: nextDate,
+          },
+        },
+      })
+
+      const created = await tx.spl.create({
+        data: {
+          requesterId: user.id,
+          date: requestedDate,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          totalHours,
+          reason: entry.reason,
+          status,
+          source: "MANUAL",
+          isManualEntry: true,
+          manualEntryBy: MANUAL_ENTRY_BY,
+          requesterSignedAt: null,
+          supervisorId,
+          regularStartAt,
+          regularEndAt,
+          plannedStartAt: plannedWindow.start,
+          plannedEndAt: plannedWindow.end,
+        },
+        select: {
+          id: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          totalHours: true,
+          status: true,
+          source: true,
+          isManualEntry: true,
+          requesterSignedAt: true,
+        },
+      })
+
+      rows.push(created)
+    }
+
+    return rows
+  })
 
   console.log(
-    `Selesai. SPL baru ditambahkan: ${insertedCount}, dilewati (sudah ada): ${skippedCount}`
+    JSON.stringify(
+      {
+        requester: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        status,
+        supervisorId,
+        seededCount: createdRows.length,
+        rows: createdRows,
+      },
+      null,
+      2
+    )
   )
-  console.log(`Total user saat ini: ${userCount}, total SPL saat ini: ${splCount}`)
 }
 
 main()
   .catch((error) => {
     console.error("Seed gagal:", error)
-    process.exit(1)
+    process.exitCode = 1
   })
   .finally(async () => {
     await prisma.$disconnect()

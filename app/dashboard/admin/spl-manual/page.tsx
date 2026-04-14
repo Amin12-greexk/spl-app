@@ -34,6 +34,7 @@ export default function ManualSPLPage() {
     startTime: "",
     endTime: "",
     endDayOffset: 0,
+    bypassWorkSchedule: false,
     reason: "",
     projectName: "",
   })
@@ -122,6 +123,7 @@ export default function ManualSPLPage() {
         startTime: "",
         endTime: "",
         endDayOffset: 0,
+        bypassWorkSchedule: false,
         reason: "",
         projectName: "",
       })
@@ -232,6 +234,7 @@ export default function ManualSPLPage() {
             sebelum diteruskan ke supervisor/manager untuk persetujuan.</p>
             <p className="text-xs"><strong>Shift Malam:</strong> Untuk shift yang melewati tengah malam (contoh: 22:00-06:00), masukkan waktu selesai yang lebih kecil dari waktu mulai. Sistem akan otomatis menghitung durasi lintas hari.</p>
             <p className="text-xs"><strong>Lembur 2 Hari:</strong> Jika lembur berakhir di hari berikutnya meskipun jam selesai lebih besar dari jam mulai, pilih durasi 2 hari.</p>
+            <p className="text-xs"><strong>Bypass Jadwal:</strong> Khusus Super Admin, toggle bypass akan melewati validasi jam reguler user dan kasus hari libur seperti Minggu.</p>
           </div>
         </div>
       </div>
@@ -292,6 +295,32 @@ export default function ManualSPLPage() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
             required
           />
+        </div>
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={formData.bypassWorkSchedule}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  bypassWorkSchedule: e.target.checked,
+                })
+              }
+              className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="text-sm text-amber-900">
+              <span className="block font-semibold">
+                Bypass jam reguler dan hari libur
+              </span>
+              <span className="block text-xs text-amber-800 mt-1">
+                Aktifkan hanya jika SPL manual memang perlu menabrak jam kerja normal
+                atau diinput pada hari libur seperti Minggu. Validasi bentrok dengan
+                jadwal reguler akan dilewati.
+              </span>
+            </span>
+          </label>
         </div>
 
         {/* Duration Days */}
