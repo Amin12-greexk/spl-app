@@ -28,6 +28,38 @@ type DailyStatus = "present" | "partial" | "absent"
 
 const MAX_RANGE_DAYS = 31
 
+const exportHeaders = [
+  "No",
+  "Tanggal",
+  "Hari",
+  "Status",
+  "Scan Pertama",
+  "Scan Terakhir",
+  "Total Scan",
+  "Detail Scan",
+  "PIN",
+  "Nama Karyawan",
+  "Departemen",
+  "Role",
+  "Jam Reguler",
+]
+
+const exportColWidths = [
+  { wch: 5 },
+  { wch: 18 },
+  { wch: 16 },
+  { wch: 18 },
+  { wch: 14 },
+  { wch: 14 },
+  { wch: 12 },
+  { wch: 32 },
+  { wch: 14 },
+  { wch: 24 },
+  { wch: 18 },
+  { wch: 14 },
+  { wch: 18 },
+]
+
 const formatDateInput = (value: Date) => {
   const year = value.getFullYear()
   const month = String(value.getMonth() + 1).padStart(2, "0")
@@ -67,6 +99,20 @@ const formatScanTime = (value: string) => {
   })
 }
 
+const buildTimestamp = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  const hour = String(now.getHours()).padStart(2, "0")
+  const minute = String(now.getMinutes()).padStart(2, "0")
+  const second = String(now.getSeconds()).padStart(2, "0")
+  return `${year}${month}${day}_${hour}${minute}${second}`
+}
+
+const sanitizeFileName = (value: string) =>
+  value.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "Absensi"
+
 const getStatusConfig = (status: DailyStatus) => {
   if (status === "present") {
     return {
@@ -104,6 +150,7 @@ export default function AdminAttendanceDetailPage() {
   const [user, setUser] = useState<AttendanceUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -280,6 +327,53 @@ export default function AdminAttendanceDetailPage() {
       ? `${user.regularStartTime} - ${user.regularEndTime}`
       : "Belum diatur"
 
+  const exportToExcel = async () => {
+    if (dateRangeInfo.error || dailyRows.length === 0) {
+      toast.error("Tidak ada data absensi untuk diexport")
+      return
+    }
+
+    setExporting(true)
+    try {
+      const XLSX = await import("xlsx")
+      const exportRows = dailyRows.map((row, index) => ({
+        No: index + 1,
+        Tanggal: row.longDate,
+        Hari: row.weekday,
+        Status: getStatusConfig(row.status).label,
+        "Scan Pertama": row.firstScan,
+        "Scan Terakhir": row.lastScan,
+        "Total Scan": row.count,
+        "Detail Scan": row.scanTimes.length > 0 ? row.scanTimes.join(", ") : "-",
+        PIN: pinValue,
+        "Nama Karyawan": user?.name || "-",
+        Departemen: departmentLabel,
+        Role: user?.role || "-",
+        "Jam Reguler": regularHoursLabel,
+      }))
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows, {
+        header: exportHeaders,
+      })
+      worksheet["!cols"] = exportColWidths
+
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Absensi")
+
+      const fileName = `Absensi_${sanitizeFileName(
+        user?.name || pinValue
+      )}_${rangeStart}_${rangeEnd}_${buildTimestamp()}.xlsx`
+
+      XLSX.writeFile(workbook, fileName)
+      toast.success("Absensi berhasil diexport ke Excel")
+    } catch (error) {
+      console.error("Error exporting attendance detail:", error)
+      toast.error("Gagal export absensi")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (status === "loading" || loading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -326,6 +420,14 @@ export default function AdminAttendanceDetailPage() {
             >
               Kembali
             </Link>
+            <button
+              type="button"
+              onClick={exportToExcel}
+              disabled={exporting || Boolean(dateRangeInfo.error) || dailyRows.length === 0}
+              className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {exporting ? "Export..." : "Export Excel"}
+            </button>
             <button
               type="button"
               onClick={() => fetchAttendance()}

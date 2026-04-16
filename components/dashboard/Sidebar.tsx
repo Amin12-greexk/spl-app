@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Role } from "@/types"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 import { useStaggerAnimation } from "@/hooks/useGSAP"
@@ -11,6 +11,77 @@ import { useStaggerAnimation } from "@/hooks/useGSAP"
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
+}
+
+interface NavItemConfig {
+  name: string
+  href: string
+  icon: React.ReactNode
+  roles: Role[]
+  badge: number | null
+  badgeKey?: "manual" | "team" | "manager"
+  customCondition?: (role: string, position: string) => boolean
+}
+
+interface NavGroupConfig {
+  id: string
+  label: string
+}
+
+const NAV_GROUPS: NavGroupConfig[] = [
+  { id: "overview", label: "Utama" },
+  { id: "personal", label: "Aktivitas Saya" },
+  { id: "approval", label: "Tim & Persetujuan" },
+  { id: "monitoring", label: "Monitoring & Laporan" },
+  { id: "admin", label: "Admin Tools" },
+]
+
+const PRODUCTION_HEAD_HIDDEN_ROUTES = new Set([
+  "/dashboard/data-lama",
+  "/dashboard/telat-input",
+  "/dashboard/ga/pengajuan",
+  "/dashboard/ga/riwayat",
+])
+
+const EXACT_ONLY_HREFS = new Set([
+  "/dashboard",
+  "/dashboard/staff",
+  "/dashboard/ga",
+  "/dashboard/hr",
+  "/dashboard/admin",
+])
+
+const resolveNavGroupId = (href: string) => {
+  if (href.startsWith("/dashboard/admin")) return "admin"
+
+  if (href === "/dashboard" || href === "/dashboard/profile") {
+    return "overview"
+  }
+
+  if (
+    [
+      "/dashboard/staff/pengajuan",
+      "/dashboard/staff",
+      "/dashboard/telat-input",
+      "/dashboard/data-lama",
+      "/dashboard/ga/pengajuan",
+      "/dashboard/ga/riwayat",
+    ].includes(href)
+  ) {
+    return "personal"
+  }
+
+  if (
+    [
+      "/dashboard/ga/persetujuan",
+      "/dashboard/ga",
+      "/dashboard/hr/persetujuan",
+    ].includes(href)
+  ) {
+    return "approval"
+  }
+
+  return "monitoring"
 }
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
@@ -30,12 +101,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const isProductionHead =
     userRole === "DEPARTMENT_HEAD" &&
     (normalizedDepartment === "produksi" || normalizedDepartment === "production")
-  const productionHeadHiddenRoutes = new Set([
-    "/dashboard/data-lama",
-    "/dashboard/telat-input",
-    "/dashboard/ga/pengajuan",
-    "/dashboard/ga/riwayat",
-  ])
   const [manualPendingCount, setManualPendingCount] = useState(0)
   const [teamPendingCount, setTeamPendingCount] = useState(0)
   const [managerPendingCount, setManagerPendingCount] = useState(0)
@@ -156,15 +221,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
   }
 
-  const navItems: Array<{
-    name: string
-    href: string
-    icon: React.ReactNode
-    roles: Role[]
-    badge: number | null
-    badgeKey?: "manual" | "team" | "manager"
-    customCondition?: (role: string, position: string) => boolean
-  }> = [
+  const navItems = useMemo<NavItemConfig[]>(() => [
       {
         name: "Dashboard",
         href: "/dashboard",
@@ -426,58 +483,185 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         roles: ["SUPER_ADMIN"],
         badge: null,
       },
-    ]
+    ], [managerPendingCount, manualPendingCount, teamPendingCount])
 
-  const filteredNavItems = navItems.filter((item) => {
-    // Check basic role permission
-    if (!item.roles.includes(userRole)) return false
+  const isItemActive = useCallback(
+    (href: string) => {
+      if (EXACT_ONLY_HREFS.has(href)) {
+        return pathname === href
+      }
+      return pathname === href || pathname.startsWith(`${href}/`)
+    },
+    [pathname]
+  )
 
-    if (isProductionHead && productionHeadHiddenRoutes.has(item.href)) {
-      return false
-    }
+  const filteredNavItems = useMemo(
+    () =>
+      navItems.filter((item) => {
+        if (!item.roles.includes(userRole)) return false
 
-    // Check custom condition if exists
-    if (item.customCondition) {
-      return item.customCondition(userRole, userPosition)
-    }
+        if (isProductionHead && PRODUCTION_HEAD_HIDDEN_ROUTES.has(item.href)) {
+          return false
+        }
 
-    return true
-  })
+        if (item.customCondition) {
+          return item.customCondition(userRole, userPosition)
+        }
+
+        return true
+      }),
+    [isProductionHead, navItems, userPosition, userRole]
+  )
+
+  const groupedNavItems = useMemo(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: filteredNavItems.filter(
+          (item) => resolveNavGroupId(item.href) === group.id
+        ),
+      })).filter((group) => group.items.length > 0),
+    [filteredNavItems]
+  )
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setExpandedGroups((prev) => {
+      const next: Record<string, boolean> = {}
+
+      groupedNavItems.forEach((group, index) => {
+        const hasActiveItem = group.items.some((item) => isItemActive(item.href))
+        next[group.id] = prev[group.id] ?? (hasActiveItem || index === 0)
+
+        if (hasActiveItem) {
+          next[group.id] = true
+        }
+      })
+
+      const prevKeys = Object.keys(prev)
+      const nextKeys = Object.keys(next)
+      const isSameState =
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((key) => prev[key] === next[key])
+
+      return isSameState ? prev : next
+    })
+  }, [groupedNavItems, isItemActive])
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }
+
+  const renderNavLink = (item: NavItemConfig, isMobile = false) => {
+    const isActive = isItemActive(item.href)
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        data-animate
+        onClick={() => {
+          handleBadgeClick(item.badgeKey)
+          if (isMobile) {
+            onClose?.()
+          }
+        }}
+        className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")} ${
+          isActive
+            ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
+            : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
+        }`}
+      >
+        <div
+          className={`transition-transform duration-300 group-hover:scale-110 ${
+            isActive
+              ? "text-white"
+              : "text-gray-400 group-hover:text-green-600"
+          }`}
+        >
+          {item.icon}
+        </div>
+        <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">
+          {item.name}
+        </span>
+        {item.badge && (
+          <span className="ml-auto min-w-[20px] rounded-full bg-red-500 px-2 py-1 text-center text-xs text-white motion-safe:animate-pulse-subtle shadow-md">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
+  const renderNavGroup = (
+    group: NavGroupConfig & { items: NavItemConfig[] },
+    isMobile = false
+  ) => {
+    const isExpanded = expandedGroups[group.id] ?? false
+    const hasActiveItem = group.items.some((item) => isItemActive(item.href))
+
+    return (
+      <div
+        key={group.id}
+        data-animate
+        className="rounded-2xl border border-gray-100 bg-gray-50/70 p-2"
+      >
+        <button
+          type="button"
+          onClick={() => toggleGroup(group.id)}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
+            hasActiveItem
+              ? "bg-green-50 text-green-800"
+              : "text-gray-700 hover:bg-white"
+          }`}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+              {group.label}
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {group.items.length} menu
+            </p>
+          </div>
+          <svg
+            className={`h-5 w-5 text-gray-400 transition-transform ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        {isExpanded && (
+          <div className="mt-2 space-y-1">
+            {group.items.map((item) => renderNavLink(item, isMobile))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40 mt-[85px]">
         <div className="flex flex-col h-full">
-          <nav ref={navRef} className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-animate
-                  onClick={() => handleBadgeClick(item.badgeKey)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
-                    ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
-                    : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
-                    }`}
-                >
-                  <div
-                    className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400 group-hover:text-green-600"
-                      }`}
-                  >
-                    {item.icon}
-                  </div>
-                  <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">{item.name}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
+          <nav ref={navRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
+            {groupedNavItems.map((group) => renderNavGroup(group))}
           </nav>
         </div>
       </aside>
@@ -502,38 +686,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav ref={mobileNavRef} className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-animate
-                  onClick={() => {
-                    handleBadgeClick(item.badgeKey)
-                    onClose?.()
-                  }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
-                    ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
-                    : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
-                    }`}
-                >
-                  <div
-                    className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400 group-hover:text-green-600"
-                      }`}
-                  >
-                    {item.icon}
-                  </div>
-                  <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">{item.name}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
+          <nav ref={mobileNavRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
+            {groupedNavItems.map((group) => renderNavGroup(group, true))}
           </nav>
         </div>
       </aside>

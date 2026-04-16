@@ -21,6 +21,28 @@ interface AttendanceUser {
 
 const ITEMS_PER_PAGE = 12
 
+const exportHeaders = [
+  "No",
+  "Nama Karyawan",
+  "PIN",
+  "Email",
+  "Departemen",
+  "Role",
+  "Posisi",
+  "Jam Reguler",
+]
+
+const exportColWidths = [
+  { wch: 5 },
+  { wch: 26 },
+  { wch: 14 },
+  { wch: 30 },
+  { wch: 18 },
+  { wch: 16 },
+  { wch: 22 },
+  { wch: 18 },
+]
+
 const getDepartmentLabel = (user: AttendanceUser) =>
   user.department?.name || user.departmentName || "-"
 
@@ -38,6 +60,17 @@ const getInitials = (name: string) =>
     .toUpperCase()
     .slice(0, 2)
 
+const buildTimestamp = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  const hour = String(now.getHours()).padStart(2, "0")
+  const minute = String(now.getMinutes()).padStart(2, "0")
+  const second = String(now.getSeconds()).padStart(2, "0")
+  return `${year}${month}${day}_${hour}${minute}${second}`
+}
+
 export default function AdminAttendancePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -47,6 +80,7 @@ export default function AdminAttendancePage() {
   const [search, setSearch] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("ALL")
   const [currentPage, setCurrentPage] = useState(1)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -150,6 +184,51 @@ export default function AdminAttendancePage() {
     return Array.from({ length: end - start + 1 }, (_, index) => start + index)
   }, [safePage, totalPages])
 
+  const exportToExcel = async () => {
+    if (filteredUsers.length === 0) {
+      toast.error("Tidak ada data user untuk diexport")
+      return
+    }
+
+    setExporting(true)
+    try {
+      const XLSX = await import("xlsx")
+
+      const exportRows = filteredUsers.map((user, index) => ({
+        No: index + 1,
+        "Nama Karyawan": user.name,
+        PIN: user.pin || "-",
+        Email: user.email,
+        Departemen: getDepartmentLabel(user),
+        Role: user.role,
+        Posisi: user.position || "-",
+        "Jam Reguler": getRegularHoursLabel(user),
+      }))
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows, {
+        header: exportHeaders,
+      })
+      worksheet["!cols"] = exportColWidths
+
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, "User Absensi")
+
+      const departmentText =
+        departmentFilter === "ALL"
+          ? "Semua_Departemen"
+          : departmentFilter.replace(/[^a-zA-Z0-9]+/g, "_")
+
+      const fileName = `User_Absensi_${departmentText}_${buildTimestamp()}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+      toast.success("Data user berhasil diexport")
+    } catch (error) {
+      console.error("Error exporting attendance users:", error)
+      toast.error("Gagal export data user")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (status === "loading" || pageLoading) {
     return (
       <div className="flex min-h-[480px] items-center justify-center">
@@ -223,7 +302,7 @@ export default function AdminAttendancePage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_240px_auto]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_240px_auto_auto]">
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <svg
@@ -267,6 +346,14 @@ export default function AdminAttendancePage() {
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
           >
             {usersLoading ? "Memuat..." : "Refresh User"}
+          </button>
+          <button
+            type="button"
+            onClick={exportToExcel}
+            disabled={exporting || filteredUsers.length === 0}
+            className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exporting ? "Export..." : "Export Excel"}
           </button>
         </div>
       </div>
