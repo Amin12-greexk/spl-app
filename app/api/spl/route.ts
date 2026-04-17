@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // <-- PATH DIPERBAIKI
 import { prisma } from "@/lib/prisma";
 import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBAIKI
-import { sendNotificationToUser } from "@/lib/notification-utils";
+import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils";
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
 import {
   getJakartaDayOfWeek,
@@ -288,7 +288,11 @@ export async function GET(req: NextRequest) {
         ]);
       const statusCount = toStatusCountMap(groupedStats)
       const approved = statusCount.get("APPROVED") || 0
-      const pending = sumStatuses(statusCount, ["PENDING_SUPERVISOR", "PENDING_MANAGER"])
+      const pending = sumStatuses(statusCount, [
+        "PENDING_SUPERADMIN",
+        "PENDING_SUPERVISOR",
+        "PENDING_MANAGER",
+      ])
       const rejected = sumStatuses(statusCount, [
         "REJECTED",
         "REJECTED_BY_SUPERVISOR",
@@ -335,7 +339,11 @@ export async function GET(req: NextRequest) {
       ]);
     const statusCount = toStatusCountMap(groupedStats)
     const approved = statusCount.get("APPROVED") || 0
-    const pending = sumStatuses(statusCount, ["PENDING_SUPERVISOR", "PENDING_MANAGER"])
+    const pending = sumStatuses(statusCount, [
+      "PENDING_SUPERADMIN",
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+    ])
     const rejected = sumStatuses(statusCount, [
       "REJECTED",
       "REJECTED_BY_SUPERVISOR",
@@ -404,12 +412,7 @@ export async function POST(req: NextRequest) {
     }
 
     const today = startOfDay(new Date())
-    if (requestedDate < today) {
-      return NextResponse.json(
-        { error: "Tanggal lembur tidak boleh sebelum hari ini" },
-        { status: 400 }
-      )
-    }
+    const isPastDateSubmission = requestedDate < today
 
     const userRecord = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -451,6 +454,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let isLateCutoffSubmission = false
+
     // Validasi waktu pengajuan (tidak berlaku untuk Security)
     if (!isSecurityDepartment) {
       // Ambil batas maksimal waktu pengajuan yang diset manager (default 16:30)
@@ -464,10 +469,7 @@ export async function POST(req: NextRequest) {
       const nowMinutes = getJakartaTimeMinutes(new Date())
       const minTotalMinutes = minHour * 60 + minMin
       if (nowMinutes > minTotalMinutes) {
-        return NextResponse.json(
-          { error: `Pengajuan hanya bisa sebelum pukul ${minTime} (atur oleh Manager)` },
-          { status: 400 }
-        );
+        isLateCutoffSubmission = true
       }
     }
 
@@ -700,13 +702,18 @@ export async function POST(req: NextRequest) {
 
     const totalHours = parseFloat((totalMinutes / 60).toFixed(2))
 
+    const needsSuperAdminReview = isPastDateSubmission || isLateCutoffSubmission
+
     // Check user's role and supervisor
     // Determine initial status based on role and department approval rules
     let initialStatus = "PENDING_MANAGER"
     let supervisorId: string | null = null
     const routingDepartmentName = currentDepartmentName || null
 
-    if (userRecord.supervisorId) {
+    if (needsSuperAdminReview) {
+      initialStatus = "PENDING_SUPERADMIN"
+      supervisorId = null
+    } else if (userRecord.supervisorId) {
       initialStatus = "PENDING_SUPERVISOR"
       supervisorId = userRecord.supervisorId
     } else if (
@@ -774,9 +781,22 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       });
 
-      const notificationTitle = "Pengajuan SPL Baru";
-      const notificationBody = `${session.user.name} mengajukan lembur pada ${formattedDate} (${body.startTime} - ${body.endTime}).`;
-      if (spl.supervisorId) {
+      const notificationTitle =
+        initialStatus === "PENDING_SUPERADMIN"
+          ? "SPL Telat Perlu Review Super Admin"
+          : "Pengajuan SPL Baru";
+      const notificationBody =
+        initialStatus === "PENDING_SUPERADMIN"
+          ? `${session.user.name} mengajukan SPL telat untuk ${formattedDate} (${body.startTime} - ${body.endTime}) dan menunggu review Super Admin.`
+          : `${session.user.name} mengajukan lembur pada ${formattedDate} (${body.startTime} - ${body.endTime}).`;
+      if (initialStatus === "PENDING_SUPERADMIN") {
+        await sendNotificationToRoles(
+          ["SUPER_ADMIN"],
+          notificationTitle,
+          notificationBody,
+          { splId: spl.id, click_action: "/dashboard/ga/persetujuan" }
+        );
+      } else if (spl.supervisorId) {
         await sendNotificationToUser(
           spl.supervisorId,
           notificationTitle,

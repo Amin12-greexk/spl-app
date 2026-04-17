@@ -126,6 +126,7 @@ export default function HRViewPage() {
         filtered = filtered.filter(
           (spl) =>
             spl.status === "PENDING" ||
+            spl.status === "PENDING_SUPERADMIN" ||
             spl.status === "PENDING_SUPERVISOR" ||
             spl.status === "PENDING_MANAGER" ||
             spl.status === "IN_PROGRESS" ||
@@ -235,6 +236,7 @@ export default function HRViewPage() {
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
       'PENDING': 'Menunggu',
+      'PENDING_SUPERADMIN': 'Review Super Admin',
       'PENDING_SUPERVISOR': 'Menunggu Supervisor',
       'PENDING_MANAGER': 'Menunggu Manager',
       'APPROVED': 'Disetujui',
@@ -250,6 +252,7 @@ export default function HRViewPage() {
   const getStats = () => {
     const pendingStatuses = new Set([
       "PENDING",
+      "PENDING_SUPERADMIN",
       "PENDING_SUPERVISOR",
       "PENDING_MANAGER",
       "IN_PROGRESS",

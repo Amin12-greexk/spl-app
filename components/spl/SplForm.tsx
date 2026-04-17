@@ -300,14 +300,6 @@ export default function SplForm() {
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    if (selectedDate < today) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Tanggal tidak diperbolehkan",
-        text: "Tanggal lembur tidak boleh sebelum hari ini.",
-      })
-      return
-    }
 
     const normalizedRegularStart = normalizeTimeValue(regularHours?.start)
     const normalizedRegularEnd = normalizeTimeValue(regularHours?.end)
@@ -403,24 +395,6 @@ export default function SplForm() {
       }
     }
 
-    if (!isSecurityDepartment) {
-      const [minH, minM] = minStart.split(":").map(Number)
-      const [startH, startM] = formData.startTime.split(":").map(Number)
-      const now = new Date()
-      const nowMinutes = now.getHours() * 60 + now.getMinutes()
-      if (!Number.isNaN(minH) && !Number.isNaN(startH)) {
-        const minMinutes = minH * 60 + minM
-        if (nowMinutes > minMinutes) {
-          await Swal.fire({
-            icon: "error",
-            title: "Lewat Batas Waktu",
-            text: `Pengajuan hanya bisa sebelum pukul ${minStart} (atur oleh Manager).`,
-          })
-          return
-        }
-      }
-    }
-
     setIsLoading(true)
 
     try {
@@ -471,7 +445,10 @@ export default function SplForm() {
       await Swal.fire({
         icon: "success",
         title: "Berhasil",
-        text: "SPL berhasil diajukan!",
+        text:
+          data.status === "PENDING_SUPERADMIN"
+            ? "SPL telat berhasil diajukan dan sedang direview Super Admin sebelum diteruskan ke Manager."
+            : "SPL berhasil diajukan!",
       })
       router.push("/dashboard")
       router.refresh()
@@ -691,7 +668,11 @@ export default function SplForm() {
                 onChange={(value) => setFormData({ ...formData, startTime: value })}
                 showWib
                 required
-                hint={isSecurityDepartment ? "Security: sesuaikan dengan waktu pulang" : `Batas pengajuan: ${minStart}`}
+                hint={
+                  isSecurityDepartment
+                    ? "Security: sesuaikan dengan waktu pulang"
+                    : `Batas normal: ${minStart}. Lewat batas akan direview Super Admin`
+                }
                 selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
               />
 

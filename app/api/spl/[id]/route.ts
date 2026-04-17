@@ -250,7 +250,12 @@ export async function DELETE(
     }
 
     // Hanya izinkan penghapusan oleh requester dan HANYA jika status masih pending
-    const pendingStatuses = ["PENDING", "PENDING_SUPERVISOR", "PENDING_MANAGER"];
+    const pendingStatuses = [
+      "PENDING",
+      "PENDING_SUPERADMIN",
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+    ];
     if (
       spl.requesterId !== session.user.id ||
       !pendingStatuses.includes(spl.status)

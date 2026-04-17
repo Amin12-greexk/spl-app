@@ -129,7 +129,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const recentUpdates = data
           .filter((spl: any) => {
             // Filter harus sama dengan logic di NotificationProvider
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
             const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             const requesterId = spl.requesterId || spl.requester?.id
             const isOwn = requesterId === sessionUserId
@@ -195,7 +195,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setNotifications(allNotifications.slice(0, 10))
-      } else if (sessionUserRole === "GA" || sessionUserRole === "DEPARTMENT_HEAD") {
+      } else if (
+        sessionUserRole === "GA" ||
+        sessionUserRole === "DEPARTMENT_HEAD" ||
+        sessionUserRole === "SUPER_ADMIN"
+      ) {
         // GA/DEPT_HEAD punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri
         // 2. Pending approval dari team mereka
@@ -207,7 +211,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
-              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               const requesterId = spl.requesterId || spl.requester?.id
               const isOwn = requesterId === sessionUserId
@@ -242,9 +246,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
 
         // 2. Fetch team SPL pending approval
+        const pendingStatus =
+          sessionUserRole === "SUPER_ADMIN"
+            ? "PENDING_SUPERADMIN"
+            : "PENDING_SUPERVISOR"
         const teamData = normalizeSpls(
           await fetchJson(
-            "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=50"
+            `/api/spl/my-team?status=${pendingStatus}&lite=1&skipCount=1&page=1&limit=50`
           )
         )
         if (teamData) {
@@ -267,7 +275,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
               return {
                 id: spl.id,
-                title: "SPL Perlu Persetujuan",
+                title: sessionUserRole === "SUPER_ADMIN" ? "SPL Telat Perlu Review" : "SPL Perlu Persetujuan",
                 message: `${spl.requester?.name || "Staff"} mengajukan SPL ${formatDate(spl.date)}`,
                 status: spl.status,
                 createdAt: spl.createdAt,
@@ -304,7 +312,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
-              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               const requesterId = spl.requesterId || spl.requester?.id
               const isOwn = requesterId === sessionUserId
