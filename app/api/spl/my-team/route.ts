@@ -69,10 +69,18 @@ export async function GET(req: NextRequest) {
         }
 
     if (statusParam) {
-      const statusList = statusParam
+      const requestedStatuses = statusParam
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean)
+      const statusList = isSuperAdmin
+        ? requestedStatuses
+        : requestedStatuses.filter((status) => status !== "PENDING_SUPERADMIN")
+
+      if (requestedStatuses.length > 0 && statusList.length === 0) {
+        where.id = "__forbidden_pending_superadmin__"
+      }
+
       if (statusList.length === 1) {
         where.status = statusList[0]
       } else if (statusList.length > 1) {

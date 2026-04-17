@@ -68,9 +68,17 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
       supervisorLabel = "GA"
     } else if (supervisorRole === "DEPARTMENT_HEAD") {
       supervisorLabel = "Kepala Dept"
+    } else if (supervisorRole === "SUPER_ADMIN") {
+      supervisorLabel = "Super Admin"
     }
 
     switch (spl.status) {
+      case "PENDING_SUPERADMIN":
+        return {
+          icon: "⏳",
+          label: "Menunggu Super Admin",
+          description: "Pengajuan telat sedang direview Super Admin",
+        }
       case "PENDING_SUPERVISOR":
         return {
           icon: "⏳",
@@ -133,6 +141,11 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
         text: "text-yellow-700",
         border: "border-yellow-200",
       },
+      PENDING_SUPERADMIN: {
+        bg: "bg-amber-50",
+        text: "text-amber-700",
+        border: "border-amber-200",
+      },
       PENDING_SUPERVISOR: {
         bg: "bg-orange-50",
         text: "text-orange-700",
@@ -192,13 +205,28 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
   }
 
   const getApprovalFlow = () => {
-    const supervisorRole = spl.supervisor?.role || "DEPARTMENT_HEAD"
-    const supervisorLabel = supervisorRole === "GA" ? "GA" : "Kepala Dept"
+    const supervisorRole =
+      spl.supervisor?.role ||
+      (spl.status === "PENDING_SUPERADMIN" ? "SUPER_ADMIN" : "DEPARTMENT_HEAD")
+    const supervisorLabel =
+      supervisorRole === "GA"
+        ? "GA"
+        : supervisorRole === "SUPER_ADMIN"
+        ? "Super Admin"
+        : "Kepala Dept"
 
-    if (spl.status === "PENDING_SUPERVISOR" || spl.supervisorApprovalDate) {
+    if (
+      spl.status === "PENDING_SUPERVISOR" ||
+      spl.status === "PENDING_SUPERADMIN" ||
+      spl.supervisorApprovalDate
+    ) {
       return [
         { label: "Staff", done: true, current: false },
-        { label: supervisorLabel, done: !!spl.supervisorApprovalDate, current: spl.status === "PENDING_SUPERVISOR" },
+        {
+          label: supervisorLabel,
+          done: !!spl.supervisorApprovalDate,
+          current: spl.status === "PENDING_SUPERADMIN" || spl.status === "PENDING_SUPERVISOR",
+        },
         {
           label: "Manager",
           done: spl.status === "APPROVED",
@@ -469,7 +497,7 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Disetujui Supervisor:
+              {spl.supervisor?.role === "SUPER_ADMIN" ? "Direview Super Admin:" : "Disetujui Supervisor:"}
             </p>
             <p className="text-sm text-green-600">
               {spl.supervisor?.name || "Supervisor"} · {format(new Date(spl.supervisorApprovalDate), "dd MMM yyyy HH:mm", { locale: id })}

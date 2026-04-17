@@ -640,6 +640,11 @@ export default function DashboardPage() {
         text: "text-yellow-800",
         label: "Menunggu",
       },
+      PENDING_SUPERADMIN: {
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        label: "Review Super Admin",
+      },
       PENDING_SUPERVISOR: {
         bg: "bg-yellow-100",
         text: "text-yellow-800",

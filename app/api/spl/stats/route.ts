@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
     const total = grouped.reduce((acc, item) => acc + getAllCount(item), 0)
     const approved = statusMap.get("APPROVED") || 0
     const pending = sumStatuses([
+      "PENDING_SUPERADMIN",
       "PENDING_SUPERVISOR",
       "PENDING_MANAGER",
       "IN_PROGRESS",

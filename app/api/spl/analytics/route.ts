@@ -50,7 +50,7 @@ export async function GET() {
             _count: { id: true },
         })
 
-        const pendingGaStatuses = ["PENDING_SUPERVISOR"]
+        const pendingGaStatuses = ["PENDING_SUPERADMIN", "PENDING_SUPERVISOR"]
         const pendingManagerStatuses = ["PENDING_MANAGER", "IN_PROGRESS", "DONE"]
         const rejectedStatuses = ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"]
 

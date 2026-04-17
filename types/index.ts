@@ -12,8 +12,9 @@ export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
+ * - PENDING_SUPERADMIN: Pengajuan telat, menunggu review Super Admin
  * - PENDING_SUPERVISOR: Menunggu persetujuan supervisor/GA/Kepala Dept
- * - PENDING_MANAGER: Sudah disetujui supervisor, menunggu persetujuan manager
+ * - PENDING_MANAGER: Sudah disetujui supervisor/super admin, menunggu persetujuan manager
  * - APPROVED: Disetujui oleh manager (final)
  * - REJECTED_BY_SUPERVISOR: Ditolak oleh supervisor
  * - REJECTED_BY_MANAGER: Ditolak oleh manager
@@ -21,6 +22,7 @@ export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
  * - REJECTED: Legacy status untuk backward compatibility
  */
 export type SplStatus =
+  | "PENDING_SUPERADMIN"
   | "PENDING_SUPERVISOR"
   | "PENDING_MANAGER"
   | "APPROVED"

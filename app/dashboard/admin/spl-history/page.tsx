@@ -314,6 +314,7 @@ export default function SplHistoryPage() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
+      PENDING_SUPERADMIN: { bg: "bg-amber-100", text: "text-amber-800", label: "Pending Super Admin" },
       PENDING_SUPERVISOR: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Supervisor" },
       PENDING_MANAGER: { bg: "bg-blue-100", text: "text-blue-800", label: "Pending Manager" },
       APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "Approved" },
@@ -430,6 +431,7 @@ export default function SplHistoryPage() {
             className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="ALL">Semua Status</option>
+            <option value="PENDING_SUPERADMIN">Pending Super Admin</option>
             <option value="PENDING_SUPERVISOR">Pending Supervisor</option>
             <option value="PENDING_MANAGER">Pending Manager</option>
             <option value="APPROVED">Approved</option>
