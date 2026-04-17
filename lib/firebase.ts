@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app"
-import { getMessaging, getToken, onMessage, Messaging } from "firebase/messaging"
+import { deleteToken, getMessaging, getToken, onMessage, Messaging } from "firebase/messaging"
 
 // Fungsi untuk validasi konfigurasi yang lebih robust
 const getFirebaseConfig = () => {
@@ -146,6 +146,48 @@ export const requestNotificationPermission = async (): Promise<string | null> =>
     console.error('❌ Error getting notification permission:', error)
     return null
   }
+}
+
+export const getCurrentNotificationToken = async (): Promise<string | null> => {
+  const { messaging: currentMessaging } = initializeFirebase()
+
+  if (!currentMessaging || typeof window === "undefined") {
+    return null
+  }
+
+  try {
+    const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    if (!vapidKey) return null
+
+    const registration = await navigator.serviceWorker.ready
+    const token = await getToken(currentMessaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration,
+    })
+
+    return token || null
+  } catch (error) {
+    console.error("Failed to get current FCM token:", error)
+    return null
+  }
+}
+
+export const revokeNotificationToken = async (): Promise<string | null> => {
+  const { messaging: currentMessaging } = initializeFirebase()
+
+  if (!currentMessaging) {
+    return null
+  }
+
+  const currentToken = await getCurrentNotificationToken()
+
+  try {
+    await deleteToken(currentMessaging)
+  } catch (error) {
+    console.error("Failed to revoke FCM token:", error)
+  }
+
+  return currentToken
 }
 
 export const onMessageListener = (callback: (payload: any) => void) => {
