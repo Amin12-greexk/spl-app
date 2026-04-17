@@ -60,6 +60,7 @@ export async function GET() {
       securityAssignments,
       unsignedManualSplCount,
       unsignedManualSpls,
+      pendingSupervisorSpls,
       recentManualSpls,
     ] = await Promise.all([
       prisma.user.findMany({
@@ -141,6 +142,35 @@ export async function GET() {
       }),
       prisma.spl.findMany({
         where: {
+          status: "PENDING_SUPERVISOR",
+        },
+        select: {
+          id: true,
+          requesterId: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          createdAt: true,
+          requester: {
+            select: {
+              id: true,
+              name: true,
+              departmentName: true,
+              department: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 6,
+      }),
+      prisma.spl.findMany({
+        where: {
           source: "MANUAL",
         },
         select: {
@@ -186,7 +216,6 @@ export async function GET() {
       .filter((user) => !securityAssignedUserIds.has(user.id))
 
     const usersWithoutSupervisor = usersWithoutSupervisorAll.slice(0, 6)
-    const usersWithoutRegularHours = usersWithoutRegularHoursAll.slice(0, 6)
     const securityWithoutShiftToday = securityWithoutShiftTodayAll.slice(0, 6)
 
     const recentUserUpdates = users.slice(0, 5).map((user) => ({
@@ -231,12 +260,15 @@ export async function GET() {
           departmentName: getDepartmentName(user) || "-",
           href: `/dashboard/admin/users/${user.id}`,
         })),
-        usersWithoutRegularHours: usersWithoutRegularHours.map((user) => ({
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          departmentName: getDepartmentName(user) || "-",
-          href: `/dashboard/admin/regular-hours`,
+        pendingSupervisorSpls: pendingSupervisorSpls.map((spl) => ({
+          id: spl.id,
+          requesterId: spl.requesterId,
+          requesterName: spl.requester.name,
+          departmentName: getDepartmentName(spl.requester) || "-",
+          date: spl.date,
+          startTime: spl.startTime,
+          endTime: spl.endTime,
+          href: `/dashboard/admin/spl-history`,
         })),
         securityWithoutShiftToday: securityWithoutShiftToday.map((user) => ({
           id: user.id,
