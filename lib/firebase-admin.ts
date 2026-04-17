@@ -55,16 +55,43 @@ export type SendResult =
   | { success: true; messageId: string; timestamp: string }
   | { error: string; token: string }
 
+const MIN_FCM_TOKEN_LENGTH = 80
+
+const normalizeToken = (token?: string | null) => token?.trim() || ""
+
+export const isLikelyFcmToken = (token?: string | null): boolean => {
+  const normalized = normalizeToken(token)
+  if (!normalized) return false
+
+  if (
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("fallback-") ||
+    normalized === "user-token"
+  ) {
+    return false
+  }
+
+  if (normalized.length < MIN_FCM_TOKEN_LENGTH) {
+    return false
+  }
+
+  return /^[A-Za-z0-9:_-]+$/.test(normalized)
+}
+
 // ======================================================
 // 🗑️ CLEANUP INVALID TOKEN FROM DATABASE
 // ======================================================
 export const cleanupInvalidToken = async (token: string): Promise<void> => {
   try {
+    const normalizedToken = normalizeToken(token)
+    if (!normalizedToken) return
+
     const { prisma } = await import("@/lib/prisma")
 
     const deleted = await prisma.userNotification.deleteMany({
       where: {
-        endpoint: token,
+        endpoint: normalizedToken,
       },
     })
 
@@ -86,9 +113,16 @@ export const sendNotification = async (
   data?: Record<string, any>
 ): Promise<SendResult> => {
   try {
-    if (!token?.trim()) throw new Error("Token is required")
+    const normalizedToken = normalizeToken(token)
+
+    if (!normalizedToken) throw new Error("Token is required")
     if (!title?.trim()) throw new Error("Title is required")
     if (!body?.trim()) throw new Error("Body is required")
+
+    if (!isLikelyFcmToken(normalizedToken)) {
+      await cleanupInvalidToken(normalizedToken)
+      throw new Error("Token FCM tidak valid")
+    }
 
     const message = {
       notification: {
@@ -102,7 +136,7 @@ export const sendNotification = async (
             return acc
           }, {} as Record<string, string>)),
       },
-      token: token.trim(),
+      token: normalizedToken,
 
       // Android config
       android: {
@@ -162,26 +196,32 @@ export const sendNotification = async (
       timestamp: new Date().toISOString(),
     }
   } catch (error: any) {
-    console.error("❌ Error sending notification:", error)
+    const errorCode = error?.code || error?.errorInfo?.code || "unknown"
+    const errorMessage =
+      error?.errorInfo?.message ||
+      error?.message ||
+      "Gagal mengirim notifikasi"
 
-    // Handle specific Firebase errors and cleanup invalid tokens
-    if (
-      error.code === "messaging/registration-token-not-registered" ||
-      error.code === "messaging/invalid-registration-token" ||
-      error.code === "messaging/invalid-argument"
-    ) {
-      console.warn("⚠️ Token is invalid, removing from database...")
+    console.error(`Firebase notification error [${errorCode}]: ${errorMessage}`)
+
+    const invalidRegistrationToken =
+      errorCode === "messaging/registration-token-not-registered" ||
+      errorCode === "messaging/invalid-registration-token" ||
+      (errorCode === "messaging/invalid-argument" &&
+        /registration token/i.test(errorMessage))
+
+    if (invalidRegistrationToken) {
+      console.warn("Token is invalid, removing from database...")
       await cleanupInvalidToken(token)
       throw new Error("Token tidak valid atau sudah expired")
     }
 
-    if (error.code === "messaging/mismatched-credential") {
-      console.error("❌ Firebase Admin credentials mismatch")
+    if (errorCode === "messaging/mismatched-credential") {
+      console.error("Firebase Admin credentials mismatch")
       throw new Error("Kredensial Firebase tidak cocok")
     }
 
-    // Generic fallback
-    throw new Error(error.message || "Gagal mengirim notifikasi")
+    throw new Error(errorMessage)
   }
 }
 
@@ -202,8 +242,34 @@ export const sendNotificationToMultiple = async (
   try {
     if (!tokens?.length) throw new Error("Tidak ada token yang valid")
 
-    const validTokens = tokens.filter((token) => token?.trim())
-    if (validTokens.length === 0) throw new Error("Tidak ada token yang valid")
+    const normalizedTokens = Array.from(
+      new Set(tokens.map((token) => normalizeToken(token)).filter(Boolean))
+    )
+
+    const malformedTokens = normalizedTokens.filter(
+      (token) => !isLikelyFcmToken(token)
+    )
+
+    if (malformedTokens.length > 0) {
+      console.warn(
+        `Skipping ${malformedTokens.length} malformed notification token(s)`
+      )
+      await Promise.allSettled(
+        malformedTokens.map((token) => cleanupInvalidToken(token))
+      )
+    }
+
+    const validTokens = normalizedTokens.filter((token) =>
+      isLikelyFcmToken(token)
+    )
+    if (validTokens.length === 0) {
+      return {
+        total: tokens.length,
+        successful: 0,
+        failed: tokens.length,
+        results: [],
+      }
+    }
 
     // Send notifications concurrently
     const promises: Promise<SendResult>[] = validTokens.map((token) =>
@@ -241,12 +307,12 @@ export const sendNotificationToMultiple = async (
 // ======================================================
 export const validateToken = async (token: string): Promise<boolean> => {
   try {
-    if (!token?.trim()) return false
+    if (!isLikelyFcmToken(token)) return false
 
     // Dry-run send to test token validity
     await admin.messaging().send(
       {
-        token: token.trim(),
+        token: normalizeToken(token),
         notification: {
           title: "Test",
           body: "Test",

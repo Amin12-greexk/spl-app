@@ -40,11 +40,21 @@ interface DashboardData {
   summary: SummaryData
   actionItems: {
     usersWithoutSupervisor: ActionLinkItem[]
-    usersWithoutRegularHours: ActionLinkItem[]
+    pendingSupervisorSpls: ActionLinkItem[]
     securityWithoutShiftToday: ActionLinkItem[]
     unsignedManualSpls: ActionLinkItem[]
   }
   recentActivity: ActivityItem[]
+}
+
+interface PurgeResult {
+  totalRows: number
+  uniqueTokensChecked: number
+  malformedRowsRemoved: number
+  invalidRowsRemoved: number
+  validRowsKept: number
+  durationMs: number
+  processedAt: string
 }
 
 const quickActions = [
@@ -182,6 +192,9 @@ export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [isPurgingTokens, setIsPurgingTokens] = useState(false)
+  const [purgeResult, setPurgeResult] = useState<PurgeResult | null>(null)
+  const [purgeError, setPurgeError] = useState("")
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -234,6 +247,33 @@ export default function AdminDashboard() {
   }
 
   const { summary, actionItems, recentActivity } = dashboardData
+
+  const handlePurgeInvalidTokens = async () => {
+    setIsPurgingTokens(true)
+    setPurgeError("")
+
+    try {
+      const response = await fetch("/api/admin/notifications/purge-invalid", {
+        method: "POST",
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Gagal purge token notifikasi invalid")
+      }
+
+      setPurgeResult(data)
+    } catch (error) {
+      console.error("Error purging invalid notification tokens:", error)
+      setPurgeError(
+        error instanceof Error
+          ? error.message
+          : "Gagal purge token notifikasi invalid"
+      )
+    } finally {
+      setIsPurgingTokens(false)
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -296,22 +336,28 @@ export default function AdminDashboard() {
           </SectionCard>
 
           <SectionCard
-            title="Perlu Tindakan: Jam Reguler"
-            subtitle="User tanpa setup jam kerja dasar di sistem."
+            title="Perlu Tindakan: SPL Pending Supervisor"
+            subtitle="Daftar SPL yang masih menunggu persetujuan di level supervisor."
           >
             <div className="space-y-3">
-              {actionItems.usersWithoutRegularHours.length === 0 ? (
-                <p className="text-sm text-gray-500">Tidak ada temuan.</p>
+              {actionItems.pendingSupervisorSpls.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Tidak ada SPL yang sedang menunggu persetujuan supervisor.
+                </p>
               ) : (
-                actionItems.usersWithoutRegularHours.map((item) => (
+                actionItems.pendingSupervisorSpls.map((item) => (
                   <Link
                     key={item.id}
                     href={item.href}
-                    className="block rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 hover:bg-rose-100/60"
+                    className="block rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 hover:bg-amber-100/60"
                   >
-                    <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {item.requesterName}
+                    </p>
                     <p className="text-xs text-gray-600">
-                      {item.role} | {item.departmentName}
+                      {item.departmentName} |{" "}
+                      {new Date(item.date || "").toLocaleDateString("id-ID")} |{" "}
+                      {item.startTime} - {item.endTime}
                     </p>
                   </Link>
                 ))
@@ -393,6 +439,93 @@ export default function AdminDashboard() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Maintenance: Token Notifikasi"
+            subtitle="Bersihkan token FCM yang malformed atau sudah tidak valid dari database."
+          >
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                Gunakan hanya saat log server mulai penuh error token invalid atau setelah banyak user ganti device/browser.
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePurgeInvalidTokens}
+                disabled={isPurgingTokens}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isPurgingTokens
+                  ? "Memproses purge token..."
+                  : "Purge Token Notifikasi Invalid"}
+              </button>
+
+              {purgeError ? (
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {purgeError}
+                </div>
+              ) : null}
+
+              {purgeResult ? (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm text-slate-700">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Total Row
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-slate-900">
+                        {purgeResult.totalRows}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Token Dicek
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-slate-900">
+                        {purgeResult.uniqueTokensChecked}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Malformed Dihapus
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-amber-600">
+                        {purgeResult.malformedRowsRemoved}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Invalid Dihapus
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-rose-600">
+                        {purgeResult.invalidRowsRemoved}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Row Tersisa Valid
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-emerald-600">
+                        {purgeResult.validRowsKept}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                        Durasi
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-slate-900">
+                        {(purgeResult.durationMs / 1000).toFixed(2)}s
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs text-slate-500">
+                    Terakhir diproses:{" "}
+                    {new Date(purgeResult.processedAt).toLocaleString("id-ID")}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </SectionCard>
 
