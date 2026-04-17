@@ -105,7 +105,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
           count += await fetchManualCount()
           setNotificationCount(count)
         }
-      } else if (session.user.role === "GA" || session.user.role === "DEPARTMENT_HEAD") {
+      } else if (
+        session.user.role === "GA" ||
+        session.user.role === "DEPARTMENT_HEAD" ||
+        session.user.role === "SUPER_ADMIN"
+      ) {
         let count = 0
 
         const ownResponse = await fetch("/api/spl?page=1&limit=100")
@@ -127,13 +131,17 @@ export default function NotificationProvider({ children }: NotificationProviderP
           count += ownUpdates.length
         }
 
+        const pendingStatus =
+          session.user.role === "SUPER_ADMIN"
+            ? "PENDING_SUPERADMIN"
+            : "PENDING_SUPERVISOR"
         const teamResponse = await fetch(
-          "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=100"
+          `/api/spl/my-team?status=${pendingStatus}&lite=1&skipCount=1&page=1&limit=100`
         )
         if (teamResponse.ok) {
           const teamData = normalizeSpls(await teamResponse.json())
           const pendingApprovals = teamData.filter((spl: any) => {
-            const isPendingSupervisor = spl.status === "PENDING_SUPERVISOR"
+            const isPendingSupervisor = spl.status === pendingStatus
             const createdDate = new Date(spl.createdAt)
             const isNew = createdDate > lastViewedTime
             return isPendingSupervisor && isNew
@@ -405,14 +413,11 @@ export default function NotificationProvider({ children }: NotificationProviderP
             },
             body: JSON.stringify({
               endpoint: fcmToken,
-              keys: {
-                p256dh: fcmToken,
-                auth: fcmToken,
-              },
             }),
           })
 
           if (response.ok) {
+            localStorage.setItem("fcm_notification_token", fcmToken)
             setIsSubscribed(true)
             if (isLoading) {
               toast.success("Notifikasi berhasil diaktifkan dengan Firebase!")
