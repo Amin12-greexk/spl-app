@@ -138,7 +138,6 @@ export async function GET() {
         orderBy: {
           createdAt: "desc",
         },
-        take: 6,
       }),
       prisma.spl.findMany({
         where: {
@@ -167,7 +166,6 @@ export async function GET() {
         orderBy: {
           createdAt: "desc",
         },
-        take: 6,
       }),
       prisma.spl.findMany({
         where: {
