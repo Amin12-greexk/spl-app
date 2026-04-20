@@ -727,74 +727,6 @@ export default function SplHistoryPage() {
     })
   }
 
-  const getApprovalColor = (spl: Spl): "green" | "yellow" | "red" => {
-    const hasSupervisorApproval = !!spl.supervisorApprovalDate
-    const hasManagerApproval = !!spl.approvalDate || spl.status === "APPROVED"
-
-    if (hasSupervisorApproval && hasManagerApproval) return "green"
-    if (hasSupervisorApproval) return "yellow"
-    return "red"
-  }
-
-  const approvalColorMap: Record<string, { rgb: string }> = {
-    green: { rgb: "C6EFCE" },
-    yellow: { rgb: "FFEB9C" },
-    red: { rgb: "FFC7CE" },
-  }
-
-  const applyRowColors = (
-    ws: any,
-    splItems: Spl[],
-    colCount: number
-  ) => {
-    const XLSX_CELL_REF = (row: number, col: number): string => {
-      let colStr = ""
-      let c = col
-      do {
-        colStr = String.fromCharCode(65 + (c % 26)) + colStr
-        c = Math.floor(c / 26) - 1
-      } while (c >= 0)
-      return `${colStr}${row + 1}`
-    }
-
-    for (let c = 0; c < colCount; c++) {
-      const cellRef = XLSX_CELL_REF(0, c)
-      if (ws[cellRef]) {
-        ws[cellRef].s = {
-          font: { bold: true, color: { rgb: "000000" } },
-          fill: { patternType: "solid", fgColor: { rgb: "D9E1F2" } },
-          alignment: { horizontal: "center", vertical: "center" },
-          border: {
-            top: { style: "thin", color: { rgb: "B0B0B0" } },
-            bottom: { style: "thin", color: { rgb: "B0B0B0" } },
-            left: { style: "thin", color: { rgb: "B0B0B0" } },
-            right: { style: "thin", color: { rgb: "B0B0B0" } },
-          },
-        }
-      }
-    }
-
-    splItems.forEach((spl, rowIndex) => {
-      const color = getApprovalColor(spl)
-      const bgColor = approvalColorMap[color]
-
-      for (let c = 0; c < colCount; c++) {
-        const cellRef = XLSX_CELL_REF(rowIndex + 1, c)
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            fill: { patternType: "solid", fgColor: bgColor },
-            border: {
-              top: { style: "thin", color: { rgb: "B0B0B0" } },
-              bottom: { style: "thin", color: { rgb: "B0B0B0" } },
-              left: { style: "thin", color: { rgb: "B0B0B0" } },
-              right: { style: "thin", color: { rgb: "B0B0B0" } },
-            },
-          }
-        }
-      }
-    })
-  }
-
   const buildExportRows = async (): Promise<ExportRow[]> => {
     const allSplsForExport = await fetchAllForExport()
     const sortedSpls = sortSplsForExport(allSplsForExport)
@@ -807,7 +739,7 @@ export default function SplHistoryPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSX = await import("xlsx-js-style")
+      const XLSX = await import("xlsx")
       const allSplsForExport = await fetchAllForExport()
       const sortedSpls = sortSplsForExport(allSplsForExport)
       const exportableSpls = sortedSpls.filter(isExportEligible)
@@ -826,49 +758,7 @@ export default function SplHistoryPage() {
 
       ws["!cols"] = exportColWidths
 
-      applyRowColors(ws, exportableSpls, exportHeaders.length)
-
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
-
-      const legendData = [
-        { Warna: "🟢 Hijau", Keterangan: "Sudah ditandatangani Supervisor DAN Manager" },
-        { Warna: "🟡 Kuning", Keterangan: "Hanya ditandatangani Supervisor" },
-        { Warna: "🔴 Merah", Keterangan: "Belum ditandatangani Supervisor maupun Manager" },
-      ]
-      const wsLegend = XLSX.utils.json_to_sheet(legendData, { header: ["Warna", "Keterangan"] })
-      wsLegend["!cols"] = [{ wch: 15 }, { wch: 55 }]
-      
-      const XLSX_CELL_REF = (row: number, col: number): string => {
-        let colStr = ""
-        let c = col
-        do {
-          colStr = String.fromCharCode(65 + (c % 26)) + colStr
-          c = Math.floor(c / 26) - 1
-        } while (c >= 0)
-        return `${colStr}${row + 1}`
-      }
-
-      for (let c = 0; c < 2; c++) {
-        const ref = XLSX_CELL_REF(0, c)
-        if (wsLegend[ref]) {
-          wsLegend[ref].s = {
-            font: { bold: true },
-            fill: { patternType: "solid", fgColor: { rgb: "D9E1F2" } },
-          }
-        }
-      }
-      const legendColors = ["C6EFCE", "FFEB9C", "FFC7CE"]
-      legendColors.forEach((rgb, i) => {
-        for (let c = 0; c < 2; c++) {
-          const ref = XLSX_CELL_REF(i + 1, c)
-          if (wsLegend[ref]) {
-            wsLegend[ref].s = {
-              fill: { patternType: "solid", fgColor: { rgb } },
-            }
-          }
-        }
-      })
-      XLSX.utils.book_append_sheet(wb, wsLegend, "Legenda Warna")
 
       const periodText = dateFilter === "ALL" ? "Semua_Periode" :
         dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
@@ -1505,7 +1395,7 @@ export default function SplHistoryPage() {
               <div>
                 <div className="font-semibold text-gray-900">{spl.requester.name}</div>
                 <div className="text-xs text-gray-500">
-                  {(spl.requester.department?.name || spl.requester.departmentName || "-")} â€¢ {spl.requester.position || "-"}
+                  {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
                 </div>
               </div>
               <div className="text-sm text-gray-600">
@@ -1848,4 +1738,5 @@ export default function SplHistoryPage() {
     </div>
   )
 }
+
 
