@@ -493,12 +493,7 @@ export default function SplHistoryPage() {
   }
 
   const isExportEligible = (spl: Spl) => {
-    const rejectedStatuses = new Set([
-      "REJECTED",
-      "REJECTED_BY_SUPERVISOR",
-      "REJECTED_BY_MANAGER",
-    ])
-    return !rejectedStatuses.has(spl.status)
+    return spl.status === "APPROVED"
   }
 
   const exportHeaders = [
