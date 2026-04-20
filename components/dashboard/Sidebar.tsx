@@ -155,7 +155,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
     const countTeamPending = async () => {
       const teamPendingStatus =
-        userRole === "SUPER_ADMIN" ? "PENDING_SUPERADMIN" : "PENDING_SUPERVISOR"
+        userRole === "SUPER_ADMIN"
+          ? "PENDING_SUPERADMIN,PENDING_SUPERVISOR"
+          : "PENDING_SUPERVISOR"
       const response = await fetch(
         `/api/spl/my-team?status=${teamPendingStatus}&lite=1&skipCount=1&page=1&limit=100`
       )
