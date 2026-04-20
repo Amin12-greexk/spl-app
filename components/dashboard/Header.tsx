@@ -248,7 +248,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         // 2. Fetch team SPL pending approval
         const pendingStatus =
           sessionUserRole === "SUPER_ADMIN"
-            ? "PENDING_SUPERADMIN"
+            ? "PENDING_SUPERADMIN,PENDING_SUPERVISOR"
             : "PENDING_SUPERVISOR"
         const teamData = normalizeSpls(
           await fetchJson(
