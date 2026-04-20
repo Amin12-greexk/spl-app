@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
         const spls = await prisma.spl.findMany({
           where,
           select: liteSelect,
-          orderBy: { createdAt: "desc" },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         });
         return NextResponse.json(spls);
       }
@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
       const spls = await prisma.spl.findMany({
         where,
         include: includeConfig,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       });
       return NextResponse.json(spls);
     }
@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
           prisma.spl.findMany({
             where,
             select: liteSelect,
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             take: limit,
             skip,
           }),
@@ -250,7 +250,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.findMany({
           where,
           include: includeConfig,
-          orderBy: { createdAt: "desc" },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           take: limit,
           skip,
         }),
@@ -281,7 +281,7 @@ export async function GET(req: NextRequest) {
           prisma.spl.findMany({
             where,
             select: liteSelect,
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             take: limit,
             skip,
           }),
@@ -332,7 +332,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.findMany({
           where,
           include: includeConfig,
-          orderBy: { createdAt: "desc" },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           take: limit,
           skip,
         }),

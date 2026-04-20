@@ -398,16 +398,15 @@ export default function HRViewPage() {
 
   const sortSplsForExport = (items: Spl[]) => {
     return [...items].sort((a, b) => {
-      // Urutkan berdasarkan tanggal paling baru (descending)
-      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime()
-      if (dateCompare !== 0) return dateCompare
-      
       const nameCompare = a.requester.name.localeCompare(
         b.requester.name,
         "id-ID",
         { sensitivity: "base" }
       )
       if (nameCompare !== 0) return nameCompare
+      
+      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
+      if (dateCompare !== 0) return dateCompare
       
       return (a.requester.pin || "").localeCompare(b.requester.pin || "")
     })
@@ -501,8 +500,8 @@ export default function HRViewPage() {
         "Tanggal Lembur": Number.isNaN(dateValue.getTime())
           ? "-"
           : format(dateValue, "dd/MM/yyyy"),
-        "Waktu Mulai": spl.startTime,
-        "Waktu Selesai": spl.endTime,
+        "Waktu Mulai": spl.actualStartAt ? format(new Date(spl.actualStartAt), "HH:mm") : spl.startTime,
+        "Waktu Selesai": spl.actualEndAt ? format(new Date(spl.actualEndAt), "HH:mm") : spl.endTime,
         "Absensi Masuk": attendanceTimes.checkIn,
         "Absensi Pulang": attendanceTimes.checkOut,
         "Total Jam": formatTotalHours(spl),
