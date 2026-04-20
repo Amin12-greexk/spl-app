@@ -708,8 +708,8 @@ export default function SplHistoryPage() {
         "Tanggal Lembur": Number.isNaN(dateValue.getTime())
           ? "-"
           : format(dateValue, "dd/MM/yyyy"),
-        "Waktu Mulai": spl.startTime,
-        "Waktu Selesai": spl.endTime,
+        "Waktu Mulai": spl.actualStartAt ? format(new Date(spl.actualStartAt), "HH:mm") : spl.startTime,
+        "Waktu Selesai": spl.actualEndAt ? format(new Date(spl.actualEndAt), "HH:mm") : spl.endTime,
         "Absensi Masuk": attendanceTimes.checkIn,
         "Absensi Pulang": attendanceTimes.checkOut,
         "Total Jam": formatTotalHoursExport(spl),
