@@ -587,14 +587,17 @@ export default function SplHistoryPage() {
 
   const sortSplsForExport = (items: Spl[]) => {
     return [...items].sort((a, b) => {
+      // Urutkan berdasarkan tanggal paling baru (descending)
+      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime()
+      if (dateCompare !== 0) return dateCompare
+
       const nameCompare = a.requester.name.localeCompare(
         b.requester.name,
         "id-ID",
         { sensitivity: "base" }
       )
       if (nameCompare !== 0) return nameCompare
-      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
-      if (dateCompare !== 0) return dateCompare
+      
       const aPin = (a.requester as any).pin || ""
       const bPin = (b.requester as any).pin || ""
       return aPin.localeCompare(bPin)
@@ -817,8 +820,6 @@ export default function SplHistoryPage() {
       toast.loading("Mempersiapkan data dan membuat file Excel...", { id: "export-excel"})
       const exportContext = await buildExportContext(exportableSpls)
       const exportData = buildRowsFromSpls(exportableSpls, exportContext)
-      const morningSpls = exportableSpls.filter((spl) => isMorningOvertime(spl as any))
-      const morningExportData = buildRowsFromSpls(morningSpls, exportContext)
 
       const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders })
       const wb = XLSX.utils.book_new()
@@ -828,21 +829,6 @@ export default function SplHistoryPage() {
       applyRowColors(ws, exportableSpls, exportHeaders.length)
 
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
-
-      if (morningExportData.length > 0) {
-        const wsMorning = XLSX.utils.json_to_sheet(morningExportData, {
-          header: exportHeaders,
-        })
-        wsMorning["!cols"] = exportColWidths
-        applyRowColors(wsMorning, morningSpls, exportHeaders.length)
-        XLSX.utils.book_append_sheet(wb, wsMorning, "Lembur Pagi")
-      } else {
-        const wsMorning = XLSX.utils.json_to_sheet([
-          { Keterangan: "Tidak ada data lembur pagi pada filter saat ini" },
-        ], { header: ["Keterangan"] })
-        wsMorning["!cols"] = [{ wch: 52 }]
-        XLSX.utils.book_append_sheet(wb, wsMorning, "Lembur Pagi")
-      }
 
       const legendData = [
         { Warna: "🟢 Hijau", Keterangan: "Sudah ditandatangani Supervisor DAN Manager" },
