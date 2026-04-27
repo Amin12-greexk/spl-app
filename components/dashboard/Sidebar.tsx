@@ -662,7 +662,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40 mt-[85px]">
+      <aside className="hidden lg:block fixed left-0 top-[76px] h-[calc(100vh-76px)] w-64 bg-white border-r border-gray-200 shadow-lg z-40">
         <div className="flex flex-col h-full">
           <nav ref={navRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
             {groupedNavItems.map((group) => renderNavGroup(group))}
@@ -672,8 +672,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`lg:hidden fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform motion-safe:transition-transform motion-safe:duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
-          } mt-[85px]`}
+        className={`lg:hidden fixed left-0 top-[76px] h-[calc(100vh-76px)] w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform motion-safe:transition-transform motion-safe:duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
