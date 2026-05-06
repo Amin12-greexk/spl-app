@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 import { getSupervisorForDepartment, hasSupervisorMapping } from "@/lib/supervisor-mapping"
 
 /**
@@ -8,6 +11,7 @@ import { getSupervisorForDepartment, hasSupervisorMapping } from "@/lib/supervis
  */
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
     const { searchParams } = new URL(req.url)
     const departmentId = searchParams.get("departmentId")
     const departmentName = searchParams.get("department")
@@ -17,6 +21,38 @@ export async function GET(req: NextRequest) {
         { error: "Parameter 'departmentId' atau 'department' diperlukan" },
         { status: 400 }
       )
+    }
+
+    if (session?.user?.supervisorId) {
+      const assignedSupervisor = await prisma.user.findUnique({
+        where: { id: session.user.supervisorId },
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          position: true,
+          departmentName: true,
+        },
+      })
+
+      if (assignedSupervisor) {
+        return NextResponse.json({
+          hasSupervisor: true,
+          supervisor: {
+            id: assignedSupervisor.id,
+            name: assignedSupervisor.name,
+            position: assignedSupervisor.position || assignedSupervisor.role,
+            department: assignedSupervisor.departmentName || null,
+          },
+          message: `Atasan Anda: ${assignedSupervisor.name}`,
+          approvalFlow: [
+            "Staff (Anda)",
+            `${assignedSupervisor.position || assignedSupervisor.role} (${assignedSupervisor.name})`,
+            "Manager",
+            "Approved",
+          ],
+        })
+      }
     }
 
     // Check if department has supervisor mapping

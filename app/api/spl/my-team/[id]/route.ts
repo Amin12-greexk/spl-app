@@ -48,7 +48,7 @@ export async function GET(
           id: params.id,
           OR: [
             { supervisorId: session.user.id },
-            { supervisorId: null, requester: { supervisorId: session.user.id } },
+            { requester: { supervisorId: session.user.id } },
           ],
           AND: [...andFilters],
         }

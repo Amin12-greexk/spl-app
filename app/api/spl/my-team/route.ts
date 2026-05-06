@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       : {
           OR: [
             { supervisorId: session.user.id },
-            { supervisorId: null, requester: { supervisorId: session.user.id } },
+            { requester: { supervisorId: session.user.id } },
           ],
           AND: [...andFilters],
         }

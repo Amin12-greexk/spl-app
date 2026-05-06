@@ -105,10 +105,33 @@ export async function getSupervisorForDepartment(params: {
   let supervisor = null
 
   if (supervisorRole === "GA") {
-    // Find GA user (khusus untuk Security, Teknik/TEKNISI, dan Driver)
+    // Prefer the GA currently assigned as supervisor for users in this department.
     supervisor = await prisma.user.findFirst({
       where: {
         role: "GA",
+        subordinates: {
+          some: {
+            OR: [
+              departmentId ? { departmentId } : undefined,
+              {
+                departmentName: {
+                  equals: departmentName,
+                  mode: "insensitive",
+                },
+              },
+              {
+                department: {
+                  is: {
+                    name: {
+                      equals: departmentName,
+                      mode: "insensitive",
+                    },
+                  },
+                },
+              },
+            ].filter(Boolean) as any,
+          },
+        },
       },
       select: {
         id: true,
@@ -119,7 +142,27 @@ export async function getSupervisorForDepartment(params: {
         departmentId: true,
         position: true,
       },
+      orderBy: { updatedAt: "desc" },
     })
+
+    // Fallback for registration/setup before subordinates are assigned.
+    if (!supervisor) {
+      supervisor = await prisma.user.findFirst({
+        where: {
+          role: "GA",
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          departmentName: true,
+          departmentId: true,
+          position: true,
+        },
+        orderBy: { updatedAt: "desc" },
+      })
+    }
   } else if (supervisorRole === "DEPARTMENT_HEAD") {
     // Find Department Head for this specific department
     supervisor = await prisma.user.findFirst({
