@@ -3,9 +3,11 @@ export const SECURITY_SHIFT_DEFINITIONS = {
   P2: { start: "11:00", end: "19:00" },
   M1: { start: "16:00", end: "04:00" },
   M2: { start: "23:00", end: "07:00" },
+  F1: { start: "08:00", end: "16:30" },
 } as const
 
 export const SECURITY_OFF_SHIFT_CODE = "OFF" as const
+export const SECURITY_FINA_SHIFT_CODE = "F1" as const
 
 export type SecurityWorkShiftCode = keyof typeof SECURITY_SHIFT_DEFINITIONS
 export type SecurityShiftCode = SecurityWorkShiftCode | typeof SECURITY_OFF_SHIFT_CODE

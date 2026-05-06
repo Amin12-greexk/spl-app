@@ -103,6 +103,13 @@ const getSecurityUsers = () =>
       role: true,
       departmentName: true,
       department: { select: { name: true } },
+      supervisor: {
+        select: {
+          name: true,
+          role: true,
+          position: true,
+        },
+      },
     },
     orderBy: { name: "asc" },
   })
@@ -118,17 +125,37 @@ const getLatestUserByRole = (role: "GA" | "MANAGER") =>
     orderBy: [{ updatedAt: "desc" }],
   })
 
-const getPdfSignatories = async (session: Session): Promise<PdfSignatory[]> => {
-  const [gaUser, managerUser] = await Promise.all([
-    getLatestUserByRole("GA"),
+type PdfSecurityUser = Awaited<ReturnType<typeof getSecurityUsers>>[number]
+
+const getPdfSignatories = async (
+  session: Session,
+  securityUsers: PdfSecurityUser[]
+): Promise<PdfSignatory[]> => {
+  const securitySupervisor = securityUsers
+    .map((user) => user.supervisor)
+    .find((supervisor) => supervisor?.role === "GA")
+  const shouldUseSessionGa = session.user.role === "GA"
+
+  const [fallbackGaUser, managerUser] = await Promise.all([
+    securitySupervisor || shouldUseSessionGa
+      ? Promise.resolve(null)
+      : getLatestUserByRole("GA"),
     getLatestUserByRole("MANAGER"),
   ])
 
   return [
     {
       label: "Dibuat oleh",
-      name: gaUser?.name || session.user.name || "-",
-      role: gaUser?.position || "GA",
+      name:
+        securitySupervisor?.name ||
+        (shouldUseSessionGa ? session.user.name : null) ||
+        fallbackGaUser?.name ||
+        "-",
+      role:
+        securitySupervisor?.position ||
+        (shouldUseSessionGa ? session.user.position : null) ||
+        fallbackGaUser?.position ||
+        "GA",
     },
     {
       label: "Disetujui Oleh",
@@ -554,11 +581,11 @@ const drawSignatures = (
 }
 
 const buildPdf = async (year: number, month: number, session: Session) => {
-  const [users, holidays, signatories] = await Promise.all([
+  const [users, holidays] = await Promise.all([
     getSecurityUsers(),
     fetchHolidays(year, month),
-    getPdfSignatories(session),
   ])
+  const signatories = await getPdfSignatories(session, users)
   const schedule = buildSecuritySchedule(users, year, month, holidays)
 
   if (schedule.missingRules.length > 0) {

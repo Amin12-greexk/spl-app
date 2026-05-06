@@ -2,6 +2,7 @@ import {
   addDays,
   getJakartaDayOfWeek,
   parseDateOnly,
+  SECURITY_FINA_SHIFT_CODE,
   SECURITY_OFF_SHIFT_CODE,
   SecurityShiftCode,
 } from "@/lib/spl-time"
@@ -62,7 +63,7 @@ const ROTATION_RULES: Array<{
   { aliases: ["DAVID", "DAFID"], anchorShift: "M2" },
 ]
 
-const FIXED_P1_WEEKDAY_RULES = [{ aliases: ["FINA"] }]
+const FIXED_FINA_WEEKDAY_RULES = [{ aliases: ["FINA"] }]
 
 const DAY_NAMES = [
   "Minggu",
@@ -185,7 +186,7 @@ export const buildSecuritySchedule = (
     })
   }
 
-  for (const rule of FIXED_P1_WEEKDAY_RULES) {
+  for (const rule of FIXED_FINA_WEEKDAY_RULES) {
     const user = findUserByAliases(users, rule.aliases, usedUserIds)
     if (!user) {
       missingRules.push(rule.aliases.join("/"))
@@ -199,10 +200,13 @@ export const buildSecuritySchedule = (
       name: user.name,
       email: user.email,
       type: "FIXED",
-      anchorShift: "P1",
+      anchorShift: SECURITY_FINA_SHIFT_CODE,
       days: dates.map((date) => {
         const dayOfWeek = getJakartaDayOfWeek(date)
-        const shiftCode = dayOfWeek === 0 || dayOfWeek === 6 ? SECURITY_OFF_SHIFT_CODE : "P1"
+        const shiftCode =
+          dayOfWeek === 0 || dayOfWeek === 6
+            ? SECURITY_OFF_SHIFT_CODE
+            : SECURITY_FINA_SHIFT_CODE
         return buildDayPayload(date, shiftCode, holidaysByDate)
       }),
     })

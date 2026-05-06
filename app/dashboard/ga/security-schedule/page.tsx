@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import Swal from "sweetalert2"
 import toast from "react-hot-toast"
 
-type ShiftCode = "P1" | "P2" | "M1" | "M2" | "OFF"
+type ShiftCode = "P1" | "P2" | "M1" | "M2" | "F1" | "OFF"
 
 interface ScheduleDay {
   date: string
@@ -73,6 +73,7 @@ const SHIFT_LABELS: Record<ShiftCode, string> = {
   P2: "P2",
   M1: "M1",
   M2: "M2",
+  F1: "F1",
   OFF: "OFF",
 }
 
@@ -81,6 +82,7 @@ const getShiftCellClass = (shiftCode: ShiftCode) => {
   if (shiftCode === "P1") return "bg-white text-gray-900"
   if (shiftCode === "P2") return "bg-gray-50 text-gray-900"
   if (shiftCode === "M1") return "bg-white text-gray-900"
+  if (shiftCode === "F1") return "bg-white text-gray-900"
   return "bg-gray-50 text-gray-900"
 }
 
@@ -288,7 +290,7 @@ export default function SecurityScheduleGeneratorPage() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase text-gray-500">
-                Personel Rotasi
+                Anggota Rotasi
               </div>
               <div className="mt-2 text-2xl font-bold text-gray-900">
                 {visibleUsers.length}
@@ -346,7 +348,7 @@ export default function SecurityScheduleGeneratorPage() {
                   Preview Jadwal
                 </h2>
                 <p className="text-sm text-gray-500">
-                  FINA tetap dibuat otomatis di database sebagai P1 Senin-Jumat, tetapi tidak ditampilkan di preview.
+                  FINA tetap dibuat otomatis di database sebagai 08:00-16:30 Senin-Jumat, tetapi tidak ditampilkan di preview.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs font-semibold">

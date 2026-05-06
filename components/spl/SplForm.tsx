@@ -15,6 +15,7 @@ const SECURITY_SHIFT_PRESETS = [
   { id: "P2", label: "P2 (11:00-19:00)", start: "11:00", end: "19:00" },
   { id: "M1", label: "M1 (16:00-04:00)", start: "16:00", end: "04:00" },
   { id: "M2", label: "M2 (23:00-07:00)", start: "23:00", end: "07:00" },
+  { id: "F1", label: "F1 FINA (08:00-16:30)", start: "08:00", end: "16:30" },
 ]
 const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
 
@@ -647,7 +648,7 @@ export default function SplForm() {
                     </div>
                     {isSecurityDepartment && (
                       <p className="mt-2 text-xs text-blue-600">
-                        <strong>Khusus Security:</strong> Pilih shift P1/P2/M1/M2 atau isi manual. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 16:00 - 04:00). Jika Sabtu tidak ada shift, hari tersebut dianggap libur.
+                        <strong>Khusus Security:</strong> Pilih shift P1/P2/M1/M2/F1 atau isi manual. Untuk shift malam yang melewati tengah malam, masukkan waktu selesai yang lebih kecil dari waktu mulai (contoh: 16:00 - 04:00). Jika Sabtu tidak ada shift, hari tersebut dianggap libur.
                       </p>
                     )}
                     {!regularHoursLoading && !isSecurityDepartment && (!regularHours?.start || !regularHours?.end) && (
