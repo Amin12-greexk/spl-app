@@ -10,7 +10,11 @@
     "postinstall": "prisma generate",
     "db:clear": "npx tsx prisma/clear-data.ts",
     "db:push": "npx prisma db push",
-    "db:seed": "npx prisma db seed"
+    "db:seed": "npx prisma db seed",
+    "db:dump": "node scripts/export-postgres.js",
+    "db:restore": "node scripts/restore-postgres.js",
+    "db:compare": "node scripts/compare-postgres.js",
+    "dokploy:postgres:create": "node scripts/dokploy-create-postgres.js"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

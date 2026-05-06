@@ -35,6 +35,10 @@ ADMIN-CREDENTIALS.md
 *.md
 *.pdf
 
+# database backups
+/backups/*.dump
+/backups/*.sql
+
 # vercel
 .vercel
 

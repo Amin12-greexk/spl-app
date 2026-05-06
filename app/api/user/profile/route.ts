@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import {
   getJakartaDayOfWeek,
+  isSecurityOffShift,
+  isSecurityWorkShiftCode,
   parseDateOnly,
   SECURITY_SHIFT_DEFINITIONS,
-  SecurityShiftCode,
   startOfDay,
 } from "@/lib/spl-time"
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
@@ -87,18 +88,18 @@ export async function GET(request: NextRequest) {
           select: { shiftCode: true },
         })
 
-        if (shiftAssignment?.shiftCode) {
-          const shiftDefinition =
-            SECURITY_SHIFT_DEFINITIONS[
-              shiftAssignment.shiftCode as SecurityShiftCode
-            ]
-
-          if (!shiftDefinition) {
+        if (isSecurityOffShift(shiftAssignment?.shiftCode)) {
+          effectiveRegularStartTime = null
+          effectiveRegularEndTime = null
+        } else if (shiftAssignment?.shiftCode) {
+          if (!isSecurityWorkShiftCode(shiftAssignment.shiftCode)) {
             return NextResponse.json(
               { error: "Shift security tidak valid" },
               { status: 400 }
             )
           }
+
+          const shiftDefinition = SECURITY_SHIFT_DEFINITIONS[shiftAssignment.shiftCode]
 
           effectiveRegularStartTime = shiftDefinition.start
           effectiveRegularEndTime = shiftDefinition.end

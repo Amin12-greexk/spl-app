@@ -6,13 +6,14 @@ import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
 import { sendNotificationToUser } from "@/lib/notification-utils"
 import {
   getJakartaDayOfWeek,
+  isSecurityOffShift,
+  isSecurityWorkShiftCode,
   JAKARTA_TIME_ZONE,
   makeWindowWithOffset,
   makeWindow,
   parseDateOnly,
   parseTimeToMinutes,
   SECURITY_SHIFT_DEFINITIONS,
-  SecurityShiftCode,
   startOfDay,
 } from "@/lib/spl-time"
 import {
@@ -125,17 +126,17 @@ export async function POST(req: NextRequest) {
         select: { shiftCode: true },
       })
 
-      if (shiftAssignment?.shiftCode) {
-        const shiftDefinition =
-          SECURITY_SHIFT_DEFINITIONS[
-            shiftAssignment.shiftCode as SecurityShiftCode
-          ]
-        if (!shiftDefinition) {
+      if (isSecurityOffShift(shiftAssignment?.shiftCode)) {
+        isSecurityWeeklyHoliday = true
+      } else if (shiftAssignment?.shiftCode) {
+        if (!isSecurityWorkShiftCode(shiftAssignment.shiftCode)) {
           return NextResponse.json(
             { error: "Shift security tidak valid" },
             { status: 400 }
           )
         }
+
+        const shiftDefinition = SECURITY_SHIFT_DEFINITIONS[shiftAssignment.shiftCode]
         const regularWindow = makeWindow(
           requestedDate,
           shiftDefinition.start,

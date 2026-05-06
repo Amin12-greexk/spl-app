@@ -21,6 +21,7 @@ const SHIFT_OPTIONS = [
   { value: "P2", label: "P2 (11:00-19:00)" },
   { value: "M1", label: "M1 (16:00-04:00)" },
   { value: "M2", label: "M2 (23:00-07:00)" },
+  { value: "OFF", label: "OFF (Libur)" },
 ]
 
 const getTodayDateValue = () => new Date().toLocaleDateString("en-CA")

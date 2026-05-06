@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import {
+  isValidSecurityShiftCode,
   parseDateOnly,
-  SECURITY_SHIFT_DEFINITIONS,
   startOfDay,
 } from "@/lib/spl-time"
 
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (!Object.prototype.hasOwnProperty.call(SECURITY_SHIFT_DEFINITIONS, normalizedShift)) {
+    if (!isValidSecurityShiftCode(normalizedShift)) {
       return NextResponse.json(
         { error: "Kode shift tidak valid" },
         { status: 400 }

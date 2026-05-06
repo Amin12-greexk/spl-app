@@ -5,7 +5,26 @@ export const SECURITY_SHIFT_DEFINITIONS = {
   M2: { start: "23:00", end: "07:00" },
 } as const
 
-export type SecurityShiftCode = keyof typeof SECURITY_SHIFT_DEFINITIONS
+export const SECURITY_OFF_SHIFT_CODE = "OFF" as const
+
+export type SecurityWorkShiftCode = keyof typeof SECURITY_SHIFT_DEFINITIONS
+export type SecurityShiftCode = SecurityWorkShiftCode | typeof SECURITY_OFF_SHIFT_CODE
+
+export const isSecurityOffShift = (value?: string | null) =>
+  value?.trim().toUpperCase() === SECURITY_OFF_SHIFT_CODE
+
+export const isSecurityWorkShiftCode = (
+  value?: string | null
+): value is SecurityWorkShiftCode => {
+  const normalized = value?.trim().toUpperCase()
+  return Boolean(
+    normalized &&
+      Object.prototype.hasOwnProperty.call(SECURITY_SHIFT_DEFINITIONS, normalized)
+  )
+}
+
+export const isValidSecurityShiftCode = (value?: string | null) =>
+  isSecurityOffShift(value) || isSecurityWorkShiftCode(value)
 
 const JAKARTA_OFFSET_MINUTES = 7 * 60
 export const JAKARTA_TIME_ZONE = "Asia/Jakarta"
