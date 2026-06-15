@@ -1666,7 +1666,7 @@ export default function SplHistoryPage() {
                   </td>
                   <td className="px-4 py-4 text-xs text-gray-600 max-w-[200px] hidden xl:table-cell">
                     <div className="line-clamp-2 italic" title={spl.reason}>
-                      "{spl.reason}"
+                      &quot;{spl.reason}&quot;
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">

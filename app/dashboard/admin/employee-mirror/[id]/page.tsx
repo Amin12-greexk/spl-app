@@ -343,7 +343,7 @@ export default function EmployeeMirrorSplPage() {
               </div>
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Alasan</p>
-                <p className="text-xs text-slate-600 italic">"{spl.reason}"</p>
+                <p className="text-xs text-slate-600 italic">&quot;{spl.reason}&quot;</p>
               </div>
               <div className="pt-2 border-t border-slate-50 flex items-center justify-between">
                 <span className="text-[10px] text-slate-500">Pimpinan: <span className="font-bold">{getLeaderName(spl)}</span></span>
@@ -401,7 +401,7 @@ export default function EmployeeMirrorSplPage() {
                     </td>
                     <td className="px-4 py-4 hidden md:table-cell">
                       <div className="max-w-[200px] lg:max-w-xs truncate italic text-slate-500" title={spl.reason}>
-                        "{spl.reason}"
+                        &quot;{spl.reason}&quot;
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center">
