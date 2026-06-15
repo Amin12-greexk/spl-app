@@ -49,22 +49,53 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date")
     const targetDate = dateParam ? parseDateOnly(dateParam) : null
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        departmentId: true,
-        departmentName: true,
-        department: { select: { id: true, name: true } },
-        position: true,
-        pin: true,
-        regularStartTime: true,
-        regularEndTime: true,
-      },
-    })
+    let user: any = null
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          departmentId: true,
+          departmentName: true,
+          department: { select: { id: true, name: true } },
+          position: true,
+          pin: true,
+          image: true,
+          regularStartTime: true,
+          regularEndTime: true,
+        },
+      })
+    } catch (err) {
+      console.warn("Prisma select failed, falling back to raw SQL for profile fetch")
+      const users = await prisma.$queryRawUnsafe(`
+        SELECT u.id, u.email, u.name, u.role, u."departmentId", u."departmentName", u.position, u.pin, u.image, u."regularStartTime", u."regularEndTime",
+        d.id as "dept_id", d.name as "dept_name"
+        FROM "users" u
+        LEFT JOIN "departments" d ON u."departmentId" = d.id
+        WHERE u.id = $1
+      `, session.user.id) as any[]
+      
+      if (users && users.length > 0) {
+        const u = users[0]
+        user = {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          departmentId: u.departmentId,
+          departmentName: u.departmentName,
+          position: u.position,
+          pin: u.pin,
+          image: u.image,
+          regularStartTime: u.regularStartTime,
+          regularEndTime: u.regularEndTime,
+          department: u.dept_id ? { id: u.dept_id, name: u.dept_name } : null
+        }
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
@@ -327,11 +358,12 @@ export async function POST(request: NextRequest) {
     // Simpan file secara lokal
     await writeFile(absolutePath, buffer)
 
-    // Update database
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { image: relativePath },
-    })
+    // Workaround: Gunakan raw SQL karena Prisma Client belum terupdate/terkunci
+    await prisma.$executeRawUnsafe(
+      'UPDATE "users" SET "image" = $1 WHERE "id" = $2',
+      relativePath,
+      session.user.id
+    )
 
     return NextResponse.json({
       message: "Foto profil berhasil diperbarui",
