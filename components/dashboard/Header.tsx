@@ -676,8 +676,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       : "bg-white border-gray-200 hover:border-green-200 hover:shadow-sm"
                     }`}
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white">
-                    {session?.user?.name ? getInitials(session.user.name) : "U"}
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white overflow-hidden relative">
+                    {session?.user?.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt="Profile"
+                        width={128}
+                        height={128}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      session?.user?.name ? getInitials(session.user.name) : "U"
+                    )}
                   </div>
 
                   <div className="hidden sm:flex flex-col items-start mr-1">
@@ -707,8 +717,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {/* User Info Header */}
                       <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg">
-                            {session?.user?.name ? getInitials(session.user.name) : "U"}
+                          <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg overflow-hidden relative">
+                            {session?.user?.image ? (
+                              <Image
+                                src={session.user.image}
+                                alt="Profile"
+                                width={128}
+                                height={128}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              session?.user?.name ? getInitials(session.user.name) : "U"
+                            )}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-gray-900 line-clamp-1">{session?.user?.name}</p>

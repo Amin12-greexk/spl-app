@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
@@ -198,9 +199,11 @@ export default function ProfilePage() {
             <div className="relative group">
               <div className="w-24 h-24 rounded-full bg-white border-4 border-white/20 overflow-hidden flex items-center justify-center shadow-lg">
                 {profile.image ? (
-                  <img
+                  <Image
                     src={profile.image}
                     alt={profile.name}
+                    width={256}
+                    height={256}
                     className="w-full h-full object-cover"
                   />
                 ) : (

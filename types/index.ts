@@ -47,6 +47,7 @@ export interface User {
   position?: string | null
   regularStartTime?: string | null
   regularEndTime?: string | null
+  image?: string | null
   supervisorId?: string | null
   supervisor?: User | null
   subordinates?: User[]
@@ -141,6 +142,7 @@ declare module "next-auth" {
     supervisorId?: string | null
     regularStartTime?: string | null
     regularEndTime?: string | null
+    image?: string | null
   }
 
   interface Session {
@@ -154,6 +156,7 @@ declare module "next-auth" {
       supervisorId?: string | null
       regularStartTime?: string | null
       regularEndTime?: string | null
+      image?: string | null
     }
   }
 }
@@ -169,6 +172,7 @@ declare module "next-auth/jwt" {
     supervisorId?: string | null
     regularStartTime?: string | null
     regularEndTime?: string | null
+    image?: string | null
   }
 }
 

@@ -325,7 +325,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    const uint8Array = new Uint8Array(bytes)
 
     const fileExtension = file.name.split(".").pop()
     const fileName = `${session.user.id}-${Date.now()}.${fileExtension}`
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
     await mkdir(path.dirname(absolutePath), { recursive: true })
     
     // Simpan file secara lokal
-    await writeFile(absolutePath, buffer)
+    await writeFile(absolutePath, uint8Array)
 
     // Update database menggunakan Raw SQL untuk menghindari masalah Prisma Client Outdated
     await prisma.$executeRawUnsafe(
