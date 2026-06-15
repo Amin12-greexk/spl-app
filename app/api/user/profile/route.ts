@@ -16,8 +16,7 @@ import {
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
 
 const normalizeTimeValue = (value: unknown) => {
-// ... existing normalizeTimeValue ...
-
+  if (typeof value !== "string") return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
 }
@@ -49,56 +48,34 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date")
     const targetDate = dateParam ? parseDateOnly(dateParam) : null
 
-    let user: any = null
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          departmentId: true,
-          departmentName: true,
-          department: { select: { id: true, name: true } },
-          position: true,
-          pin: true,
-          image: true,
-          regularStartTime: true,
-          regularEndTime: true,
-        },
-      })
-    } catch (err) {
-      console.warn("Prisma select failed, falling back to raw SQL for profile fetch")
-      const users = await prisma.$queryRawUnsafe(`
-        SELECT u.id, u.email, u.name, u.role, u."departmentId", u."departmentName", u.position, u.pin, u.image, u."regularStartTime", u."regularEndTime",
-        d.id as "dept_id", d.name as "dept_name"
-        FROM "users" u
-        LEFT JOIN "departments" d ON u."departmentId" = d.id
-        WHERE u.id = $1
-      `, session.user.id) as any[]
-      
-      if (users && users.length > 0) {
-        const u = users[0]
-        user = {
-          id: u.id,
-          email: u.email,
-          name: u.name,
-          role: u.role,
-          departmentId: u.departmentId,
-          departmentName: u.departmentName,
-          position: u.position,
-          pin: u.pin,
-          image: u.image,
-          regularStartTime: u.regularStartTime,
-          regularEndTime: u.regularEndTime,
-          department: u.dept_id ? { id: u.dept_id, name: u.dept_name } : null
-        }
-      }
+    // Use raw SQL to fetch profile to avoid Prisma Client synchronization issues
+    const users = await prisma.$queryRawUnsafe(`
+      SELECT u.id, u.email, u.name, u.role, u."departmentId", u.department as "departmentName", u.position, u.pin, u.image, u."regularStartTime", u."regularEndTime",
+      d.id as "dept_id", d.name as "dept_name"
+      FROM "users" u
+      LEFT JOIN "departments" d ON u."departmentId" = d.id
+      WHERE u.id = $1
+    `, session.user.id) as any[]
+
+
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    const u = users[0]
+    const user = {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      departmentId: u.departmentId,
+      departmentName: u.departmentName,
+      position: u.position,
+      pin: u.pin,
+      image: u.image,
+      regularStartTime: u.regularStartTime,
+      regularEndTime: u.regularEndTime,
+      department: u.dept_id ? { id: u.dept_id, name: u.dept_name } : null
     }
 
     let effectiveRegularStartTime = user.regularStartTime
@@ -355,10 +332,13 @@ export async function POST(request: NextRequest) {
     const relativePath = `/uploads/profiles/${fileName}`
     const absolutePath = path.join(process.cwd(), "public", relativePath)
 
+    // Pastikan direktori ada
+    await mkdir(path.dirname(absolutePath), { recursive: true })
+    
     // Simpan file secara lokal
     await writeFile(absolutePath, buffer)
 
-    // Workaround: Gunakan raw SQL karena Prisma Client belum terupdate/terkunci
+    // Update database menggunakan Raw SQL untuk menghindari masalah Prisma Client Outdated
     await prisma.$executeRawUnsafe(
       'UPDATE "users" SET "image" = $1 WHERE "id" = $2',
       relativePath,
