@@ -229,118 +229,184 @@ export default function EmployeeMirrorSplPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Mirror SPL
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Audit View • Mirroring Employee
           </p>
-          <h1 className="mt-1 text-3xl font-bold text-slate-900">
+          <h1 className="mt-1 text-2xl font-black text-slate-900 flex items-center gap-2">
+            <span className="h-8 w-1 bg-red-600 rounded-full"></span>
             {user?.name || "Karyawan"}
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Menampilkan riwayat SPL sesuai perspektif akun target.
+          <p className="mt-2 text-xs text-slate-500 leading-relaxed max-w-md">
+            Anda sedang melihat riwayat SPL dari sudut pandang target.
             {hideUnsignedManual
-              ? " SPL manual yang belum ditandatangani disembunyikan."
-              : " SPL manual unsigned tetap terlihat untuk role ini."}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Mode mirror: {mirrorMode}
+              ? " Sistem menyembunyikan SPL manual tanpa tanda tangan."
+              : " Semua data SPL terlihat dalam mode audit ini."}
           </p>
         </div>
         <Link
           href="/dashboard/admin/employee-mirror"
-          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all hover:shadow-md"
         >
-          Kembali ke Mirror Karyawan
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Kembali ke Daftar
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">Email</p>
-          <p className="mt-1 text-sm font-medium text-slate-900">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm lg:p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase">Email</p>
+          <p className="mt-0.5 text-xs lg:text-sm font-semibold text-slate-900 truncate">
             {user?.email || "-"}
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">Role</p>
-          <p className="mt-1 text-sm font-medium text-slate-900">
-            {user?.role || "-"}
+        <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm lg:p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase">Departemen</p>
+          <p className="mt-0.5 text-xs lg:text-sm font-semibold text-slate-900 truncate">
+            {user?.department?.name || user?.departmentName || "-"}
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">Departemen</p>
-          <p className="mt-1 text-sm font-medium text-slate-900">
-            {user?.department?.name || user?.departmentName || "-"}
+        <div className="col-span-2 lg:col-span-1 rounded-xl border border-slate-100 bg-white p-3 shadow-sm lg:p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase">Mode Akses</p>
+          <p className="mt-0.5 text-xs lg:text-sm font-semibold text-red-600 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse"></span>
+            Audit: {mirrorMode}
           </p>
         </div>
       </div>
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <select
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-500 lg:w-64"
-          >
-            <option value="ALL">Semua Bulan</option>
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari alasan, status, jam, pimpinan..."
-            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
-          />
+        <div className="flex flex-col gap-3 md:flex-row">
+          <div className="relative w-full md:w-64">
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="w-full appearance-none rounded-xl border border-gray-200 bg-slate-50 py-2.5 pl-4 pr-10 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="ALL">Semua Periode</option>
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari alasan, status, pimpinan..."
+              className="w-full rounded-xl border border-gray-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+            />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      {/* Mobile & Tablet Cards */}
+      <div className="space-y-4 md:hidden">
+        {filteredSpls.length === 0 ? (
+          <div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-200">
+            <p className="text-xs text-slate-500">Tidak ada data ditemukan</p>
+          </div>
+        ) : (
+          filteredSpls.map((spl) => (
+            <div key={spl.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                  {new Date(spl.date).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+                {getStatusBadge(spl.status)}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Lembur</p>
+                  <p className="text-xs font-bold text-slate-800">{spl.startTime} - {spl.endTime}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Realisasi</p>
+                  <p className="text-xs font-bold text-emerald-600">{getActualRangeLabel(spl)}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Alasan</p>
+                <p className="text-xs text-slate-600 italic">"{spl.reason}"</p>
+              </div>
+              <div className="pt-2 border-t border-slate-50 flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">Pimpinan: <span className="font-bold">{getLeaderName(spl)}</span></span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table - Optimized for Laptop screens */}
+      <div className="hidden md:block rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold">Tgl Lembur</th>
-                <th className="px-4 py-3 text-left font-semibold">Pimpinan</th>
-                <th className="px-4 py-3 text-left font-semibold">Jam Reguler</th>
-                <th className="px-4 py-3 text-left font-semibold">Jam Lembur</th>
-                <th className="px-4 py-3 text-left font-semibold">Jam Realisasi</th>
-                <th className="px-4 py-3 text-left font-semibold">Alasan</th>
-                <th className="px-4 py-3 text-left font-semibold">Status</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">Tanggal</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider hidden lg:table-cell">Pimpinan</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider hidden xl:table-cell">Reguler</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">Jam Lembur</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">Realisasi</th>
+                <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider hidden md:table-cell">Alasan</th>
+                <th className="px-4 py-4 text-center text-[10px] font-bold uppercase tracking-wider">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-50">
               {filteredSpls.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                    Tidak ada data SPL yang terlihat pada filter ini.
+                  <td colSpan={7} className="px-4 py-16 text-center text-gray-400 italic">
+                    Belum ada data SPL untuk ditampilkan
                   </td>
                 </tr>
               ) : (
                 filteredSpls.map((spl) => (
-                  <tr key={spl.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-700">
-                      {new Date(spl.date).toLocaleDateString("id-ID")}
+                  <tr key={spl.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-4 whitespace-nowrap font-bold text-slate-700">
+                      {new Date(spl.date).toLocaleDateString("id-ID", { day: '2-digit', month: 'short' })}
+                      <span className="hidden lg:inline text-slate-400 font-normal ml-1">{new Date(spl.date).getFullYear()}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{getLeaderName(spl)}</td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-slate-600 hidden lg:table-cell">
+                      {getLeaderName(spl)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-slate-500 hidden xl:table-cell">
                       {getRegularHoursLabel(spl)}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {spl.startTime} - {spl.endTime}
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800">{spl.startTime} - {spl.endTime}</span>
+                        <span className="text-[10px] text-slate-400 xl:hidden">Reg: {getRegularHoursLabel(spl)}</span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {getActualRangeLabel(spl)}
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className={`font-bold ${spl.actualStartAt ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        {getActualRangeLabel(spl)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700 max-w-sm truncate" title={spl.reason}>
-                      {spl.reason}
+                    <td className="px-4 py-4 hidden md:table-cell">
+                      <div className="max-w-[200px] lg:max-w-xs truncate italic text-slate-500" title={spl.reason}>
+                        "{spl.reason}"
+                      </div>
                     </td>
-                    <td className="px-4 py-3">{getStatusBadge(spl.status)}</td>
+                    <td className="px-4 py-4 text-center">
+                      {getStatusBadge(spl.status)}
+                    </td>
                   </tr>
                 ))
               )}

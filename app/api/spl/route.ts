@@ -110,9 +110,13 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim();
     if (search) {
       where.OR = [
+        { id: { contains: search, mode: "insensitive" } },
+        { requesterId: { contains: search, mode: "insensitive" } },
         { reason: { contains: search, mode: "insensitive" } },
+        { projectName: { contains: search, mode: "insensitive" } },
         { requester: { name: { contains: search, mode: "insensitive" } } },
         { requester: { email: { contains: search, mode: "insensitive" } } },
+        { requester: { pin: { contains: search, mode: "insensitive" } } },
       ];
     }
 
@@ -269,13 +273,16 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    const statsWhere = { ...where };
+    delete statsWhere.status;
+
     if (lite) {
       const [total, groupedStats, spls] =
         await prisma.$transaction([
           prisma.spl.count({ where }),
           prisma.spl.groupBy({
             by: ["status"],
-            where: baseWhere,
+            where: statsWhere,
             orderBy: { status: "asc" },
             _count: { _all: true },
           }),
@@ -326,7 +333,7 @@ export async function GET(req: NextRequest) {
         prisma.spl.count({ where }),
         prisma.spl.groupBy({
           by: ["status"],
-          where: baseWhere,
+          where: statsWhere,
           orderBy: { status: "asc" },
           _count: { _all: true },
         }),

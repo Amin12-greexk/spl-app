@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
@@ -49,6 +49,7 @@ interface Spl {
     id: string
     name: string
     email: string
+    pin?: string | null
     departmentId: string | null
     departmentName: string | null
     department: {
@@ -71,7 +72,7 @@ interface Spl {
 export default function SplHistoryPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const PAGE_SIZE = 10
+  const PAGE_SIZE = 50
   const [spls, setSpls] = useState<Spl[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)
@@ -90,6 +91,14 @@ export default function SplHistoryPage() {
     rejected: 0,
   })
   const [editingSpl, setEditingSpl] = useState<Spl | null>(null)
+
+  const focusedUser = useMemo(() => {
+    if (!searchQuery.trim() || spls.length === 0) return null
+    const firstUserId = spls[0].requester.id
+    const isSingleUser = spls.every((s) => s.requester.id === firstUserId)
+    if (isSingleUser) return spls[0].requester
+    return null
+  }, [spls, searchQuery])
   const [editForm, setEditForm] = useState({
     date: "",
     startTime: "",
@@ -102,6 +111,12 @@ export default function SplHistoryPage() {
     projectName: "",
   })
   const [isSaving, setIsSaving] = useState(false)
+
+  const focusOnUser = (name: string) => {
+    setSearchInput(name)
+    setSearchQuery(name)
+    setPage(1)
+  }
 
   const fetchSpls = useCallback(async () => {
     setIsFetching(true)
@@ -369,10 +384,54 @@ export default function SplHistoryPage() {
     return `${hours} jam ${minutes} menit`
   }
 
+  const sortedSpls = useMemo(() => {
+    return [...spls].sort((a, b) => {
+      const dateCompare =
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+  }, [spls])
+
+  const formatDateShort = (value: Date | string) =>
+    new Date(value).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+
+  const formatDateTimeShort = (value: Date | string) =>
+    new Date(value).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+
+  const shortId = (value: string) =>
+    value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
+
+  const getSourceBadge = (spl: Spl) => {
+    if (spl.isManualEntry) {
+      return (
+        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+          Manual
+        </span>
+      )
+    }
+
+    return (
+      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+        Sistem
+      </span>
+    )
+  }
+
   const paginationControls = (
     <div className="flex flex-col gap-3 px-4 py-3 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-gray-600">
-        Menampilkan {spls.length} dari {total} data
+        Menampilkan {sortedSpls.length} dari {total} data
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -1218,12 +1277,72 @@ export default function SplHistoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Riwayat SPL</h1>
-        <p className="text-gray-600 text-sm mt-1">View dan delete riwayat semua SPL</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Riwayat SPL</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Tabel otomatis diurutkan dari tanggal lembur terbaru.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            Urut: Tanggal Terbaru
+          </span>
+          {searchQuery.trim() && (
+            <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+              Hasil pencarian: {total}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Focused User Insight */}
+      {focusedUser && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500 mb-2">
+          <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl shadow-md p-5 text-white">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold border-2 border-white/30">
+                  {focusedUser.name.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold leading-tight">{focusedUser.name}</h2>
+                  <p className="text-red-100 text-xs">
+                    PIN: {focusedUser.pin || "-"} • {(focusedUser.department?.name || focusedUser.departmentName || "-")}
+                  </p>
+                  <p className="text-red-100 text-[10px] mt-0.5 opacity-80">{focusedUser.position || "-"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push(`/dashboard/admin/employee-mirror/${focusedUser.id}`)}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-semibold transition-all backdrop-blur-sm border border-white/20 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Lihat Profil Lengkap
+                </button>
+                <button
+                  onClick={() => {
+                    setSearchInput("")
+                    setSearchQuery("")
+                  }}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
+                  title="Tutup Fokus"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1253,21 +1372,52 @@ export default function SplHistoryPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Cari user, email, atau alasan..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_0.7fr_auto]">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Cari nama, email, ID SPL, ID user, PIN, project, atau alasan..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <svg
+              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("")
+                  setSearchQuery("")
+                  setPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                title="Bersihkan pencarian"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
           <select
             value={filterStatus}
             onChange={(e) => {
               setFilterStatus(e.target.value)
               setPage(1)
             }}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="ALL">Semua Status</option>
             <option value="PENDING_SUPERADMIN">Pending Super Admin</option>
@@ -1279,6 +1429,18 @@ export default function SplHistoryPage() {
             <option value="REJECTED_BY_SUPERVISOR">Rejected (Supervisor)</option>
             <option value="REJECTED_BY_MANAGER">Rejected (Manager)</option>
           </select>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchInput("")
+              setSearchQuery("")
+              setFilterStatus("ALL")
+              setPage(1)
+            }}
+            className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Reset
+          </button>
         </div>
         {/* Date Filter */}
         <div className="mb-4">
@@ -1388,7 +1550,12 @@ export default function SplHistoryPage() {
                 {getStatusBadge(spl.status)}
               </div>
               <div>
-                <div className="font-semibold text-gray-900">{spl.requester.name}</div>
+                <div 
+                  className="font-semibold text-gray-900 cursor-pointer hover:text-red-600 transition-colors"
+                  onClick={() => focusOnUser(spl.requester.name)}
+                >
+                  {spl.requester.name}
+                </div>
                 <div className="text-xs text-gray-500">
                   {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
                 </div>
@@ -1445,78 +1612,102 @@ export default function SplHistoryPage() {
       {/* SPL Table (Desktop) */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[1000px] w-full whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Waktu</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jam</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alasan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Waktu</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jam</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">Alasan</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Type</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200">
               {spls.map((spl) => (
-                <tr key={spl.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                <tr key={spl.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                     {new Date(spl.date).toLocaleDateString("id-ID", {
                       day: "2-digit",
                       month: "short",
-                      year: "numeric",
                     })}
+                    <span className="hidden lg:inline"> {new Date(spl.date).getFullYear()}</span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="font-medium text-gray-900">{spl.requester.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
+                  <td className="px-4 py-4">
+                    <div className="max-w-[150px] lg:max-w-[200px]">
+                      <div 
+                        className="font-semibold text-gray-900 cursor-pointer hover:text-red-600 transition-colors truncate"
+                        onClick={() => focusOnUser(spl.requester.name)}
+                        title={spl.requester.name}
+                      >
+                        {spl.requester.name}
+                      </div>
+                      <div className="text-[10px] text-gray-500 truncate">
+                        {(spl.requester.department?.name || spl.requester.departmentName || "-")}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {spl.startTime} - {spl.endTime}
+                  <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-600 hidden lg:table-cell">
+                    <div className="flex flex-col">
+                      <span>{spl.startTime}</span>
+                      <span className="text-gray-400">s/d</span>
+                      <span>{spl.endTime}</span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm font-bold text-gray-900">
+                      {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
+                    </div>
+                    <div className="lg:hidden text-[10px] text-gray-400">
+                      {spl.startTime}-{spl.endTime}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                    {spl.reason}
+                  <td className="px-4 py-4 text-xs text-gray-600 max-w-[200px] hidden xl:table-cell">
+                    <div className="line-clamp-2 italic" title={spl.reason}>
+                      "{spl.reason}"
+                    </div>
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(spl.status)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {getStatusBadge(spl.status)}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
+                    <div className="flex flex-col gap-1">
                       {spl.isManualEntry && (
-                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
-                          Manual
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded text-center border border-purple-200">
+                          MANUAL
                         </span>
                       )}
                       {isMorningOvertime(spl) && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded">
-                          Lembur Pagi
+                        <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded text-center border border-orange-200">
+                          PAGI
+                        </span>
+                      )}
+                      {!spl.isManualEntry && !isMorningOvertime(spl) && (
+                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded text-center">
+                          SYSTEM
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEdit(spl)}
-                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
                         title="Edit Data"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
                         onClick={() => handleDelete(spl.id, spl.requester.name, spl.date)}
-                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Hapus Permanen"
+                        className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                        title="Hapus"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
