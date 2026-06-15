@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { writeFile, mkdir } from "fs/promises"
+import path from "path"
 import {
   getJakartaDayOfWeek,
   isSecurityOffShift,
@@ -14,7 +16,8 @@ import {
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
 
 const normalizeTimeValue = (value: unknown) => {
-  if (typeof value !== "string") return null
+// ... existing normalizeTimeValue ...
+
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
 }
@@ -285,6 +288,57 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error updating profile:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const formData = await request.formData()
+    const file = formData.get("file") as File | null
+
+    if (!file) {
+      return NextResponse.json({ error: "Tidak ada file yang diupload" }, { status: 400 })
+    }
+
+    // Validasi tipe file
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "File harus berupa gambar" }, { status: 400 })
+    }
+
+    // Validasi ukuran file (maks 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      return NextResponse.json({ error: "Ukuran file maksimal 2MB" }, { status: 400 })
+    }
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    const fileExtension = file.name.split(".").pop()
+    const fileName = `${session.user.id}-${Date.now()}.${fileExtension}`
+    const relativePath = `/uploads/profiles/${fileName}`
+    const absolutePath = path.join(process.cwd(), "public", relativePath)
+
+    // Simpan file secara lokal
+    await writeFile(absolutePath, buffer)
+
+    // Update database
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { image: relativePath },
+    })
+
+    return NextResponse.json({
+      message: "Foto profil berhasil diperbarui",
+      imageUrl: relativePath,
+    })
+  } catch (error) {
+    console.error("Error uploading profile picture:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
