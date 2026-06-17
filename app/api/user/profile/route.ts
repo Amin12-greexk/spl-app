@@ -3,8 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { writeFile, mkdir } from "fs/promises"
-import path from "path"
+import { sanityClient } from "@/lib/sanity"
 import {
   getJakartaDayOfWeek,
   isSecurityOffShift,
@@ -325,35 +324,29 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(bytes)
+    const buffer = Buffer.from(bytes)
 
-    const fileExtension = file.name.split(".").pop()
-    const fileName = `${session.user.id}-${Date.now()}.${fileExtension}`
-    
-    // Simpan di folder public/uploads/profiles
-    // Jika menggunakan Dokploy, folder /public/uploads harus di-mount sebagai volume
-    const relativePath = `/uploads/profiles/${fileName}`
-    const absolutePath = path.join(process.cwd(), "public", relativePath)
+    // Upload ke Sanity.io
+    const asset = await sanityClient.assets.upload("image", buffer, {
+      filename: file.name,
+      contentType: file.type,
+    })
 
-    // Pastikan direktori ada
-    await mkdir(path.dirname(absolutePath), { recursive: true })
-    
-    // Simpan file secara lokal
-    await writeFile(absolutePath, uint8Array)
+    const imageUrl = asset.url
 
     // Update database menggunakan Raw SQL untuk menghindari masalah Prisma Client Outdated
     await prisma.$executeRawUnsafe(
       'UPDATE "users" SET "image" = $1 WHERE "id" = $2',
-      relativePath,
+      imageUrl,
       session.user.id
     )
 
     return NextResponse.json({
       message: "Foto profil berhasil diperbarui",
-      imageUrl: relativePath,
+      imageUrl: imageUrl,
     })
   } catch (error) {
-    console.error("Error uploading profile picture locally:", error)
+    console.error("Error uploading profile picture to Sanity:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
