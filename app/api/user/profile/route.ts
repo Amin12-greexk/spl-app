@@ -14,6 +14,8 @@ import {
 } from "@/lib/spl-time"
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
 
+export const dynamic = "force-dynamic"
+
 const normalizeTimeValue = (value: unknown) => {
   if (typeof value !== "string") return null
   const trimmed = value.trim()
