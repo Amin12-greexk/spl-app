@@ -329,6 +329,9 @@ export async function POST(request: NextRequest) {
 
     const fileExtension = file.name.split(".").pop()
     const fileName = `${session.user.id}-${Date.now()}.${fileExtension}`
+    
+    // Simpan di folder public/uploads/profiles
+    // Jika menggunakan Dokploy, folder /public/uploads harus di-mount sebagai volume
     const relativePath = `/uploads/profiles/${fileName}`
     const absolutePath = path.join(process.cwd(), "public", relativePath)
 
@@ -350,7 +353,7 @@ export async function POST(request: NextRequest) {
       imageUrl: relativePath,
     })
   } catch (error) {
-    console.error("Error uploading profile picture:", error)
+    console.error("Error uploading profile picture locally:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
