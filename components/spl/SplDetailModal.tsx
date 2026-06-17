@@ -40,7 +40,6 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     const numericValue = typeof value === "number" ? value : Number(value)
     if (!Number.isFinite(numericValue)) return "-"
     const totalMinutes = Math.round(numericValue * 60)
-    // Jika durasi kurang dari 30 menit, tidak dihitung
     if (totalMinutes < 30) return "0 menit"
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
@@ -135,70 +134,29 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
   const showMorningBadge = isMorningOvertime(spl)
 
   const getStatusBadge = () => {
-    const statusConfig = {
-      PENDING: {
-        bg: "bg-yellow-50",
-        text: "text-yellow-700",
-        border: "border-yellow-200",
-      },
-      PENDING_SUPERADMIN: {
-        bg: "bg-amber-50",
-        text: "text-amber-700",
-        border: "border-amber-200",
-      },
-      PENDING_SUPERVISOR: {
-        bg: "bg-orange-50",
-        text: "text-orange-700",
-        border: "border-orange-200",
-      },
-      PENDING_MANAGER: {
-        bg: "bg-blue-50",
-        text: "text-blue-700",
-        border: "border-blue-200",
-      },
-      APPROVED: {
-        bg: "bg-green-50",
-        text: "text-green-700",
-        border: "border-green-200",
-      },
-      IN_PROGRESS: {
-        bg: "bg-yellow-50",
-        text: "text-yellow-700",
-        border: "border-yellow-200",
-      },
-      DONE: {
-        bg: "bg-green-50",
-        text: "text-green-700",
-        border: "border-green-200",
-      },
-      REJECTED: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-      },
-      REJECTED_BY_SUPERVISOR: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-      },
-      REJECTED_BY_MANAGER: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-      },
-    }
+    const isApproved = ["APPROVED", "DONE"].includes(spl.status)
+    const isRejected = ["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status)
+    const isPending = [
+      "PENDING",
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+      "PENDING_SUPERADMIN",
+      "IN_PROGRESS",
+    ].includes(spl.status)
 
-    const config = statusConfig[spl.status as keyof typeof statusConfig] || {
-      bg: "bg-gray-50",
-      text: "text-gray-700",
-      border: "border-gray-200",
-    }
+    const cls = isApproved
+      ? "bg-green-50 text-green-700 border-green-200"
+      : isRejected
+        ? "bg-red-50 text-red-700 border-red-200"
+        : isPending
+          ? "bg-amber-50 text-amber-700 border-amber-200"
+          : "bg-gray-50 text-gray-600 border-gray-200"
 
     return (
       <span
-        className={`px-3 py-1.5 text-sm font-bold rounded-lg border ${config.bg} ${config.text} ${config.border} shadow-sm flex items-center gap-2 whitespace-nowrap`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border ${cls}`}
       >
-        <span className="text-base">{statusInfo.icon}</span>
+        <span className="text-sm leading-none">{statusInfo.icon}</span>
         {statusInfo.label}
       </span>
     )
@@ -212,8 +170,8 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
       supervisorRole === "GA"
         ? "GA"
         : supervisorRole === "SUPER_ADMIN"
-        ? "Super Admin"
-        : "Kepala Dept"
+          ? "Super Admin"
+          : "Kepala Dept"
 
     if (
       spl.status === "PENDING_SUPERVISOR" ||
@@ -221,7 +179,7 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
       spl.supervisorApprovalDate
     ) {
       return [
-        { label: "Staff", done: true, current: false },
+        { label: "Pemohon", done: true, current: false },
         {
           label: supervisorLabel,
           done: !!spl.supervisorApprovalDate,
@@ -245,101 +203,92 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     ]
   }
 
+  const approvalFlow = getApprovalFlow()
+  const isRejected = ["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status)
+  const isManual = spl.source === "MANUAL" || spl.isManualEntry
+
+  // Inisial nama untuk avatar approver
+  const approverInitials = spl.approver?.name
+    ? spl.approver.name
+      .split(" ")
+      .slice(0, 2)
+      .map((w: string) => w[0])
+      .join("")
+      .toUpperCase()
+    : "?"
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Detail SPL"
-      size="large"
-    >
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-        {/* Header Info */}
-        <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-200">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 truncate">
+    <Modal isOpen={isOpen} onClose={onClose} title="Detail SPL" size="large">
+      <div>
+
+        {/* ── Header: identitas + badge ── */}
+        <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 truncate">
               {spl.requester.name}
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {requesterDepartmentName} • {spl.requester.email}
+            <p className="text-sm text-gray-500 mt-0.5">
+              {requesterDepartmentName} · {spl.requester.email}
             </p>
             {spl.requester.pin && (
-              <p className="text-sm text-gray-500 mt-0.5">
-                PIN: {spl.requester.pin}
-              </p>
+              <p className="text-xs text-gray-400 mt-0.5">PIN: {spl.requester.pin}</p>
             )}
           </div>
-          <div className="flex flex-col items-end gap-2">
-            {(spl.source === "MANUAL" || spl.isManualEntry) && (
-              <span
-                className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200 cursor-help"
-                title="SPL diinput telat oleh IT melalui akun Super Admin"
-              >
-                ⚠️ Telat Input
+
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            {isManual && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-amber-50 text-amber-700 border-amber-200">
+                ⚠️ Telat input
               </span>
             )}
             {spl.source === "LEGACY" && (
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-blue-50 text-blue-700 border-blue-200">
-                Data Lama
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-blue-50 text-blue-700 border-blue-200">
+                Data lama
               </span>
             )}
             {showMorningBadge && (
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200">
-                Lembur Pagi
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-amber-50 text-amber-700 border-amber-200">
+                🌅 Lembur pagi
               </span>
             )}
             {getStatusBadge()}
           </div>
         </div>
 
-        {/* Warning box untuk SPL telat input */}
-        {(spl.source === "MANUAL" || spl.isManualEntry) && (
-          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <span className="text-orange-500 text-base mt-0.5">⚠️</span>
-              <div className="text-sm">
-                <p className="font-semibold text-orange-800">SPL Telat Input</p>
-                <p className="text-orange-700 mt-0.5">
-                  SPL ini dibuat secara manual oleh IT melalui akun Super Admin karena karyawan melewati batas waktu pengajuan normal.
-                  Karyawan telah menandatangani SPL ini sebagai konfirmasi.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Approval Flow Progress */}
-        {!["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
-          <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
-            <p className="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Alur Persetujuan
+        {/* ── Alur persetujuan ── */}
+        {!isRejected && (
+          <div className="py-4 border-b border-gray-100">
+            <p className="text-xs text-gray-400 font-medium mb-3 uppercase tracking-wide">
+              Alur persetujuan
             </p>
-            <div className="flex items-center gap-2">
-              {getApprovalFlow().map((step, index) => (
-                <div key={index} className="flex items-center gap-2 flex-1">
-                  <div className="flex flex-col items-center flex-1">
+            <div className="flex items-center">
+              {approvalFlow.map((step, index) => (
+                <div key={index} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center">
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step.done
-                        ? "bg-green-500 border-green-600 text-white shadow-md"
-                        : step.current
-                          ? "bg-blue-500 border-blue-600 text-white shadow-md animate-pulse"
-                          : "bg-gray-100 border-gray-300 text-gray-400"
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border transition-colors ${step.done
+                          ? "bg-green-500 border-green-500 text-white"
+                          : step.current
+                            ? "bg-blue-500 border-blue-500 text-white"
+                            : "bg-white border-gray-200 text-gray-400"
                         }`}
                     >
                       {step.done ? "✓" : index + 1}
                     </div>
                     <span
-                      className={`text-xs font-semibold mt-1.5 ${step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
+                      className={`text-xs mt-1.5 font-medium ${step.done
+                          ? "text-green-600"
+                          : step.current
+                            ? "text-blue-600"
+                            : "text-gray-400"
                         }`}
                     >
                       {step.label}
                     </span>
                   </div>
-                  {index < getApprovalFlow().length - 1 && (
+                  {index < approvalFlow.length - 1 && (
                     <div
-                      className={`h-0.5 flex-1 ${step.done ? "bg-green-500" : "bg-gray-300"
+                      className={`flex-1 h-px mx-2 mb-5 ${step.done ? "bg-green-400" : "bg-gray-200"
                         }`}
                     />
                   )}
@@ -349,206 +298,217 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
           </div>
         )}
 
-        {/* Rejection Notice */}
-        {["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
-          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-sm font-semibold text-red-700 mb-1.5 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {statusInfo.label}
-            </p>
-            <p className="text-sm text-red-600">
-              {statusInfo.description}
-            </p>
+        {/* ── Penolakan ── */}
+        {isRejected && (
+          <div className="mt-4 flex items-start gap-2.5 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <span className="text-red-400 text-base mt-0.5">❌</span>
+            <div>
+              <p className="text-sm font-semibold text-red-700">{statusInfo.label}</p>
+              <p className="text-sm text-red-600 mt-0.5">{statusInfo.description}</p>
+            </div>
           </div>
         )}
 
-        {/* Main Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500 font-medium">📅 Tanggal:</span>
-              <span className="font-semibold text-gray-900">
-                {format(new Date(spl.date), "dd MMMM yyyy", { locale: id })}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500 font-medium">⏰ Waktu:</span>
-              <span className="font-semibold text-gray-900">
-                {spl.startTime} - {spl.endTime}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500 font-medium">⏱️ Total Jam:</span>
-              <span className="font-semibold text-green-600">{displayHoursText}</span>
-            </div>
+        {/* ── Info grid ── */}
+        <div className="grid grid-cols-2 mt-4 border border-gray-100 rounded-lg overflow-hidden">
+          <div className="p-3 border-b border-r border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Tanggal</p>
+            <p className="text-sm font-medium text-gray-900">
+              {format(new Date(spl.date), "dd MMM yyyy", { locale: id })}
+            </p>
           </div>
-
-          <div className="space-y-3">
-            {spl.projectName && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500 font-medium">📁 Proyek:</span>
-                <span className="font-semibold text-gray-900">{spl.projectName}</span>
-              </div>
-            )}
-
-            {realizationRange() && (
-              <div className="flex flex-col gap-1 text-sm">
-                <span className="text-gray-500 font-medium">🎯 Realisasi:</span>
-                <span className="font-semibold text-gray-900">
-                  {realizationRange()}
-                  {realizationHoursText ? ` (${realizationHoursText})` : ""}
-                </span>
-              </div>
-            )}
+          <div className="p-3 border-b border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Waktu</p>
+            <p className="text-sm font-medium text-gray-900">
+              {spl.startTime} – {spl.endTime}
+            </p>
           </div>
+          <div className={`p-3 ${spl.projectName ? "border-r border-gray-100" : "col-span-2"}`}>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total jam</p>
+            <p className="text-sm font-semibold text-green-600">{displayHoursText}</p>
+          </div>
+          {spl.projectName && (
+            <div className="p-3">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Proyek</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{spl.projectName}</p>
+            </div>
+          )}
+          {realizationRange() && (
+            <div className="col-span-2 p-3 border-t border-gray-100">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Realisasi</p>
+              <p className="text-sm font-medium text-gray-900">
+                {realizationRange()}
+                {realizationHoursText && (
+                  <span className="text-gray-400 font-normal ml-1.5">({realizationHoursText})</span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Reason */}
-        <div className="pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-500 font-medium mb-2">📝 Alasan Lembur:</p>
-          <p className="text-sm text-gray-900 leading-relaxed">{spl.reason}</p>
+        {/* ── Alasan lembur ── */}
+        <div className="mt-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Alasan lembur</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{spl.reason}</p>
         </div>
 
-        {/* Realization Note */}
+        {/* ── Catatan realisasi ── */}
         {spl.realizationNote && (
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 font-medium mb-2">✍️ Catatan Realisasi:</p>
-            <p className="text-sm text-gray-900 leading-relaxed">{spl.realizationNote}</p>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+              Catatan realisasi
+            </p>
+            <p className="text-sm text-gray-700 leading-relaxed">{spl.realizationNote}</p>
           </div>
         )}
 
-        {/* Realization Reason */}
+        {/* ── Alasan overrun ── */}
         {spl.overrunReason && (
-          <div className="pt-3 border-t border-red-100 bg-red-50 p-3 rounded-lg">
-            <p className="text-sm text-red-700 font-semibold mb-2 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Alasan Realisasi:
+          <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1.5">
+              Alasan realisasi
             </p>
-            <p className="text-sm text-red-600 leading-relaxed">{spl.overrunReason}</p>
+            <p className="text-sm text-red-700 leading-relaxed">{spl.overrunReason}</p>
           </div>
         )}
 
-        {/* Proof Images */}
+        {/* ── Warning: telat input ── */}
+        {isManual && (
+          <div className="mt-4 flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+            <span className="text-amber-500 text-base mt-0.5">⚠️</span>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">SPL telat input</p>
+              <p className="text-sm text-amber-700 mt-0.5 leading-relaxed">
+                Dibuat manual oleh IT via akun Super Admin karena batas waktu pengajuan normal
+                terlewati. Karyawan telah menandatangani sebagai konfirmasi.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Foto bukti (sebelum) ── */}
         {spl.proofImage && (
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 font-medium mb-2">Foto Bukti Pengerjaan (sebelum):</p>
-            <div className="bg-gray-50 border rounded-lg p-3">
-              <div className="relative w-full h-64">
-                <Image
-                  src={spl.proofImage}
-                  alt="Foto bukti pengerjaan lembur"
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-contain rounded"
-                  loading="lazy"
-                />
-              </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Foto bukti pengerjaan
+            </p>
+            <div className="relative w-full h-52 rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+              <Image
+                src={spl.proofImage}
+                alt="Foto bukti pengerjaan lembur"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-contain"
+                loading="lazy"
+              />
             </div>
           </div>
         )}
 
+        {/* ── Foto bukti realisasi ── */}
         {spl.realizationProofImage && (
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 font-medium mb-2">📸 Foto Bukti Realisasi:</p>
-            <div className="bg-gray-50 border rounded-lg p-3">
-              <div className="relative w-full h-64">
-                <Image
-                  src={spl.realizationProofImage}
-                  alt="Foto bukti realisasi lembur"
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-contain rounded"
-                  loading="lazy"
-                />
-              </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Foto bukti realisasi
+            </p>
+            <div className="relative w-full h-52 rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+              <Image
+                src={spl.realizationProofImage}
+                alt="Foto bukti realisasi lembur"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-contain"
+                loading="lazy"
+              />
             </div>
           </div>
         )}
 
-        {/* Signature */}
+        {/* ── Tanda tangan ── */}
         {spl.signature && (
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 font-medium mb-2">✍️ Tanda Tangan Pemohon:</p>
-            <div className="bg-gray-50 border rounded-lg p-3">
-              <div className="relative w-full h-32">
-                <Image
-                  src={spl.signature}
-                  alt={`Tanda tangan ${spl.requester.name}`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-contain"
-                  loading="lazy"
-                />
-              </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Tanda tangan pemohon
+            </p>
+            <div className="relative w-full h-28 rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+              <Image
+                src={spl.signature}
+                alt={`Tanda tangan ${spl.requester.name}`}
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-contain"
+                loading="lazy"
+              />
             </div>
           </div>
         )}
 
-        {/* Supervisor Approval */}
+        {/* ── Supervisor approval ── */}
         {spl.supervisorApprovalDate && (
-          <div className="pt-3 border-t border-gray-100 bg-green-50 p-3 rounded-lg">
-            <p className="text-sm text-green-700 font-semibold mb-1.5 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {spl.supervisor?.role === "SUPER_ADMIN" ? "Direview Super Admin:" : "Disetujui Supervisor:"}
-            </p>
-            <p className="text-sm text-green-600">
-              {spl.supervisor?.name || "Supervisor"} · {format(new Date(spl.supervisorApprovalDate), "dd MMM yyyy HH:mm", { locale: id })}
-            </p>
+          <div className="mt-4 flex items-center gap-2.5 p-3 bg-green-50 border border-green-100 rounded-lg">
+            <span className="text-green-500 text-base">✓</span>
+            <div>
+              <p className="text-sm font-semibold text-green-800">
+                {spl.supervisor?.role === "SUPER_ADMIN"
+                  ? "Direview Super Admin"
+                  : "Disetujui Kepala Dept"}
+              </p>
+              <p className="text-sm text-green-700 mt-0.5">
+                {spl.supervisor?.name || "Supervisor"} ·{" "}
+                {format(new Date(spl.supervisorApprovalDate), "dd MMM yyyy, HH:mm", {
+                  locale: id,
+                })}
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Rejection Reasons */}
+        {/* ── Alasan penolakan manager ── */}
         {spl.rejectionReason && (
-          <div className="pt-3 border-t border-gray-100 bg-red-50 p-3 rounded-lg border border-red-200">
-            <p className="text-sm text-red-700 font-semibold mb-2 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Alasan Penolakan:
+          <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1.5">
+              Alasan penolakan
             </p>
-            <p className="text-sm text-red-600 leading-relaxed">{spl.rejectionReason}</p>
+            <p className="text-sm text-red-700 leading-relaxed">{spl.rejectionReason}</p>
           </div>
         )}
 
+        {/* ── Alasan penolakan supervisor ── */}
         {spl.supervisorRejectionReason && (
-          <div className="pt-3 border-t border-gray-100 bg-red-50 p-3 rounded-lg border border-red-200">
-            <p className="text-sm text-red-700 font-semibold mb-2 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Alasan Penolakan (Supervisor):
+          <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1.5">
+              Alasan penolakan (supervisor)
             </p>
-            <p className="text-sm text-red-600 leading-relaxed">{spl.supervisorRejectionReason}</p>
+            <p className="text-sm text-red-700 leading-relaxed">
+              {spl.supervisorRejectionReason}
+            </p>
           </div>
         )}
 
-        {/* Approver Info */}
+        {/* ── Approver info ── */}
         {spl.approver && (
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-500 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Diproses oleh: {spl.approver.name}
-              {spl.approvalDate && ` · ${format(new Date(spl.approvalDate), "dd MMM yyyy HH:mm", { locale: id })}`}
-            </p>
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+              {approverInitials}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-800">{spl.approver.name}</p>
+              {spl.approvalDate && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Disetujui{" "}
+                  {format(new Date(spl.approvalDate), "dd MMM yyyy, HH:mm", { locale: id })}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+      {/* ── Footer ── */}
+      <div className="mt-5 pt-4 border-t border-gray-100 flex justify-end">
         <button
           onClick={onClose}
-          className="px-6 py-2.5 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+          className="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
         >
           Tutup
         </button>
@@ -556,5 +516,3 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
     </Modal>
   )
 }
-
-

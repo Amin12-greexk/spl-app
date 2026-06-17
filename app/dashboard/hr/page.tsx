@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Spl } from "@/types"
 import SplCard from "@/components/spl/SplCard"
 import SplDetailModal from "@/components/spl/SplDetailModal"
-import Button from "@/components/ui/Button"
 import Input from "@/components/ui/Input"
 import toast from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
-import { id } from "date-fns/locale" // Import locale Indonesia
+import { id } from "date-fns/locale"
 import { getEffectiveHours, getEffectiveMinutes } from "@/lib/spl-hours"
 import { isMorningOvertime } from "@/lib/spl-labels"
 
@@ -21,6 +20,31 @@ type ExportRow = Record<string, string | number>
 type ExportContext = {
   resolvePin: (spl: Spl) => string
   attendanceByPin: Map<string, AttendanceRecord[]>
+}
+
+function StatPill({
+  value,
+  label,
+  tone,
+}: {
+  value: string | number
+  label: string
+  tone: "blue" | "amber" | "emerald" | "rose" | "violet" | "orange"
+}) {
+  const toneMap = {
+    blue: "border-blue-200 bg-blue-50 text-blue-900",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
+    violet: "border-violet-200 bg-violet-50 text-violet-900",
+    orange: "border-orange-200 bg-orange-50 text-orange-900",
+  }
+  return (
+    <div className={`rounded-xl border p-4 shadow-sm ${toneMap[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] opacity-60">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+    </div>
+  )
 }
 
 export default function HRViewPage() {
@@ -44,7 +68,6 @@ export default function HRViewPage() {
     try {
       const limit = 50
 
-      // Fetch halaman pertama dulu agar UI langsung tampil
       const firstResponse = await fetch(`/api/spl?lite=1&skipStats=1&page=1&limit=${limit}`)
       if (!firstResponse.ok) throw new Error("Gagal mengambil data SPL")
 
@@ -53,12 +76,10 @@ export default function HRViewPage() {
       setSpls(firstItems)
       setIsLoading(false)
 
-      // Jika halaman pertama sudah < limit, tidak perlu fetch lagi
       if (firstItems.length < limit) return
 
       setIsFetchingMore(true)
 
-      // Fetch halaman berikutnya secara paralel (batch 5 halaman sekaligus)
       let currentPage = 2
       while (true) {
         const batchSize = 5
@@ -80,7 +101,6 @@ export default function HRViewPage() {
           setSpls((prev) => [...prev, ...allBatchItems])
         }
 
-        // Cek apakah ada halaman yang < limit (berarti sudah habis)
         const lastNonEmptyBatch = batchItems.findLastIndex((b) => b.length > 0)
         const anyShortPage = batchItems.some((b) => b.length < limit)
         if (anyShortPage || lastNonEmptyBatch < 0) break
@@ -105,46 +125,30 @@ export default function HRViewPage() {
     setSelectedSpl(null)
   }
 
-  useEffect(() => {
-    fetchSpls()
-  }, [fetchSpls])
+  useEffect(() => { fetchSpls() }, [fetchSpls])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchInput)
-    }, 300)
-
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300)
     return () => clearTimeout(timer)
   }, [searchInput])
 
   const filteredSpls = useMemo(() => {
     let filtered = spls
 
-    // Filter by status
     if (filterStatus !== "ALL") {
       if (filterStatus === "PENDING") {
-        filtered = filtered.filter(
-          (spl) =>
-            spl.status === "PENDING" ||
-            spl.status === "PENDING_SUPERADMIN" ||
-            spl.status === "PENDING_SUPERVISOR" ||
-            spl.status === "PENDING_MANAGER" ||
-            spl.status === "IN_PROGRESS" ||
-            spl.status === "DONE"
+        filtered = filtered.filter((spl) =>
+          ["PENDING", "PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status)
         )
       } else if (filterStatus === "REJECTED") {
-        filtered = filtered.filter(
-          (spl) =>
-            spl.status === "REJECTED" ||
-            spl.status === "REJECTED_BY_SUPERVISOR" ||
-            spl.status === "REJECTED_BY_MANAGER"
+        filtered = filtered.filter((spl) =>
+          ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status)
         )
       } else {
         filtered = filtered.filter((spl) => spl.status === filterStatus)
       }
     }
 
-    // Filter by search query (nama atau PIN)
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase().trim()
       filtered = filtered.filter(
@@ -154,69 +158,46 @@ export default function HRViewPage() {
       )
     }
 
-    // Filter by date
     const now = new Date()
-
     switch (dateFilter) {
       case "THIS_WEEK": {
         const weekStart = startOfWeek(now, { weekStartsOn: 1 })
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
-        filtered = filtered.filter((spl) =>
-          isWithinInterval(new Date(spl.date), { start: weekStart, end: weekEnd })
-        )
+        filtered = filtered.filter((spl) => isWithinInterval(new Date(spl.date), { start: weekStart, end: weekEnd }))
         break
       }
-
       case "THIS_MONTH": {
         const monthStart = startOfMonth(now)
         const monthEnd = endOfMonth(now)
-        filtered = filtered.filter((spl) =>
-          isWithinInterval(new Date(spl.date), { start: monthStart, end: monthEnd })
-        )
+        filtered = filtered.filter((spl) => isWithinInterval(new Date(spl.date), { start: monthStart, end: monthEnd }))
         break
       }
-
       case "LAST_MONTH": {
         const lastMonth = subMonths(now, 1)
-        const lastMonthStart = startOfMonth(lastMonth)
-        const lastMonthEnd = endOfMonth(lastMonth)
         filtered = filtered.filter((spl) =>
-          isWithinInterval(new Date(spl.date), { start: lastMonthStart, end: lastMonthEnd })
+          isWithinInterval(new Date(spl.date), { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) })
         )
         break
       }
-
       case "LAST_3_MONTHS": {
-        const threeMonthsAgo = subMonths(now, 3)
-        filtered = filtered.filter(
-          (spl) => new Date(spl.date) >= threeMonthsAgo
-        )
+        filtered = filtered.filter((spl) => new Date(spl.date) >= subMonths(now, 3))
         break
       }
-
       case "CUSTOM": {
         if (customStartDate && customEndDate) {
-          const start = new Date(customStartDate)
-          const end = new Date(customEndDate)
           filtered = filtered.filter((spl) =>
-            isWithinInterval(new Date(spl.date), { start, end })
+            isWithinInterval(new Date(spl.date), { start: new Date(customStartDate), end: new Date(customEndDate) })
           )
         }
         break
       }
-
-      default:
-        break
     }
 
     return filtered
   }, [spls, filterStatus, dateFilter, customStartDate, customEndDate, searchQuery])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [filterStatus, dateFilter, customStartDate, customEndDate, searchQuery])
+  useEffect(() => { setCurrentPage(1) }, [filterStatus, dateFilter, customStartDate, customEndDate, searchQuery])
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredSpls.length / itemsPerPage)
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
@@ -224,8 +205,7 @@ export default function HRViewPage() {
 
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber)
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const handleItemsPerPageChange = (value: number) => {
@@ -235,34 +215,18 @@ export default function HRViewPage() {
 
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
-      'PENDING': 'Menunggu',
-      'PENDING_SUPERADMIN': 'Review Super Admin',
-      'PENDING_SUPERVISOR': 'Menunggu Supervisor',
-      'PENDING_MANAGER': 'Menunggu Manager',
-      'APPROVED': 'Disetujui',
-      'IN_PROGRESS': 'Berjalan',
-      'DONE': 'Selesai',
-      'REJECTED': 'Ditolak',
-      'REJECTED_BY_SUPERVISOR': 'Ditolak Supervisor',
-      'REJECTED_BY_MANAGER': 'Ditolak Manager',
+      PENDING: "Menunggu", PENDING_SUPERADMIN: "Review Super Admin",
+      PENDING_SUPERVISOR: "Menunggu Supervisor", PENDING_MANAGER: "Menunggu Manager",
+      APPROVED: "Disetujui", IN_PROGRESS: "Berjalan", DONE: "Selesai",
+      REJECTED: "Ditolak", REJECTED_BY_SUPERVISOR: "Ditolak Supervisor",
+      REJECTED_BY_MANAGER: "Ditolak Manager",
     }
     return statusMap[status] || status
   }
 
   const getStats = () => {
-    const pendingStatuses = new Set([
-      "PENDING",
-      "PENDING_SUPERADMIN",
-      "PENDING_SUPERVISOR",
-      "PENDING_MANAGER",
-      "IN_PROGRESS",
-      "DONE",
-    ])
-    const rejectedStatuses = new Set([
-      "REJECTED",
-      "REJECTED_BY_SUPERVISOR",
-      "REJECTED_BY_MANAGER",
-    ])
+    const pendingStatuses = new Set(["PENDING", "PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER", "IN_PROGRESS", "DONE"])
+    const rejectedStatuses = new Set(["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"])
     const sumHours = (items: Spl[]) =>
       items.reduce((sum, spl) => {
         const effectiveHours = getEffectiveHours(spl)
@@ -271,16 +235,9 @@ export default function HRViewPage() {
         return sum + (Number.isFinite(fallback) ? fallback : 0)
       }, 0)
 
-    const pendingItems = filteredSpls.filter((spl) =>
-      pendingStatuses.has(spl.status)
-    )
-    const approvedItems = filteredSpls.filter(
-      (spl) => spl.status === "APPROVED"
-    )
-    const rejectedItems = filteredSpls.filter((spl) =>
-      rejectedStatuses.has(spl.status)
-    )
-
+    const pendingItems = filteredSpls.filter((spl) => pendingStatuses.has(spl.status))
+    const approvedItems = filteredSpls.filter((spl) => spl.status === "APPROVED")
+    const rejectedItems = filteredSpls.filter((spl) => rejectedStatuses.has(spl.status))
     return {
       total: filteredSpls.length,
       pending: pendingItems.length,
@@ -292,56 +249,34 @@ export default function HRViewPage() {
   }
 
   const getSupervisorApprovalLabels = (spl: Spl) => {
-    if (spl.supervisor?.role === "GA") {
-      return { ga: spl.supervisor.name, deptHead: "-" }
-    }
-    if (spl.supervisor?.role === "DEPARTMENT_HEAD") {
-      return { ga: "-", deptHead: spl.supervisor.name }
-    }
+    if (spl.supervisor?.role === "GA") return { ga: spl.supervisor.name, deptHead: "-" }
+    if (spl.supervisor?.role === "DEPARTMENT_HEAD") return { ga: "-", deptHead: spl.supervisor.name }
     return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
   }
 
-  const isExportEligible = (spl: Spl) => {
-    return spl.status === "APPROVED"
-  }
+  const isExportEligible = (spl: Spl) => spl.status === "APPROVED"
 
   const exportHeaders = [
-    "No",
-    "Nama Karyawan",
-    "PIN",
-    "Departemen",
-    "Tanggal Lembur",
-    "Waktu Mulai",
-    "Waktu Selesai",
-    "Absensi Masuk",
-    "Absensi Pulang",
-    "Total Jam",
-    "Alasan Lembur",
-    "Status",
-    "Disetujui Oleh GA",
-    "Disetujui Oleh",
-    "Tanggal Persetujuan",
-    "Alasan Penolakan",
-    "Tanggal Pengajuan",
-    "Tanda Tangan",
+    "No", "Nama Karyawan", "PIN", "Departemen", "Tanggal Lembur",
+    "Waktu Mulai", "Waktu Selesai", "Absensi Masuk", "Absensi Pulang",
+    "Total Jam", "Alasan Lembur", "Status", "Disetujui Oleh GA",
+    "Disetujui Oleh", "Tanggal Persetujuan", "Alasan Penolakan",
+    "Tanggal Pengajuan", "Tanda Tangan",
   ]
 
   const exportColWidths = [
     { wch: 5 }, { wch: 20 }, { wch: 10 }, { wch: 15 },
     { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
     { wch: 10 }, { wch: 40 }, { wch: 12 }, { wch: 20 },
-    { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 18 },
-    { wch: 12 },
+    { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 18 }, { wch: 12 },
   ]
 
   const roundHoursFromMinutes = (minutes: number | null): number | string | null => {
     if (minutes === null || !Number.isFinite(minutes)) return null
-    // Jika durasi kurang dari 30 menit, tidak dihitung
     if (minutes < 30) return 0
     if (minutes === 30) return "30 menit"
     const hours = Math.floor(minutes / 60)
     const remainder = minutes % 60
-    // Hanya bulatkan ke atas jika sisa LEBIH dari 30 menit
     return remainder > 30 ? hours + 1 : hours
   }
 
@@ -349,11 +284,9 @@ export default function HRViewPage() {
     const effectiveMinutes = getEffectiveMinutes(spl)
     const roundedFromEffective = roundHoursFromMinutes(effectiveMinutes)
     if (roundedFromEffective !== null) return roundedFromEffective
-
     const fallback = Number(spl.totalHours)
     if (!Number.isFinite(fallback)) return "-"
-    const fallbackMinutes = Math.round(fallback * 60)
-    const roundedFromStored = roundHoursFromMinutes(fallbackMinutes)
+    const roundedFromStored = roundHoursFromMinutes(Math.round(fallback * 60))
     return roundedFromStored ?? "-"
   }
 
@@ -361,29 +294,16 @@ export default function HRViewPage() {
     const trimmed = (value || "").trim()
     if (!trimmed) return "-"
     const parts = trimmed.split(" ")
-    if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
-      return parts[1].slice(0, 5)
-    }
-    const normalized = trimmed.replace(" ", "T")
-    const parsed = new Date(normalized)
+    if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) return parts[1].slice(0, 5)
+    const parsed = new Date(trimmed.replace(" ", "T"))
     if (Number.isNaN(parsed.getTime())) return trimmed
     return format(parsed, "HH:mm")
   }
 
-  const getAttendanceTimes = (
-    records: AttendanceRecord[],
-    dateKey: string
-  ) => {
-    if (!dateKey || records.length === 0) {
-      return { checkIn: "-", checkOut: "-" }
-    }
-    const dayRecords = records.filter((record) => {
-      const recordDateKey = record.scan_date.split(" ")[0]
-      return recordDateKey === dateKey
-    })
-    if (dayRecords.length === 0) {
-      return { checkIn: "-", checkOut: "-" }
-    }
+  const getAttendanceTimes = (records: AttendanceRecord[], dateKey: string) => {
+    if (!dateKey || records.length === 0) return { checkIn: "-", checkOut: "-" }
+    const dayRecords = records.filter((r) => r.scan_date.split(" ")[0] === dateKey)
+    if (dayRecords.length === 0) return { checkIn: "-", checkOut: "-" }
     dayRecords.sort((a, b) => a.scan_date.localeCompare(b.scan_date))
     return {
       checkIn: formatScanTime(dayRecords[0].scan_date),
@@ -391,26 +311,17 @@ export default function HRViewPage() {
     }
   }
 
-  const sortSplsForExport = (items: Spl[]) => {
-    return [...items].sort((a, b) => {
-      const nameCompare = a.requester.name.localeCompare(
-        b.requester.name,
-        "id-ID",
-        { sensitivity: "base" }
-      )
+  const sortSplsForExport = (items: Spl[]) =>
+    [...items].sort((a, b) => {
+      const nameCompare = a.requester.name.localeCompare(b.requester.name, "id-ID", { sensitivity: "base" })
       if (nameCompare !== 0) return nameCompare
-      
       const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
       if (dateCompare !== 0) return dateCompare
-      
       return (a.requester.pin || "").localeCompare(b.requester.pin || "")
     })
-  }
 
   const buildExportContext = async (exportableSpls: Spl[]): Promise<ExportContext> => {
-    const needsPinLookup = exportableSpls.some(
-      (spl) => !(spl.requester.pin || "").toString().trim()
-    )
+    const needsPinLookup = exportableSpls.some((spl) => !(spl.requester.pin || "").toString().trim())
     const nameToPin = new Map<string, string>()
 
     if (needsPinLookup) {
@@ -422,9 +333,7 @@ export default function HRViewPage() {
             data.forEach((user) => {
               const name = (user?.name || "").toString().toLowerCase().trim()
               const pin = (user?.pin || "").toString().trim()
-              if (name && pin && !nameToPin.has(name)) {
-                nameToPin.set(name, pin)
-              }
+              if (name && pin && !nameToPin.has(name)) nameToPin.set(name, pin)
             })
           }
         }
@@ -436,29 +345,20 @@ export default function HRViewPage() {
     const resolvePin = (spl: Spl) => {
       const directPin = (spl.requester.pin || "").toString().trim()
       if (directPin) return directPin
-      const nameKey = spl.requester.name.toLowerCase().trim()
-      return nameToPin.get(nameKey) || ""
+      return nameToPin.get(spl.requester.name.toLowerCase().trim()) || ""
     }
 
-    const uniquePins = Array.from(
-      new Set(exportableSpls.map(resolvePin).filter(Boolean))
-    )
+    const uniquePins = Array.from(new Set(exportableSpls.map(resolvePin).filter(Boolean)))
     const attendanceByPin = new Map<string, AttendanceRecord[]>()
 
     if (uniquePins.length > 0) {
       await Promise.all(
         uniquePins.map(async (pin) => {
           try {
-            const response = await fetch(
-              `/api/hr/attendance?pin=${encodeURIComponent(pin)}`
-            )
-            if (!response.ok) {
-              attendanceByPin.set(pin, [])
-              return
-            }
+            const response = await fetch(`/api/hr/attendance?pin=${encodeURIComponent(pin)}`)
+            if (!response.ok) { attendanceByPin.set(pin, []); return }
             const data = await response.json()
-            const records = Array.isArray(data?.data) ? data.data : []
-            attendanceByPin.set(pin, records)
+            attendanceByPin.set(pin, Array.isArray(data?.data) ? data.data : [])
           } catch (error) {
             console.error("Error fetching attendance for pin:", pin, error)
             attendanceByPin.set(pin, [])
@@ -470,31 +370,22 @@ export default function HRViewPage() {
     return { resolvePin, attendanceByPin }
   }
 
-  const buildRowsFromSpls = (items: Spl[], context: ExportContext): ExportRow[] => {
-    return items.map((spl, index) => {
+  const buildRowsFromSpls = (items: Spl[], context: ExportContext): ExportRow[] =>
+    items.map((spl, index) => {
       const { resolvePin, attendanceByPin } = context
       const supervisorLabels = getSupervisorApprovalLabels(spl)
       const resolvedPin = resolvePin(spl)
       const dateValue = new Date(spl.date)
-      const dateKey = Number.isNaN(dateValue.getTime())
-        ? ""
-        : format(dateValue, "yyyy-MM-dd")
-      const attendanceRecords = resolvedPin
-        ? attendanceByPin.get(resolvedPin) || []
-        : []
+      const dateKey = Number.isNaN(dateValue.getTime()) ? "" : format(dateValue, "yyyy-MM-dd")
+      const attendanceRecords = resolvedPin ? attendanceByPin.get(resolvedPin) || [] : []
       const attendanceTimes = getAttendanceTimes(attendanceRecords, dateKey)
 
       return {
         No: index + 1,
         "Nama Karyawan": spl.requester.name,
         PIN: resolvedPin || "-",
-        Departemen:
-          spl.requester.department?.name ||
-          spl.requester.departmentName ||
-          "-",
-        "Tanggal Lembur": Number.isNaN(dateValue.getTime())
-          ? "-"
-          : format(dateValue, "dd/MM/yyyy"),
+        Departemen: spl.requester.department?.name || spl.requester.departmentName || "-",
+        "Tanggal Lembur": Number.isNaN(dateValue.getTime()) ? "-" : format(dateValue, "dd/MM/yyyy"),
         "Waktu Mulai": spl.actualStartAt ? format(new Date(spl.actualStartAt), "HH:mm") : spl.startTime,
         "Waktu Selesai": spl.actualEndAt ? format(new Date(spl.actualEndAt), "HH:mm") : spl.endTime,
         "Absensi Masuk": attendanceTimes.checkIn,
@@ -504,56 +395,39 @@ export default function HRViewPage() {
         Status: getStatusText(spl.status),
         "Disetujui Oleh GA": supervisorLabels.ga,
         "Disetujui Oleh": spl.approver?.name || "-",
-        "Tanggal Persetujuan": spl.approvalDate
-          ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm")
-          : "-",
+        "Tanggal Persetujuan": spl.approvalDate ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm") : "-",
         "Alasan Penolakan": spl.rejectionReason || "-",
         "Tanggal Pengajuan": format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
         "Tanda Tangan": spl.signature ? "Ada" : "Tidak",
       }
     })
-  }
 
   const buildExportRows = async (sourceSpls: Spl[] = filteredSpls): Promise<ExportRow[]> => {
-    const sortedSpls = sortSplsForExport(sourceSpls)
-    const exportableSpls = sortedSpls.filter(isExportEligible)
+    const exportableSpls = sortSplsForExport(sourceSpls).filter(isExportEligible)
     if (exportableSpls.length === 0) return []
-
-    const exportContext = await buildExportContext(exportableSpls)
-    return buildRowsFromSpls(exportableSpls, exportContext)
+    return buildRowsFromSpls(exportableSpls, await buildExportContext(exportableSpls))
   }
 
   const exportToExcel = async () => {
     try {
       const XLSX = await import("xlsx")
-      const sortedSpls = sortSplsForExport(filteredSpls)
-      const exportableSpls = sortedSpls.filter(isExportEligible)
+      const exportableSpls = sortSplsForExport(filteredSpls).filter(isExportEligible)
+      if (exportableSpls.length === 0) { toast.error("Tidak ada data untuk diexport"); return }
 
-      if (exportableSpls.length === 0) {
-        toast.error("Tidak ada data untuk diexport")
-        return
-      }
-
-      const exportContext = await buildExportContext(exportableSpls)
-      const exportData = buildRowsFromSpls(exportableSpls, exportContext)
-
+      const exportData = buildRowsFromSpls(exportableSpls, await buildExportContext(exportableSpls))
       const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders })
-      const wb = XLSX.utils.book_new()
-
       ws["!cols"] = exportColWidths
-
+      const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
 
-      const periodText = dateFilter === "ALL" ? "Semua_Periode" :
-        dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
-          dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
-            dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
-              dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
-                `${customStartDate}_sampai_${customEndDate}`
+      const periodText = dateFilter === "ALL" ? "Semua_Periode"
+        : dateFilter === "THIS_WEEK" ? "Minggu_Ini"
+          : dateFilter === "THIS_MONTH" ? "Bulan_Ini"
+            : dateFilter === "LAST_MONTH" ? "Bulan_Lalu"
+              : dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir"
+                : `${customStartDate}_sampai_${customEndDate}`
 
-      const fileName = `Data_SPL_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`
-      XLSX.writeFile(wb, fileName)
-
+      XLSX.writeFile(wb, `Data_SPL_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`)
       toast.success("Data berhasil diexport ke Excel!")
     } catch (error) {
       console.error("Error exporting to Excel:", error)
@@ -564,19 +438,10 @@ export default function HRViewPage() {
   const copyTableData = async () => {
     try {
       const exportData = await buildExportRows()
-      if (exportData.length === 0) {
-        toast.error("Tidak ada data untuk disalin")
-        return
-      }
-
-      const tableData = exportData.map((row) =>
-        exportHeaders.map((header) => String(row[header] ?? ""))
-      )
-
-      const csvContent = [exportHeaders, ...tableData]
-        .map(row => row.map(cell => `"${cell}"`).join("\t"))
+      if (exportData.length === 0) { toast.error("Tidak ada data untuk disalin"); return }
+      const csvContent = [exportHeaders, ...exportData.map((row) => exportHeaders.map((h) => String(row[h] ?? "")))]
+        .map((row) => row.map((cell) => `"${cell}"`).join("\t"))
         .join("\n")
-
       await navigator.clipboard.writeText(csvContent)
       toast.success("Data berhasil disalin ke clipboard!")
     } catch (error) {
@@ -589,11 +454,8 @@ export default function HRViewPage() {
     const base64 = dataUrl.split(",")[1]
     if (!base64) return null
     const binary = atob(base64)
-    const len = binary.length
-    const bytes = new Uint8Array(len)
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binary.charCodeAt(i)
-    }
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
     return bytes
   }
 
@@ -626,19 +488,12 @@ export default function HRViewPage() {
     return trimmed.length > 0 ? `${trimmed}${ellipsis}` : ellipsis
   }
 
-  const wrapTextByWidth = (
-    text: string,
-    maxWidth: number,
-    font: any,
-    size: number,
-    maxLines = 2
-  ) => {
+  const wrapTextByWidth = (text: string, maxWidth: number, font: any, size: number, maxLines = 2) => {
     const normalized = text.replace(/\s+/g, " ").trim()
     if (!normalized) return ["-"]
     const words = normalized.split(" ")
     const lines: string[] = []
     let current = ""
-
     for (const word of words) {
       const candidate = current ? `${current} ${word}` : word
       if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
@@ -649,29 +504,16 @@ export default function HRViewPage() {
       }
       if (lines.length === maxLines) break
     }
-
-    if (lines.length < maxLines && current) {
-      lines.push(current)
-    }
-
-    if (lines.length > maxLines) {
-      lines.length = maxLines
-    }
-
+    if (lines.length < maxLines && current) lines.push(current)
+    if (lines.length > maxLines) lines.length = maxLines
     if (lines.length === maxLines) {
-      const lastIndex = maxLines - 1
-      lines[lastIndex] = fitTextToWidth(lines[lastIndex], maxWidth, font, size)
+      lines[maxLines - 1] = fitTextToWidth(lines[maxLines - 1], maxWidth, font, size)
     }
-
     return lines
   }
 
-  // --- REVISED PDF GENERATION (FIXED OVERLAP & ALIGNMENT) ---
   const generateRekapPdf = async () => {
-    if (filteredSpls.length === 0) {
-      toast.error("Tidak ada data untuk direkap")
-      return
-    }
+    if (filteredSpls.length === 0) { toast.error("Tidak ada data untuk direkap"); return }
 
     try {
       const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
@@ -679,25 +521,12 @@ export default function HRViewPage() {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      const pageWidth = 595.28 // A4 width
-      const pageHeight = 841.89 // A4 height
+      const pageWidth = 595.28
+      const pageHeight = 841.89
       const margin = 30
-
       const colWidths = [25, 90, 40, 60, 45, 45, 100, 65, 65]
-      const headers = [
-        "No",
-        "Nama",
-        "PIN",
-        "Tanggal",
-        "Mulai",
-        "Selesai",
-        "Keterangan",
-        "TTD Pemohon",
-        "TTD Atasan",
-      ]
+      const headers = ["No", "Nama", "PIN", "Tanggal", "Mulai", "Selesai", "Keterangan", "TTD Pemohon", "TTD Atasan"]
       const tableWidth = colWidths.reduce((sum, width) => sum + width, 0)
-
-      // FIXED: Reduced rowsPerPage from 10 to 8 to prevent overlap with footer
       const rowsPerPage = 8
       const rowHeight = 60
 
@@ -710,78 +539,50 @@ export default function HRViewPage() {
       try {
         const logoResponse = await fetch("/logo.png")
         if (logoResponse.ok) {
-          const logoBytes = await logoResponse.arrayBuffer()
-          logoImage = await pdfDoc.embedPng(logoBytes)
+          logoImage = await pdfDoc.embedPng(await logoResponse.arrayBuffer())
         }
-      } catch (error) {
-        logoImage = null
-      }
+      } catch { logoImage = null }
 
       for (let pageIndex = 0; pageIndex < splsPerPage.length; pageIndex++) {
         const page = pdfDoc.addPage([pageWidth, pageHeight])
         const pageSPLs = splsPerPage[pageIndex]
         let y = pageHeight - margin
 
-        // --- HEADER ---
         const logoSize = 40
         if (logoImage) {
-          const scale = Math.min(
-            logoSize / logoImage.width,
-            logoSize / logoImage.height
-          )
+          const scale = Math.min(logoSize / logoImage.width, logoSize / logoImage.height)
           const dims = logoImage.scale(scale)
-          const logoX = margin + (logoSize - dims.width) / 2
-          const logoY = y - logoSize + (logoSize - dims.height) / 2
-          page.drawImage(logoImage, { x: logoX, y: logoY, width: dims.width, height: dims.height })
-        } else {
-          page.drawRectangle({
-            x: margin, y: y - logoSize, width: logoSize, height: logoSize,
-            color: rgb(0.1, 0.6, 0.3), opacity: 0.2
+          page.drawImage(logoImage, {
+            x: margin + (logoSize - dims.width) / 2,
+            y: y - logoSize + (logoSize - dims.height) / 2,
+            width: dims.width, height: dims.height,
           })
+        } else {
+          page.drawRectangle({ x: margin, y: y - logoSize, width: logoSize, height: logoSize, color: rgb(0.1, 0.6, 0.3), opacity: 0.2 })
           page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
           page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
         }
 
         page.drawText("REKAP ABSEN MANUAL STAFF PT TUNAS ESTA INDONESIA", {
-          x: margin + logoSize + 15,
-          y: y - 25,
-          size: 14,
-          font: bold
+          x: margin + logoSize + 15, y: y - 25, size: 14, font: bold,
         })
         y -= 60
 
-        // --- TABEL HEADER ---
         const tableX = margin
         let currentX = tableX
-
-        page.drawRectangle({
-          x: tableX, y: y - 25,
-          width: tableWidth, height: 25,
-          color: rgb(0.9, 0.9, 0.9)
-        })
+        page.drawRectangle({ x: tableX, y: y - 25, width: tableWidth, height: 25, color: rgb(0.9, 0.9, 0.9) })
 
         for (let i = 0; i < headers.length; i++) {
           const textWidth = bold.widthOfTextAtSize(headers[i], 9)
-          const centerX = currentX + (colWidths[i] - textWidth) / 2
-
-          page.drawText(headers[i], {
-            x: centerX, y: y - 17,
-            size: 9, font: bold
-          })
-
-          page.drawLine({
-            start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 },
-            thickness: 0.5, color: rgb(0, 0, 0)
-          })
+          page.drawText(headers[i], { x: currentX + (colWidths[i] - textWidth) / 2, y: y - 17, size: 9, font: bold })
+          page.drawLine({ start: { x: currentX, y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
           currentX += colWidths[i]
         }
-
-        page.drawLine({ start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
-        page.drawLine({ start: { x: tableX, y: y }, end: { x: currentX, y: y }, thickness: 0.5 })
+        page.drawLine({ start: { x: currentX, y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
+        page.drawLine({ start: { x: tableX, y }, end: { x: currentX, y }, thickness: 0.5 })
         page.drawLine({ start: { x: tableX, y: y - 25 }, end: { x: currentX, y: y - 25 }, thickness: 0.5 })
         y -= 25
 
-        // --- TABEL ROWS ---
         for (let index = 0; index < rowsPerPage; index++) {
           const spl = pageSPLs[index]
           const rowY = y - (index + 1) * rowHeight
@@ -801,127 +602,82 @@ export default function HRViewPage() {
 
             for (let i = 0; i < 6; i++) {
               const isCenter = i !== 1
-              const rawText = rowData[i]
-              const textSize = 9
-              const displayText = fitTextToWidth(rawText, colWidths[i] - 10, font, textSize)
-              const textWidth = font.widthOfTextAtSize(displayText, textSize)
-              let textX = currentX + 5
-              if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
-
-              page.drawText(displayText, {
-                x: textX, y: rowY + (rowHeight / 2) - 4,
-                size: textSize, font: font
-              })
+              const displayText = fitTextToWidth(rowData[i], colWidths[i] - 10, font, 9)
+              const textWidth = font.widthOfTextAtSize(displayText, 9)
+              const textX = isCenter ? currentX + (colWidths[i] - textWidth) / 2 : currentX + 5
+              page.drawText(displayText, { x: textX, y: rowY + rowHeight / 2 - 4, size: 9, font })
               currentX += colWidths[i]
               page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
             }
 
-            // Keterangan
-            const ketIndex = 6
-            const ketText = spl.reason || "-"
-            const ketLines = wrapText(ketText, 25)
+            const ketLines = wrapText(spl.reason || "-", 25)
             let ketY = rowY + rowHeight - 15
             ketLines.slice(0, 4).forEach((line) => {
               page.drawText(line, { x: currentX + 5, y: ketY, size: 8, font })
               ketY -= 10
             })
-            currentX += colWidths[ketIndex]
+            currentX += colWidths[6]
             page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
 
             const signatureCells = [
+              { name: spl.requester.name, signature: spl.signature || null },
               {
-                name: spl.requester.name,
-                signature: spl.signature || null,
-              },
-              {
-                name:
-                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
-                    ? spl.supervisor?.name || "-"
-                    : "-",
-                signature:
-                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
-                    ? spl.supervisorSignature || null
-                    : null,
+                name: spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                  ? spl.supervisor?.name || "-" : "-",
+                signature: spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                  ? spl.supervisorSignature || null : null,
               },
             ]
 
-            const drawSignatureImage = async (
-              dataUrl: string,
-              boxX: number,
-              boxY: number,
-              boxWidth: number,
-              boxHeight: number
-            ) => {
+            const drawSignatureImage = async (dataUrl: string, boxX: number, boxY: number, boxWidth: number, boxHeight: number) => {
               try {
                 const signatureBytes = dataUrlToBytes(dataUrl)
                 if (!signatureBytes) return false
-                let signatureImage
-                if (dataUrl.includes("image/png")) {
-                  signatureImage = await pdfDoc.embedPng(signatureBytes)
-                } else {
-                  signatureImage = await pdfDoc.embedJpg(signatureBytes)
-                }
-
-                const scale = Math.min(
-                  boxWidth / signatureImage.width,
-                  boxHeight / signatureImage.height
-                )
+                const signatureImage = dataUrl.includes("image/png")
+                  ? await pdfDoc.embedPng(signatureBytes)
+                  : await pdfDoc.embedJpg(signatureBytes)
+                const scale = Math.min(boxWidth / signatureImage.width, boxHeight / signatureImage.height)
                 const dims = signatureImage.scale(scale)
-                const imgX = boxX + (boxWidth - dims.width) / 2
-                const imgY = boxY + (boxHeight - dims.height) / 2
                 page.drawImage(signatureImage, {
-                  x: imgX,
-                  y: imgY,
-                  width: dims.width,
-                  height: dims.height,
+                  x: boxX + (boxWidth - dims.width) / 2,
+                  y: boxY + (boxHeight - dims.height) / 2,
+                  width: dims.width, height: dims.height,
                 })
                 return true
-              } catch (e) {
-                console.error("Signature error", e)
-                return false
-              }
+              } catch { return false }
             }
 
             for (let sigIndex = 0; sigIndex < signatureCells.length; sigIndex++) {
               const cellWidth = colWidths[7 + sigIndex]
               const cell = signatureCells[sigIndex]
-              const nameText = cell.name || "-"
               const nameSize = 7
               const namePadding = 4
-              const nameMaxWidth = cellWidth - namePadding * 2
-              const nameLines = wrapTextByWidth(nameText, nameMaxWidth, bold, nameSize, 2)
+              const nameLines = wrapTextByWidth(cell.name || "-", cellWidth - namePadding * 2, bold, nameSize, 2)
               const nameLineHeight = 8
               const nameBlockHeight = nameLines.length * nameLineHeight
-              const nameBaseY = rowY + namePadding
 
               nameLines.forEach((line, lineIndex) => {
                 const lineWidth = bold.widthOfTextAtSize(line, nameSize)
-                const lineX = currentX + Math.max(2, (cellWidth - lineWidth) / 2)
-                const lineY = nameBaseY + (nameLines.length - 1 - lineIndex) * nameLineHeight
-                page.drawText(line, { x: lineX, y: lineY, size: nameSize, font: bold })
+                page.drawText(line, {
+                  x: currentX + Math.max(2, (cellWidth - lineWidth) / 2),
+                  y: rowY + namePadding + (nameLines.length - 1 - lineIndex) * nameLineHeight,
+                  size: nameSize, font: bold,
+                })
               })
 
-              const padding = 4
               const gap = 2
-              const signatureBoxX = currentX + padding
-              const signatureBoxY = rowY + nameBlockHeight + padding + gap
-              const signatureBoxWidth = cellWidth - padding * 2
-              const signatureBoxHeight = rowHeight - nameBlockHeight - padding * 2 - gap
+              const signatureBoxX = currentX + namePadding
+              const signatureBoxY = rowY + nameBlockHeight + namePadding + gap
+              const signatureBoxWidth = cellWidth - namePadding * 2
+              const signatureBoxHeight = rowHeight - nameBlockHeight - namePadding * 2 - gap
 
               if (cell.signature) {
-                await drawSignatureImage(
-                  cell.signature,
-                  signatureBoxX,
-                  signatureBoxY,
-                  signatureBoxWidth,
-                  signatureBoxHeight
-                )
+                await drawSignatureImage(cell.signature, signatureBoxX, signatureBoxY, signatureBoxWidth, signatureBoxHeight)
               } else {
                 page.drawText("-", {
                   x: signatureBoxX + signatureBoxWidth / 2 - 2,
                   y: signatureBoxY + signatureBoxHeight / 2 - 4,
-                  size: 8,
-                  font,
+                  size: 8, font,
                 })
               }
 
@@ -937,14 +693,10 @@ export default function HRViewPage() {
           page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + tableWidth, y: rowY }, thickness: 0.5 })
         }
 
-        // --- FOOTER TANDA TANGAN (POSISI DIATUR AGAR TIDAK NABRAK) ---
-        // Dengan rowsPerPage = 8, tabel berakhir di Y ~246.
-        // Kita set footerY di 80, maka Header TTD mulai di Y ~140. Aman (Gap ~100 poin).
-
         const footerY = 80
         const boxWidth = 140
-        const totalFooterWidth = pageWidth - (margin * 2)
-        const gap = (totalFooterWidth - (boxWidth * 3)) / 2
+        const totalFooterWidth = pageWidth - margin * 2
+        const gap = (totalFooterWidth - boxWidth * 3) / 2
 
         const signatures = [
           { role: "Diajukan Oleh", name: "..........................", title: "Pemohon / Leader" },
@@ -952,44 +704,24 @@ export default function HRViewPage() {
           { role: "Mengetahui", name: "Tiyas Indah S.", title: "Plant Manager" },
         ]
 
-        // 1. Gambar Tanggal & Lokasi
         const dateText = `Demak, ${format(new Date(), "dd MMMM yyyy", { locale: id })}`
-        const dateXPos = margin + (2 * (boxWidth + gap))
-        const dateWidth = font.widthOfTextAtSize(dateText, 10)
-        const centeredDateX = dateXPos + (boxWidth - dateWidth) / 2
-
+        const dateXPos = margin + 2 * (boxWidth + gap)
         page.drawText(dateText, {
-          x: centeredDateX,
-          y: footerY + 85,
-          size: 10, font
+          x: dateXPos + (boxWidth - font.widthOfTextAtSize(dateText, 10)) / 2,
+          y: footerY + 85, size: 10, font,
         })
 
-        // 2. Loop Gambar Box Tanda Tangan
         signatures.forEach((sig, idx) => {
-          const xPos = margin + (idx * (boxWidth + gap))
-
+          const xPos = margin + idx * (boxWidth + gap)
           const drawCentered = (text: string, y: number, f: any, s: number) => {
-            const w = f.widthOfTextAtSize(text, s)
-            page.drawText(text, { x: xPos + (boxWidth - w) / 2, y, size: s, font: f })
+            page.drawText(text, { x: xPos + (boxWidth - f.widthOfTextAtSize(text, s)) / 2, y, size: s, font: f })
           }
-
-          // Role
           drawCentered(sig.role + " :", footerY + 60, bold, 9)
-
-          // Garis
-          page.drawLine({
-            start: { x: xPos, y: footerY + 25 },
-            end: { x: xPos + boxWidth, y: footerY + 25 },
-            thickness: 0.5
-          })
-
-          // Nama
+          page.drawLine({ start: { x: xPos, y: footerY + 25 }, end: { x: xPos + boxWidth, y: footerY + 25 }, thickness: 0.5 })
           drawCentered(sig.name, footerY + 12, bold, 9)
-          // Title
           drawCentered(sig.title, footerY, font, 9)
         })
-
-      } // End Page Loop
+      }
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" })
@@ -1012,108 +744,74 @@ export default function HRViewPage() {
       case "THIS_MONTH": return "Bulan Ini"
       case "LAST_MONTH": return "Bulan Lalu"
       case "LAST_3_MONTHS": return "3 Bulan Terakhir"
-      case "CUSTOM": return `${customStartDate} - ${customEndDate}`
+      case "CUSTOM": return `${customStartDate} – ${customEndDate}`
       default: return "Semua Periode"
     }
   }
 
   const stats = useMemo(getStats, [filteredSpls])
 
+  // ─── Loading State ───────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-600"></div>
-          <p className="text-gray-600 text-sm">Memuat data SPL...</p>
-        </div>
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-200 border-t-green-600" />
+        <p className="text-sm text-gray-500">Memuat data SPL...</p>
       </div>
     )
   }
 
+  // ─── Main Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-6 text-white shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5">
+
+      {/* Fetching more: thin progress bar */}
+      {isFetchingMore && (
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-green-100">
+          <div className="h-full w-3/5 animate-pulse rounded-full bg-green-500" />
+        </div>
+      )}
+
+      {/* Hero */}
+      <div className="rounded-2xl bg-gradient-to-r from-green-600 via-green-700 to-green-800 p-6 text-white shadow-lg">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-              📊 Data & Laporan SPL
-            </h1>
-            <p className="text-green-100">
-              Kelola dan export data Surat Perintah Lembur
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green-200">
+              Human Resources
             </p>
-            <div className="mt-2 text-sm text-green-100">
-              Filter: {getDateFilterLabel()} • Status: {filterStatus === "ALL" ? "Semua" : filterStatus}
-            </div>
-            {isFetchingMore && (
-              <div className="mt-1 text-xs text-green-100/90">
-                Memuat data tambahan...
-              </div>
-            )}
+            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Data & Laporan SPL</h1>
+            <p className="mt-1.5 text-sm text-green-100">
+              {getDateFilterLabel()}
+              {" · "}
+              {filterStatus === "ALL" ? "Semua Status" : filterStatus}
+              {isFetchingMore && " · Memuat data tambahan…"}
+            </p>
           </div>
-          <div className="mt-4 sm:mt-0 flex items-center space-x-2">
-            <div className="bg-white/20 rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">
-                {stats.total} SPL • {stats.approvedHours} Jam ACC Manager
-                {Number(stats.pendingHours) > 0 && (
-                  <span className="ml-1">• {stats.pendingHours} Jam Pending</span>
-                )}
-              </span>
-            </div>
+          <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm backdrop-blur-sm">
+            <p className="font-semibold tabular-nums">{stats.total} SPL</p>
+            <p className="mt-0.5 text-xs text-green-100">{stats.approvedHours} jam ACC Manager</p>
           </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total SPL</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-gray-600">Menunggu</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-            <div className="text-sm text-gray-600">Disetujui</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-            <div className="text-sm text-gray-600">Ditolak</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.approvedHours}</div>
-            <div className="text-sm text-gray-600">Jam ACC Manager</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{stats.pendingHours}</div>
-            <div className="text-sm text-gray-600">Jam Pending</div>
-          </div>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+        <StatPill value={stats.total} label="Total SPL" tone="blue" />
+        <StatPill value={stats.pending} label="Menunggu" tone="amber" />
+        <StatPill value={stats.approved} label="Disetujui" tone="emerald" />
+        <StatPill value={stats.rejected} label="Ditolak" tone="rose" />
+        <StatPill value={stats.approvedHours} label="Jam ACC Manager" tone="violet" />
+        <StatPill value={stats.pendingHours} label="Jam Pending" tone="orange" />
       </div>
 
-      {/* Advanced Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Data</h3>
+      {/* Filter + Export Panel */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="space-y-4">
 
-        {/* Search Filter */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">Cari Nama atau PIN:</label>
+          {/* Search */}
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -1121,74 +819,79 @@ export default function HRViewPage() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Ketik nama karyawan atau PIN..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              placeholder="Cari nama karyawan atau PIN…"
+              className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             {searchInput && (
               <button
-                onClick={() => {
-                  setSearchInput("")
-                  setSearchQuery("")
-                }}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                onClick={() => { setSearchInput(""); setSearchQuery("") }}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
               >
-                <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
           </div>
-        </div>
 
-        {/* Status Filter */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">Filter Status:</label>
-          <div className="flex flex-wrap gap-2">
-            {["ALL", "PENDING", "APPROVED", "REJECTED"].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === status
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                {status === "ALL" ? "Semua" :
-                  status === "PENDING" ? "Menunggu" :
-                    status === "APPROVED" ? "Disetujui" : "Ditolak"}
-              </button>
-            ))}
+          {/* Status + Period filters side by side */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Status</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { value: "ALL", label: "Semua" },
+                  { value: "PENDING", label: "Menunggu" },
+                  { value: "APPROVED", label: "Disetujui" },
+                  { value: "REJECTED", label: "Ditolak" },
+                ].map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setFilterStatus(s.value)}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors
+                      ${filterStatus === s.value
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Periode</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { value: "ALL", label: "Semua" },
+                  { value: "THIS_WEEK", label: "Minggu" },
+                  { value: "THIS_MONTH", label: "Bulan Ini" },
+                  { value: "LAST_MONTH", label: "Bulan Lalu" },
+                  { value: "LAST_3_MONTHS", label: "3 Bulan" },
+                  { value: "CUSTOM", label: "Custom" },
+                ].map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setDateFilter(p.value)}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors
+                      ${dateFilter === p.value
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Date Filter */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">Filter Periode:</label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
-            {[
-              { value: "ALL", label: "Semua Periode" },
-              { value: "THIS_WEEK", label: "Minggu Ini" },
-              { value: "THIS_MONTH", label: "Bulan Ini" },
-              { value: "LAST_MONTH", label: "Bulan Lalu" },
-              { value: "LAST_3_MONTHS", label: "3 Bulan Terakhir" },
-              { value: "CUSTOM", label: "Custom" }
-            ].map((period) => (
-              <button
-                key={period.value}
-                onClick={() => setDateFilter(period.value)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${dateFilter === period.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                {period.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Custom Date Range */}
+          {/* Custom date range */}
           {dateFilter === "CUSTOM" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
               <Input
                 label="Tanggal Mulai"
                 type="date"
@@ -1203,154 +906,133 @@ export default function HRViewPage() {
               />
             </div>
           )}
-        </div>
 
-        {/* Export & Summary */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-4 border-t border-gray-200">
-          <div className="text-sm text-gray-600">
-            Menampilkan <span className="font-semibold text-gray-900">{filteredSpls.length}</span> dari <span className="font-semibold text-gray-900">{spls.length}</span> data SPL
-            {Number(stats.approvedHours) > 0 && (
-              <span className="ml-2">• Total <span className="font-semibold text-green-600">{stats.approvedHours} jam</span> ACC Manager</span>
-            )}
-            {Number(stats.pendingHours) > 0 && (
-              <span className="ml-2">• Pending <span className="font-semibold text-yellow-600">{stats.pendingHours} jam</span></span>
-            )}
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={copyTableData}
-              variant="outline"
-              className="flex items-center gap-2"
-              disabled={filteredSpls.length === 0}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Copy Table
-            </Button>
-            <Button
-              onClick={exportToExcel}
-              className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-green-700"
-              disabled={filteredSpls.length === 0}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export Excel
-            </Button>
-            <Button
-              onClick={generateRekapPdf}
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700"
-              disabled={filteredSpls.length === 0}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              Generate Rekap PDF
-            </Button>
+          {/* Summary + Export */}
+          <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-gray-900">{filteredSpls.length}</span>
+              {" dari "}
+              {spls.length} SPL
+              {Number(stats.approvedHours) > 0 && (
+                <> · <span className="font-semibold text-green-600">{stats.approvedHours} jam</span> ACC</>
+              )}
+              {Number(stats.pendingHours) > 0 && (
+                <> · <span className="font-semibold text-amber-600">{stats.pendingHours} jam</span> pending</>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={copyTableData}
+                disabled={filteredSpls.length === 0}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={exportToExcel}
+                disabled={filteredSpls.length === 0}
+                className="flex items-center gap-1.5 rounded-xl bg-green-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Excel
+              </button>
+              <button
+                type="button"
+                onClick={generateRekapPdf}
+                disabled={filteredSpls.length === 0}
+                className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Rekap PDF
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       {filteredSpls.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Items per page selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-700">Tampilkan:</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              >
-                <option value={10}>10</option>
-                <option value={15}>15</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-              </select>
-              <span className="text-sm text-gray-700">per halaman</span>
-            </div>
+        <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white px-5 py-3.5 shadow-sm sm:flex-row">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span className="tabular-nums">
+              {indexOfFirstItem + 1}–{Math.min(indexOfLastItem, filteredSpls.length)} dari {filteredSpls.length}
+            </span>
+            <span className="text-gray-200">|</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+              className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            >
+              {[10, 15, 20, 30, 50].map((n) => (
+                <option key={n} value={n}>{n} / hal</option>
+              ))}
+            </select>
+          </div>
 
-            {/* Page info */}
-            <div className="text-sm text-gray-700">
-              Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredSpls.length)} dari {filteredSpls.length} data
-            </div>
-
-            {/* Page numbers */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                ← Prev
-              </button>
-
-              {/* Page numbers */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  let pageNumber
-                  if (totalPages <= 5) {
-                    pageNumber = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNumber = i + 1
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNumber = totalPages - 4 + i
-                  } else {
-                    pageNumber = currentPage - 2 + i
-                  }
-
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => handlePageChange(pageNumber)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${currentPage === pageNumber
-                        ? "bg-green-600 text-white"
-                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                        }`}
-                    >
-                      {pageNumber}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Next →
-              </button>
-            </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ←
+            </button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let pageNumber: number
+              if (totalPages <= 5) pageNumber = i + 1
+              else if (currentPage <= 3) pageNumber = i + 1
+              else if (currentPage >= totalPages - 2) pageNumber = totalPages - 4 + i
+              else pageNumber = currentPage - 2 + i
+              return (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => handlePageChange(pageNumber)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold tabular-nums transition-colors
+                    ${currentPage === pageNumber
+                      ? "bg-green-600 text-white"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                >
+                  {pageNumber}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              →
+            </button>
           </div>
         </div>
       )}
 
-      {/* SPL Cards */}
+      {/* SPL Cards / Empty State */}
       {filteredSpls.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Tidak Ada Data
-              </h3>
-              <p className="text-gray-500 text-sm">
-                Tidak ada SPL dengan filter yang dipilih
-              </p>
-            </div>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white py-16 shadow-sm">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+            <svg className="h-7 w-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
+          <h3 className="text-base font-semibold text-gray-900">Tidak Ada Data</h3>
+          <p className="mt-1 text-sm text-gray-500">Tidak ada SPL dengan filter yang dipilih</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {currentItems.map((spl) => (
             <SplCard
               key={spl.id}
@@ -1366,12 +1048,7 @@ export default function HRViewPage() {
       )}
 
       {/* Detail Modal */}
-      <SplDetailModal
-        spl={selectedSpl}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-      />
+      <SplDetailModal spl={selectedSpl} isOpen={isModalOpen} onClose={handleCloseModal} />
     </div>
   )
 }
-

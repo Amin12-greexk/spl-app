@@ -45,3 +45,10 @@ ADMIN-CREDENTIALS.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# User requested ignores
+*.sql
+*.jpg
+*.jpeg
+/backups/
+/public/uploads/

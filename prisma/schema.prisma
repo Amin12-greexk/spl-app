@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,105 +8,94 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-// Blok ENUM sudah dihapus
-
 model User {
-  id                     String             @id @default(cuid())
-  email                  String             @unique
-  password               String
-  pin                    String
-  name                   String
-  role                   String             @default("STAFF") // STAFF, HR, MANAGER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, TEKNISI, DRIVER, SUPER_ADMIN
-  departmentName         String?            @map("department")
-  departmentId           String?
-  department             Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  position               String? // Security, IT Staff, Admin, etc
-  image                  String? // URL or path to profile picture
-  regularStartTime       String? // Jam kerja reguler mulai (HH:MM)
-  regularEndTime         String? // Jam kerja reguler selesai (HH:MM)
-  supervisorId           String? // ID atasan langsung
-  supervisor             User?              @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates           User[]             @relation("SupervisorRelation")
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  splRequests            Spl[]              @relation("requester")
-  splApprovals           Spl[]              @relation("approver")
-  splSupervisorApprovals Spl[]              @relation("supervisor")
-  notifications          UserNotification[]
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
+  password                 String
+  name                     String
+  role                     String                    @default("STAFF")
+  departmentName           String?                   @map("department")
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  pin                      String
+  position                 String?
+  supervisorId             String?
+  departmentId             String?
+  regularStartTime         String?
+  regularEndTime           String?
+  image                    String?
   securityShiftAssignments SecurityShiftAssignment[]
+  splApprovals             Spl[]                     @relation("approver")
+  splRequests              Spl[]                     @relation("requester")
+  splSupervisorApprovals   Spl[]                     @relation("supervisor")
+  notifications            UserNotification[]
+  department               Department?               @relation(fields: [departmentId], references: [id])
+  supervisor               User?                     @relation("SupervisorRelation", fields: [supervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates             User[]                    @relation("SupervisorRelation")
 
-  @@index([role], map: "users_role_idx")
-  @@index([supervisorId], map: "users_supervisorId_idx")
-  @@index([departmentId], map: "users_departmentId_idx")
+  @@index([role])
+  @@index([supervisorId])
+  @@index([departmentId])
   @@map("users")
 }
 
 model Department {
-  id         String   @id @default(cuid())
-  name       String   @unique
-  supervised Boolean  @default(false)
-  approvalMode String @default("DIRECT") // DIRECT | GA | DEPARTMENT_HEAD
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  users      User[]
+  id           String   @id @default(cuid())
+  name         String   @unique
+  supervised   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  approvalMode String   @default("DIRECT")
+  users        User[]
 
   @@map("departments")
 }
 
 model Spl {
-  id          String   @id @default(cuid())
-  requesterId String
-  requester   User     @relation("requester", fields: [requesterId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  date        DateTime
-  startTime   String
-  endTime     String
-  totalHours  Float
-  reason      String
-  signature   String? // Tanda tangan pemohon
-  projectName String?
-  proofImage  String? // Foto bukti pengerjaan lembur
-  actualStartAt DateTime?
-  actualEndAt   DateTime?
-  actualTotalHours Float?
-  realizationNote String?
-  realizationProofImage String?
-  overrunReason String?
-  regularStartAt DateTime?
-  regularEndAt   DateTime?
-  plannedStartAt DateTime?
-  plannedEndAt   DateTime?
-  realizedMinutes Int?
-  realizationCounted Boolean?
-  realizationCancelReason String?
-
-  // Status: PENDING_SUPERVISOR, PENDING_MANAGER, APPROVED, REJECTED_BY_SUPERVISOR, REJECTED_BY_MANAGER
-  status String @default("PENDING_SUPERVISOR")
-  source String @default("SYSTEM") // SYSTEM | MANUAL | LEGACY
-
-  // Approval Level 1: Supervisor (GA/Department Head)
+  id                        String    @id @default(cuid())
+  requesterId               String
+  date                      DateTime
+  startTime                 String
+  endTime                   String
+  totalHours                Float
+  reason                    String
+  projectName               String?
+  status                    String    @default("PENDING_SUPERVISOR")
+  approverId                String?
+  approvalDate              DateTime?
+  rejectionReason           String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  signature                 String?
   supervisorId              String?
-  supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   supervisorApprovalDate    DateTime?
-  supervisorSignature       String? // Tanda tangan supervisor
+  supervisorSignature       String?
   supervisorRejectionReason String?
+  proofImage                String?
+  isManualEntry             Boolean   @default(false)
+  manualEntryBy             String?
+  requesterSignedAt         DateTime?
+  actualStartAt             DateTime?
+  actualEndAt               DateTime?
+  actualTotalHours          Float?
+  realizationNote           String?
+  realizationProofImage     String?
+  overrunReason             String?
+  regularStartAt            DateTime?
+  regularEndAt              DateTime?
+  plannedStartAt            DateTime?
+  plannedEndAt              DateTime?
+  realizedMinutes           Int?
+  realizationCounted        Boolean?
+  realizationCancelReason   String?
+  source                    String    @default("SYSTEM")
+  approver                  User?     @relation("approver", fields: [approverId], references: [id])
+  requester                 User      @relation("requester", fields: [requesterId], references: [id])
+  supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id])
 
-  // Approval Level 2: Manager (existing)
-  approverId      String?
-  approver        User?     @relation("approver", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  approvalDate    DateTime?
-  rejectionReason String? // Alasan penolakan manager
-
-  // Manual Entry (by Super Admin)
-  isManualEntry     Boolean   @default(false)
-  manualEntryBy     String? // Super Admin ID yang buat manual entry
-  requesterSignedAt DateTime? // Waktu user sign manual SPL
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([requesterId, createdAt], map: "spls_requesterId_createdAt_idx")
-  @@index([status, createdAt], map: "spls_status_createdAt_idx")
-  @@index([supervisorId, createdAt], map: "spls_supervisorId_createdAt_idx")
+  @@index([requesterId, createdAt])
+  @@index([status, createdAt])
+  @@index([supervisorId, createdAt])
   @@index([isManualEntry, requesterSignedAt], map: "spls_manual_unsigned_idx")
   @@map("spls")
 }
@@ -116,11 +103,11 @@ model Spl {
 model SecurityShiftAssignment {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   workDate  DateTime
   shiftCode String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workDate], map: "security_shift_user_date_unique")
   @@index([workDate], map: "security_shift_workDate_idx")
@@ -131,12 +118,12 @@ model SecurityShiftAssignment {
 model UserNotification {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   endpoint  String
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, endpoint])
   @@map("user_notifications")

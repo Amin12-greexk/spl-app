@@ -49,6 +49,7 @@ export const authOptions: NextAuthOptions = {
             supervisorId: user.supervisorId,
             regularStartTime: user.regularStartTime,
             regularEndTime: user.regularEndTime,
+            image: user.image,
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -64,7 +65,7 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
         token.role = user.role
@@ -75,7 +76,30 @@ export const authOptions: NextAuthOptions = {
         token.supervisorId = user.supervisorId
         token.regularStartTime = user.regularStartTime
         token.regularEndTime = user.regularEndTime
+        token.image = user.image
       }
+      
+      // Handle session update trigger (used after profile photo upload)
+      if (trigger === "update" && session?.image !== undefined) {
+        token.image = session.image
+      }
+
+      // Refresh image from DB if token doesn't have it yet
+      // (handles users who logged in before the image feature was added)
+      if (!token.image && token.id) {
+        try {
+          const dbUser = await prisma.$queryRawUnsafe(
+            `SELECT image FROM "users" WHERE id = $1 LIMIT 1`,
+            token.id
+          ) as Array<{ image: string | null }>
+          if (dbUser.length > 0 && dbUser[0].image) {
+            token.image = dbUser[0].image
+          }
+        } catch {
+          // silently ignore — image just won't show until next login
+        }
+      }
+      
       return token
     },
     async session({ session, token }) {
@@ -89,6 +113,7 @@ export const authOptions: NextAuthOptions = {
         session.user.supervisorId = token.supervisorId as string | null
         session.user.regularStartTime = token.regularStartTime as string | null
         session.user.regularEndTime = token.regularEndTime as string | null
+        session.user.image = token.image as string | null
       }
       return session
     },
