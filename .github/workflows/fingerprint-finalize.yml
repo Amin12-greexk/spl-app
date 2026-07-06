@@ -1,0 +1,27 @@
+name: SPL fingerprint-finalize poller
+
+# Vercel's Hobby plan caps cron jobs at once/day, but /api/cron/fingerprint-finalize
+# is designed to be polled frequently (idempotent — see lib/fingerprint.ts). This
+# workflow pings it every 10 minutes so AUTO-mode overtime realization doesn't lag
+# up to 24h behind. auto-fill-realization is NOT included here on purpose — its
+# own 3-day threshold makes the once/day Vercel cron perfectly sufficient.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call fingerprint-finalize
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SPL_APP_URL }}/api/cron/fingerprint-finalize")
+          echo "HTTP status: $status"
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "::error::fingerprint-finalize returned $status"
+            exit 1
+          fi
