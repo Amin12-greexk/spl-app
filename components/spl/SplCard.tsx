@@ -295,6 +295,22 @@ function SplCard({
       Lembur Pagi
     </span>
   ) : null
+  const autoBadge =
+    spl.realizationSource === "AUTO_FINGER" ? (
+      <span
+        className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-teal-50 text-teal-700 border-teal-200 cursor-help"
+        title="Realisasi terisi otomatis dari data fingerprint"
+      >
+        🔘 Realisasi Fingerprint
+      </span>
+    ) : spl.inputMode === "AUTO" ? (
+      <span
+        className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-teal-50 text-teal-700 border-teal-200 cursor-help"
+        title="Diajukan dengan mode otomatis; realisasi menunggu data fingerprint"
+      >
+        Otomatis
+      </span>
+    ) : null
 
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
@@ -362,6 +378,7 @@ function SplCard({
             {legacyBadge}
             {expiredBadge}
             {morningBadge}
+            {autoBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -452,6 +469,7 @@ function SplCard({
             {legacyBadge}
             {expiredBadge}
             {morningBadge}
+            {autoBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -671,6 +689,7 @@ function SplCard({
           {legacyBadge}
           {expiredBadge}
           {morningBadge}
+          {autoBadge}
           {getStatusBadge(spl.status, false)}
         </div>
       </div>

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { UpdateSplStatusInput, Role, SplStatus } from "@/types"; // Impor semua tipe yang dibutuhkan
 import { sendNotificationToUser } from "@/lib/notification-utils"; // Impor fungsi pengirim notifikasi
 import { JAKARTA_TIME_ZONE } from "@/lib/spl-time";
+import { recordSplAudit } from "@/lib/spl-audit";
 
 /**
  * GET /api/spl/[id]
@@ -185,6 +186,16 @@ export async function PATCH(
       },
     });
 
+    await recordSplAudit({
+      splId: spl.id,
+      action: normalizedStatus === "APPROVED" ? "MANAGER_APPROVE" : "MANAGER_REJECT",
+      actorId: session.user.id,
+      oldStatus: existingSpl.status,
+      newStatus: normalizedStatus,
+      source: existingSpl.source,
+      note: normalizedStatus === "REJECTED_BY_MANAGER" ? body.rejectionReason : undefined,
+    });
+
     // --- Logika Mengirim Notifikasi Balasan ---
     try {
       // Format tanggal SPL
@@ -270,6 +281,16 @@ export async function DELETE(
       where: {
         id: params.id,
       },
+    });
+
+    await recordSplAudit({
+      splId: spl.id,
+      action: "DELETE",
+      actorId: session.user.id,
+      oldStatus: spl.status,
+      newStatus: null,
+      source: spl.source,
+      note: "Dihapus oleh pemohon (status pending)",
     });
 
     return NextResponse.json({ message: "SPL deleted successfully" });

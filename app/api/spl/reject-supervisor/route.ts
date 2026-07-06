@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToUser } from "@/lib/notification-utils"
 import { JAKARTA_TIME_ZONE } from "@/lib/spl-time"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 export async function POST(req: NextRequest) {
   try {
@@ -126,6 +127,16 @@ export async function POST(req: NextRequest) {
           },
         },
       },
+    })
+
+    await recordSplAudit({
+      splId: updatedSpl.id,
+      action: "SUPERVISOR_REJECT",
+      actorId: session.user.id,
+      oldStatus: spl.status,
+      newStatus: "REJECTED_BY_SUPERVISOR",
+      source: spl.source,
+      note: rejectionReason,
     })
 
     // Send notification to requester

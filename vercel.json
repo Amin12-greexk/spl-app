@@ -3,6 +3,10 @@
         {
             "path": "/api/cron/auto-fill-realization",
             "schedule": "0 18 * * *"
+        },
+        {
+            "path": "/api/cron/fingerprint-finalize",
+            "schedule": "0 * * * *"
         }
     ]
 }

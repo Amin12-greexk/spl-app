@@ -162,6 +162,38 @@ export const getJakartaTimeMinutes = (value: Date = new Date()) => {
   return parts.hour * 60 + parts.minute
 }
 
+/** Format a Date as "HH:MM" in Asia/Jakarta. */
+export const formatJakartaHHMM = (value: Date) => {
+  const parts = getJakartaParts(value)
+  const hh = String(parts.hour).padStart(2, "0")
+  const mm = String(parts.minute).padStart(2, "0")
+  return `${hh}:${mm}`
+}
+
+/**
+ * Parse an attendance scan timestamp expressed as Asia/Jakarta wall-clock,
+ * e.g. "2026-06-18 17:42:10" or "2026-06-18T17:42:10". Returns a Date (UTC-correct), or null.
+ */
+export const parseJakartaDateTime = (value: string): Date | null => {
+  if (typeof value !== "string") return null
+  const normalized = value.trim().replace("T", " ")
+  const [datePart, timePart = "00:00:00"] = normalized.split(/\s+/)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null
+  const [y, mo, d] = datePart.split("-").map(Number)
+  const [hStr = "0", mStr = "0", sStr = "0"] = timePart.split(":")
+  const h = Number(hStr)
+  const mi = Number(mStr)
+  const s = Number(sStr)
+  if (
+    [y, mo, d, h, mi, s].some((n) => Number.isNaN(n)) ||
+    mo < 1 || mo > 12 || d < 1 || d > 31 ||
+    h < 0 || h > 23 || mi < 0 || mi > 59 || s < 0 || s > 59
+  ) {
+    return null
+  }
+  return makeJakartaDate(y, mo, d, h, mi, s)
+}
+
 export const getJakartaDayOfWeek = (value: Date) => {
   const parts = getJakartaParts(value)
   // Use noon UTC to avoid any timezone edge cases when computing weekday.

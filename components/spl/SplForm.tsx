@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import NextImage from "next/image"
@@ -17,8 +17,6 @@ const SECURITY_SHIFT_PRESETS = [
   { id: "M2", label: "M2 (23:00-07:00)", start: "23:00", end: "07:00" },
   { id: "F1", label: "F1 FINA (08:00-16:30)", start: "08:00", end: "16:30" },
 ]
-const GA_SUPERVISED_DEPARTMENTS = new Set(["security", "teknik", "driver"])
-
 export default function SplForm() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -38,17 +36,27 @@ export default function SplForm() {
     date: "",
     startTime: "",
     endTime: "",
+    estimatedEndTime: "",
     reason: "",
     projectName: "",
     proofImage: "",
   })
+  // Dual-mode (Auto + Manual) overtime
+  const [overtimeFlags, setOvertimeFlags] = useState<{ auto: boolean; manual: boolean }>({
+    auto: false,
+    manual: true,
+  })
+  const [mode, setMode] = useState<"AUTO" | "MANUAL">("MANUAL")
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [showPhotoSection, setShowPhotoSection] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [showPhotoSection, setShowPhotoSection] = useState(true)
   const [showGuidelines, setShowGuidelines] = useState(false)
   const [showRegularHours, setShowRegularHours] = useState(false)
   const departmentKey = (session?.user?.department || "").toLowerCase()
   const isSecurityDepartment = departmentKey === "security"
-  const isGaSupervisedDepartment = GA_SUPERVISED_DEPARTMENTS.has(departmentKey)
   const todayInputValue = (() => {
     const now = new Date()
     const year = now.getFullYear()
@@ -71,6 +79,28 @@ export default function SplForm() {
     }
     loadMin()
   }, [])
+
+  useEffect(() => {
+    const loadFlags = async () => {
+      try {
+        const res = await fetch("/api/settings/overtime-flags")
+        const data = await res.json()
+        if (res.ok) {
+          const auto = Boolean(data?.auto)
+          const manual = data?.manual !== false
+          setOvertimeFlags({ auto, manual })
+          // Default to Auto when available (recommended), otherwise Manual.
+          setMode(auto ? "AUTO" : "MANUAL")
+        }
+      } catch (err) {
+        console.error("Gagal mengambil konfigurasi mode lembur", err)
+      }
+    }
+    loadFlags()
+  }, [])
+
+  const isAutoMode = mode === "AUTO"
+  const showModeToggle = overtimeFlags.auto && overtimeFlags.manual
 
   useEffect(() => {
     const loadRegularHours = async () => {
@@ -176,6 +206,82 @@ export default function SplForm() {
     if (!matched) return
     setRegularHours({ start: matched.start, end: matched.end })
   }
+
+  const openCamera = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: {
+          ideal: "environment",
+        },
+      },
+      audio: false,
+    })
+
+    setCameraStream(stream)
+    setShowCamera(true)
+
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+    }, 100)
+  } catch (err) {
+    await Swal.fire({
+      icon: "error",
+      title: "Kamera tidak tersedia",
+      text: "Pastikan browser memiliki izin kamera.",
+    })
+  }
+}
+
+const closeCamera = () => {
+  cameraStream?.getTracks().forEach((t) => t.stop())
+  setCameraStream(null)
+  setShowCamera(false)
+}
+const capturePhoto = async () => {
+  try {
+    if (!videoRef.current || !canvasRef.current) return
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const ctx = canvas.getContext("2d")
+
+    if (!ctx) return
+
+    ctx.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    )
+
+    const base64 = canvas.toDataURL(
+      "image/jpeg",
+      0.7
+    )
+
+    setFormData((prev) => ({
+      ...prev,
+      proofImage: base64,
+    }))
+
+    setImagePreview(base64)
+
+    closeCamera()
+  } catch {
+    Swal.fire({
+      icon: "error",
+      title: "Gagal mengambil foto",
+    })
+  }
+}
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -302,15 +408,25 @@ export default function SplForm() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
+    if (!isAutoMode && (!formData.startTime || !formData.endTime)) {
+      await Swal.fire({
+        icon: "error",
+        title: "Jam lembur belum diisi",
+        text: "Isi jam mulai dan jam selesai lembur, atau gunakan mode otomatis.",
+      })
+      return
+    }
+
     const normalizedRegularStart = normalizeTimeValue(regularHours?.start)
     const normalizedRegularEnd = normalizeTimeValue(regularHours?.end)
 
     const proofImageValue = (formData.proofImage || "").trim()
-    if (isGaSupervisedDepartment && proofImageValue.length < 30) {
+    if (proofImageValue.length < 30) {
+      setShowPhotoSection(true)
       await Swal.fire({
         icon: "error",
         title: "Foto bukti wajib diunggah",
-        text: "Untuk departemen yang disupervisi GA, unggah foto bukti lembur terlebih dahulu.",
+        text: "Ambil foto atau unggah foto bukti lembur terlebih dahulu.",
       })
       return
     }
@@ -353,7 +469,7 @@ export default function SplForm() {
       }
     }
 
-    if (normalizedRegularStart && normalizedRegularEnd) {
+    if (!isAutoMode && normalizedRegularStart && normalizedRegularEnd) {
       const startMinutes = parseTimeToMinutes(formData.startTime)
       const endMinutes = parseTimeToMinutes(formData.endTime)
       const regularStartMinutes = parseTimeToMinutes(normalizedRegularStart)
@@ -429,12 +545,33 @@ export default function SplForm() {
         })
       }
 
+      const payload = isAutoMode
+        ? {
+            signature: formData.signature,
+            date: formData.date,
+            reason: formData.reason,
+            projectName: formData.projectName,
+            proofImage: formData.proofImage,
+            mode: "AUTO",
+            estimatedEndTime: formData.estimatedEndTime || undefined,
+          }
+        : {
+            signature: formData.signature,
+            date: formData.date,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            reason: formData.reason,
+            projectName: formData.projectName,
+            proofImage: formData.proofImage,
+            mode: "MANUAL",
+          }
+
       const response = await fetch("/api/spl", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -661,44 +798,104 @@ export default function SplForm() {
               </div>
             )}
 
-            {/* Waktu Lembur - Compact */}
-            <div id="spl-waktu" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TimePicker
-                label="Waktu Mulai Lembur"
-                value={formData.startTime}
-                onChange={(value) => setFormData({ ...formData, startTime: value })}
-                showWib
-                required
-                hint={
-                  isSecurityDepartment
-                    ? "Security: sesuaikan dengan waktu pulang"
-                    : `Batas normal: ${minStart}. Lewat batas akan direview Super Admin`
-                }
-                selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
-              />
+            {/* Mode Input Lembur - Auto vs Manual */}
+            {showModeToggle && (
+              <div className="border border-green-200 rounded-lg p-3 bg-green-50/50">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Metode Input Lembur</p>
+                    <p className="text-xs text-gray-600">
+                      {isAutoMode
+                        ? "Otomatis: jam mulai & selesai diambil dari fingerprint saat Anda pulang."
+                        : "Manual: isi sendiri jam mulai & selesai lembur."}
+                    </p>
+                  </div>
+                  <div className="inline-flex rounded-lg border border-green-300 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setMode("AUTO")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-micro ${
+                        isAutoMode ? "bg-green-600 text-white" : "bg-white text-gray-700 hover:bg-green-50"
+                      }`}
+                    >
+                      Otomatis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("MANUAL")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-micro ${
+                        !isAutoMode ? "bg-green-600 text-white" : "bg-white text-gray-700 hover:bg-green-50"
+                      }`}
+                    >
+                      Manual
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-              <div className="relative">
+            {isAutoMode ? (
+              /* Mode Auto: jam mulai otomatis, hanya estimasi (opsional) */
+              <div id="spl-waktu" className="space-y-3">
+                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs text-blue-800">
+                    Jam mulai lembur otomatis dihitung dari jam pulang reguler Anda. Realisasi (jam mulai/selesai sebenarnya) akan terisi otomatis dari data fingerprint saat Anda pulang. Jika fingerprint gagal/terlambat, Anda tetap bisa input manual nanti.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TimePicker
+                    label="Estimasi Selesai (Opsional)"
+                    value={formData.estimatedEndTime}
+                    onChange={(value) => setFormData({ ...formData, estimatedEndTime: value })}
+                    showWib
+                    hint="Kosongkan untuk default +2 jam dari jam pulang reguler"
+                    selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Mode Manual: jam mulai & selesai wajib (perilaku lama) */
+              <div id="spl-waktu" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TimePicker
-                  label="Waktu Selesai Lembur"
-                  value={formData.endTime}
-                  onChange={(value) => setFormData({ ...formData, endTime: value })}
+                  label="Waktu Mulai Lembur"
+                  value={formData.startTime}
+                  onChange={(value) => setFormData({ ...formData, startTime: value })}
                   showWib
                   required
-                  hint={overnight ? "Lembur lintas hari terdeteksi" : "Harus lebih besar dari waktu mulai"}
+                  hint={
+                    isSecurityDepartment
+                      ? "Security: sesuaikan dengan waktu pulang"
+                      : `Batas normal: ${minStart}. Lewat batas akan direview Super Admin`
+                  }
                   selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
                 />
-                {overnight && (
-                  <div className="absolute top-8 right-0">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md shadow-sm">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Keesokan Hari
-                    </span>
-                  </div>
-                )}
+
+                <div className="relative">
+                  <TimePicker
+                    label="Waktu Selesai Lembur"
+                    value={formData.endTime}
+                    onChange={(value) => setFormData({ ...formData, endTime: value })}
+                    showWib
+                    required
+                    hint={overnight ? "Lembur lintas hari terdeteksi" : "Harus lebih besar dari waktu mulai"}
+                    selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
+                  />
+                  {overnight && (
+                    <div className="absolute top-8 right-0">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md shadow-sm">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Keesokan Hari
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Duration Display - Inline */}
             {duration && (
@@ -743,11 +940,7 @@ export default function SplForm() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span className="text-sm font-semibold text-gray-900">Foto Bukti Lembur</span>
-                  {isGaSupervisedDepartment ? (
-                    <span className="text-xs text-red-500">(Wajib)</span>
-                  ) : (
-                    <span className="text-xs text-gray-500">(Opsional)</span>
-                  )}
+                  <span className="text-xs text-red-500">(Wajib)</span>
                   {imagePreview && (
                     <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✓ Uploaded</span>
                   )}
@@ -764,19 +957,72 @@ export default function SplForm() {
               {showPhotoSection && (
                 <div className="p-4 bg-white border-t border-gray-200 motion-safe:animate-slide-down">
                   {!imagePreview ? (
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-micro">
-                      <div className="flex flex-col items-center justify-center py-4 px-4">
-                        <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <p className="text-xs text-gray-600 text-center">
-                          <span className="font-semibold text-green-600">Klik untuk upload</span>
-                          <br />
-                          PNG, JPG (Max 5MB)
-                        </p>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label className="flex flex-col items-center justify-center w-full min-h-32 border-2 border-green-300 border-dashed rounded-lg cursor-pointer bg-green-50 hover:bg-green-100 transition-micro">
+                          <div className="flex flex-col items-center justify-center py-4 px-4">
+                            <svg className="w-8 h-8 mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <p className="text-xs text-gray-700 text-center">
+                              <button
+  type="button"
+  onClick={openCamera}
+  className="flex flex-col items-center justify-center w-full min-h-32 border-2 border-green-300 border-dashed rounded-lg bg-green-50 hover:bg-green-100 transition-micro"
+>
+  <svg
+    className="w-8 h-8 mb-2 text-green-600"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+    />
+  </svg>
+
+  <p className="text-xs text-center">
+    <span className="font-semibold text-green-700">
+      Ambil Foto
+    </span>
+    <br />
+    Buka Kamera
+  </p>
+</button>
+                              <br />
+                              Buka kamera perangkat
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleImageUpload}
+                          />
+                        </label>
+                        <label className="flex flex-col items-center justify-center w-full min-h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-micro">
+                          <div className="flex flex-col items-center justify-center py-4 px-4">
+                            <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p className="text-xs text-gray-600 text-center">
+                              <span className="font-semibold text-green-600">Pilih dari Galeri</span>
+                              <br />
+                              PNG, JPG (Max 8MB)
+                            </p>
+                          </div>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                        </label>
                       </div>
-                      <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                    </label>
+                      <p className="text-xs text-gray-500">
+                        Foto bukti wajib untuk semua departemen sebelum SPL diajukan.
+                      </p>
+                    </div>
                   ) : (
                     <div className="relative">
                       <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
@@ -865,7 +1111,43 @@ export default function SplForm() {
           </div>
         </form>
       </div>
+              {showCamera && (
+  <div className="fixed inset-0 z-[100] bg-black">
 
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="w-full h-full object-cover"
+    />
+
+    <canvas
+      ref={canvasRef}
+      className="hidden"
+    />
+
+    <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-4">
+
+      <button
+        type="button"
+        onClick={closeCamera}
+        className="bg-red-500 text-white px-6 py-3 rounded-full"
+      >
+        Tutup
+      </button>
+
+      <button
+        type="button"
+        onClick={capturePhoto}
+        className="bg-green-600 text-white px-8 py-3 rounded-full"
+      >
+        Ambil
+      </button>
+
+    </div>
+
+  </div>
+)}
       {/* Sticky Action Buttons - Bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-40 motion-safe:animate-slide-up">
         <div className="max-w-5xl mx-auto px-4 py-3 sm:py-4">

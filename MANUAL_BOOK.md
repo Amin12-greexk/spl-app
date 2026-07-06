@@ -36,7 +36,7 @@ Manual book ini disusun untuk memberikan panduan lengkap dan mendetail kepada se
 Sistem SPL memiliki tiga level pengguna dengan hak akses yang berbeda:
 
 - **Staff**: Karyawan yang mengajukan Surat Perintah Lembur
-- **Manager**: Pihak yang berwenang menyetujui atau menolak pengajuan SPL
+- **Supervisor/Manager**: Pihak berwenang (berjenjang) yang menyetujui atau menolak pengajuan SPL
 - **HR (Human Resources)**: Administrator yang mengelola data dan laporan SPL secara keseluruhan
 
 ### 1.4 Spesifikasi Teknis
@@ -255,7 +255,12 @@ Sebelum membuat pengajuan, pastikan:
 
 3. **Mengisi Formulir Pengajuan**
 
-   Formulir dibagi menjadi 4 bagian:
+   Formulir meliputi bagian-bagian berikut:
+   - **Data Dasar**: Tanggal Lembur dan Nama Proyek.
+   - **Jam Kerja Reguler**: Jam mulai dan selesai reguler. Khusus Security dapat memilih preset Shift (P1, P2, M1, M2, F1).
+   - **Waktu Lembur**: Jam mulai dan selesai lembur (tidak boleh bentrok dengan jam reguler).
+   - **Alasan & Foto**: Alasan lembur dan Foto Bukti (wajib untuk Security/Teknik/Driver).
+   - **Tanda Tangan**: Tanda tangan digital wajib diisi.
 
    **A. Informasi Dasar**
 

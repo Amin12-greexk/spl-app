@@ -89,6 +89,15 @@ model Spl {
   realizationCounted        Boolean?
   realizationCancelReason   String?
   source                    String    @default("SYSTEM")
+  // --- Dual-mode (Auto + Manual) overtime, additive & backward compatible ---
+  // How the REQUEST was input: "MANUAL" (legacy default) or "AUTO".
+  inputMode                 String?   @default("MANUAL")
+  // How REALIZATION was computed: "MANUAL" or "AUTO_FINGER" (null = not realized yet).
+  realizationSource         String?
+  // Optional user-provided estimated finish (Auto mode plan). Plan only, not realization.
+  plannedEstimatedEndAt     DateTime?
+  // Set when fingerprint data finalized the realization.
+  fingerprintMatchedAt      DateTime?
   approver                  User?     @relation("approver", fields: [approverId], references: [id])
   requester                 User      @relation("requester", fields: [requesterId], references: [id])
   supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id])
@@ -137,4 +146,22 @@ model Setting {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+// Append-only audit trail for every SPL status change / important mutation.
+// Intentionally FK-less so history survives hard-deletes of an Spl/User.
+model SplAuditLog {
+  id        String   @id @default(cuid())
+  splId     String
+  actorId   String?
+  oldStatus String?
+  newStatus String?
+  source    String?
+  action    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([splId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("spl_audit_logs")
 }

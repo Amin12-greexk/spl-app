@@ -25,7 +25,22 @@
       "Bash(npx prisma format)",
       "Bash(npm run db:seed:*)",
       "Bash(tr:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(sed -E 's/=.*/=<redacted>/' .env)",
+      "Bash(sed -E 's/=.*/=<redacted>/' .env.local)",
+      "Bash(docker context *)",
+      "Bash(\"/c/Program Files/Docker/Docker/Docker Desktop.exe\")",
+      "Bash(echo \"launched Docker Desktop, exit: $?\")",
+      "Bash(export DATABASE_URL='postgresql://spl:spl_local_pw@localhost:55432/spldb?schema=public')",
+      "Bash(export SHADOW_DATABASE_URL='postgresql://spl:spl_local_pw@localhost:55432/spldb_shadow?schema=public')",
+      "Bash(docker exec *)",
+      "Bash(DATABASE_URL=postgresql://spl:spl_local_pw@localhost:55432/spldb?schema=public SHADOW_DATABASE_URL=postgresql://spl:spl_local_pw@localhost:55432/spldb_shadow?schema=public npx tsx scripts/seed-local.ts)",
+      "Bash(DATABASE_URL='postgresql://spl:spl_local_pw@localhost:55432/spldb?schema=public' npx tsx scripts/mock-absen.ts)",
+      "Bash(echo \"mock pid $!\")",
+      "Bash(curl -s \"http://127.0.0.1:5599/scans?pin=1001\")",
+      "Bash(npx next *)",
+      "Bash(echo \"next dev pid $!\")",
+      "Bash(DATABASE_URL=postgresql://spl:spl_local_pw@localhost:55432/spldb?schema=public NEXTAUTH_SECRET=local-test-secret-32chars-minimum-xyz CRON_SECRET=local-cron-secret npx tsx scripts/test-scenarios.ts)"
     ],
     "deny": [],
     "ask": []

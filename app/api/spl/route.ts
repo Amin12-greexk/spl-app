@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-// Path impor di bawah ini diperbaiki untuk menunjuk ke lokasi definisi authOptions yang benar
-import { authOptions } from "@/lib/auth"; // <-- PATH DIPERBAIKI
+import { getAuthenticatedUser } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBAIKI
 import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils";
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
+import { recordSplAudit } from "@/lib/spl-audit";
 import {
+  addDays,
+  formatJakartaHHMM,
   getJakartaDayOfWeek,
   getJakartaTimeMinutes,
   isSecurityOffShift,
@@ -16,6 +17,7 @@ import {
   parseDateOnly,
   parseTimeToMinutes,
   SECURITY_SHIFT_DEFINITIONS,
+  setTimeOnDate,
   startOfDay,
 } from "@/lib/spl-time"
 import {
@@ -23,6 +25,10 @@ import {
   parseRegularOverrideValue,
   windowsOverlap,
 } from "@/lib/regular-hours"
+import {
+  AUTO_DEFAULT_OVERTIME_MINUTES,
+  getOvertimeFlagsWithSettings,
+} from "@/lib/feature-flags"
 
 /**
  * GET /api/spl
@@ -34,9 +40,9 @@ import {
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const authUser = await getAuthenticatedUser(req);
 
-    if (!session) {
+    if (!authUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -54,7 +60,7 @@ export async function GET(req: NextRequest) {
     // Tipe any untuk where clause agar dinamis
     const baseWhere: any = {};
 
-    const userRole = session.user.role as Role;
+    const userRole = authUser.role as Role;
     const selfOnlyRoles: Role[] = [
       "STAFF",
       "TEKNISI",
@@ -80,7 +86,7 @@ export async function GET(req: NextRequest) {
 
     if (selfOnlyRoles.includes(userRole)) {
       // Staff/TEKNISI/DRIVER/GA/Department Head/Pengawas Produksi hanya bisa melihat data miliknya
-      baseWhere.requesterId = session.user.id;
+      baseWhere.requesterId = authUser.id;
     } else if (canViewAllRoles.includes(userRole)) {
       // HR/Manager/Super Admin bisa lihat SPL mereka sendiri ATAU semua SPL
       // Jika ada userId parameter, filter by userId
@@ -90,7 +96,7 @@ export async function GET(req: NextRequest) {
       // Jika tidak ada userId, tidak ada filter (lihat semua)
     } else {
       // Fallback: batasi ke data milik sendiri
-      baseWhere.requesterId = session.user.id;
+      baseWhere.requesterId = authUser.id;
     }
 
     const where: any = { ...baseWhere };
@@ -394,9 +400,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const authUser = await getAuthenticatedUser(req);
 
-    if (!session || !["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"].includes(session.user.role as Role)) {
+    if (!authUser || !["STAFF", "TEKNISI", "DRIVER", "GA", "DEPARTMENT_HEAD", "PRODUCTION_SUPERVISOR", "HR"].includes(authUser.role as Role)) {
       return NextResponse.json(
         { error: "Hanya STAFF, TEKNISI, DRIVER, GA, DEPARTMENT_HEAD, PRODUCTION_SUPERVISOR, atau HR yang bisa mengajukan SPL" },
         { status: 403 }
@@ -405,9 +411,35 @@ export async function POST(req: NextRequest) {
 
     const body: CreateSplInput = await req.json();
 
-    // Validasi input dasar
-    if (!body.date || !body.startTime || !body.endTime || !body.reason || !body.signature) {
-      return NextResponse.json({ error: "Semua field wajib diisi termasuk tanda tangan" }, { status: 400 });
+    // Tentukan mode input (Auto/Manual) berdasarkan feature flag
+    const flags = await getOvertimeFlagsWithSettings(prisma)
+    const isAutoMode = body.mode === "AUTO"
+
+    if (isAutoMode && !flags.auto) {
+      return NextResponse.json(
+        { error: "Mode lembur otomatis belum diaktifkan. Gunakan input manual." },
+        { status: 400 }
+      )
+    }
+    if (!isAutoMode && !flags.manual) {
+      return NextResponse.json(
+        { error: "Mode input manual sedang dinonaktifkan." },
+        { status: 400 }
+      )
+    }
+
+    // Validasi input dasar (jam mulai/selesai hanya wajib di mode manual)
+    if (!body.date || !body.reason || !body.signature) {
+      return NextResponse.json(
+        { error: "Tanggal, alasan, dan tanda tangan wajib diisi" },
+        { status: 400 }
+      );
+    }
+    if (!isAutoMode && (!body.startTime || !body.endTime)) {
+      return NextResponse.json(
+        { error: "Jam mulai dan jam selesai lembur wajib diisi" },
+        { status: 400 }
+      );
     }
 
     if (typeof body.signature !== "string" || body.signature.trim().length < 30) {
@@ -423,7 +455,7 @@ export async function POST(req: NextRequest) {
     const isPastDateSubmission = requestedDate < today
 
     const userRecord = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: authUser.id },
       select: {
         id: true,
         role: true,
@@ -445,21 +477,16 @@ export async function POST(req: NextRequest) {
 
     const departmentKey = (currentDepartmentName || "").toLowerCase()
     const isSecurityDepartment = departmentKey === "security"
-    const isGaSupervisedDepartment = ["security", "teknik", "driver"].includes(
-      departmentKey
-    )
 
-    if (isGaSupervisedDepartment) {
-      if (
-        !body.proofImage ||
-        typeof body.proofImage !== "string" ||
-        body.proofImage.trim().length < 30
-      ) {
-        return NextResponse.json(
-          { error: "Foto bukti wajib diunggah untuk departemen ini" },
-          { status: 400 }
-        )
-      }
+    if (
+      !body.proofImage ||
+      typeof body.proofImage !== "string" ||
+      body.proofImage.trim().length < 30
+    ) {
+      return NextResponse.json(
+        { error: "Foto bukti wajib diunggah untuk semua departemen" },
+        { status: 400 }
+      )
     }
 
     let isLateCutoffSubmission = false
@@ -481,20 +508,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const startMinutes = parseTimeToMinutes(body.startTime)
-    const endMinutes = parseTimeToMinutes(body.endTime)
+    if (!isAutoMode) {
+      const startMinutes = parseTimeToMinutes(body.startTime as string)
+      const endMinutes = parseTimeToMinutes(body.endTime as string)
 
-    if (startMinutes === null || endMinutes === null) {
-      return NextResponse.json(
-        { error: "Format jam lembur tidak valid (HH:MM)" },
-        { status: 400 }
-      )
-    }
-    if (startMinutes === endMinutes) {
-      return NextResponse.json(
-        { error: "Jam lembur akhir harus > jam lembur mulai" },
-        { status: 400 }
-      )
+      if (startMinutes === null || endMinutes === null) {
+        return NextResponse.json(
+          { error: "Format jam lembur tidak valid (HH:MM)" },
+          { status: 400 }
+        )
+      }
+      if (startMinutes === endMinutes) {
+        return NextResponse.json(
+          { error: "Jam lembur akhir harus > jam lembur mulai" },
+          { status: 400 }
+        )
+      }
     }
 
     let regularStartAt: Date | null = null
@@ -636,15 +665,72 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plannedWindow = makeWindow(requestedDate, body.startTime, body.endTime)
-    if (!plannedWindow) {
-      return NextResponse.json(
-        { error: "Waktu lembur tidak valid" },
-        { status: 400 }
+    // Tentukan window rencana (planned) + jam mulai/selesai efektif.
+    // Mode Auto: jam mulai = jam pulang reguler; jam selesai = estimasi atau default +N jam.
+    // Mode Manual: dari jam yang diisi user (perilaku lama).
+    let plannedStartAt: Date
+    let plannedEndAt: Date
+    let splStartTime: string
+    let splEndTime: string
+    let plannedEstimatedEndAt: Date | null = null
+
+    if (isAutoMode) {
+      if (!hasRegularWindow || !regularEndAt) {
+        return NextResponse.json(
+          { error: "Mode otomatis membutuhkan jam reguler. Gunakan input manual." },
+          { status: 400 }
+        )
+      }
+      plannedStartAt = regularEndAt
+      const estimateRaw =
+        typeof body.estimatedEndTime === "string"
+          ? body.estimatedEndTime.trim()
+          : ""
+      if (estimateRaw) {
+        const estMinutes = parseTimeToMinutes(estimateRaw)
+        if (estMinutes === null) {
+          return NextResponse.json(
+            { error: "Format estimasi selesai tidak valid (HH:MM)" },
+            { status: 400 }
+          )
+        }
+        let estEnd = setTimeOnDate(startOfDay(plannedStartAt), estimateRaw)
+        if (!estEnd) {
+          return NextResponse.json(
+            { error: "Estimasi selesai tidak valid" },
+            { status: 400 }
+          )
+        }
+        if (estEnd <= plannedStartAt) {
+          estEnd = addDays(estEnd, 1)
+        }
+        plannedEndAt = estEnd
+        plannedEstimatedEndAt = estEnd
+      } else {
+        plannedEndAt = new Date(
+          plannedStartAt.getTime() + AUTO_DEFAULT_OVERTIME_MINUTES * 60000
+        )
+      }
+      splStartTime = formatJakartaHHMM(plannedStartAt)
+      splEndTime = formatJakartaHHMM(plannedEndAt)
+    } else {
+      const plannedWindow = makeWindow(
+        requestedDate,
+        body.startTime as string,
+        body.endTime as string
       )
+      if (!plannedWindow) {
+        return NextResponse.json(
+          { error: "Waktu lembur tidak valid" },
+          { status: 400 }
+        )
+      }
+      plannedStartAt = plannedWindow.start
+      plannedEndAt = plannedWindow.end
+      splStartTime = body.startTime as string
+      splEndTime = body.endTime as string
     }
 
-    const { start: plannedStartAt, end: plannedEndAt } = plannedWindow
     if (plannedEndAt <= plannedStartAt) {
       return NextResponse.json(
         { error: "Jam lembur akhir harus > jam lembur mulai" },
@@ -674,7 +760,7 @@ export async function POST(req: NextRequest) {
 
     const overlap = await prisma.spl.findFirst({
       where: {
-        requesterId: session.user.id,
+        requesterId: authUser.id,
         actualEndAt: null,
         status: {
           notIn: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
@@ -753,10 +839,10 @@ export async function POST(req: NextRequest) {
 
     const spl = await prisma.spl.create({
       data: {
-        requesterId: session.user.id,
+        requesterId: authUser.id,
         date: requestedDate,
-        startTime: body.startTime,
-        endTime: body.endTime,
+        startTime: splStartTime,
+        endTime: splEndTime,
         totalHours,
         reason: body.reason,
         signature: body.signature.trim(),
@@ -766,6 +852,8 @@ export async function POST(req: NextRequest) {
         regularEndAt,
         plannedStartAt,
         plannedEndAt,
+        plannedEstimatedEndAt,
+        inputMode: isAutoMode ? "AUTO" : "MANUAL",
         status: initialStatus,
         supervisorId,
         source: "SYSTEM",
@@ -775,6 +863,16 @@ export async function POST(req: NextRequest) {
           select: { id: true, name: true, email: true },
         },
       },
+    });
+
+    await recordSplAudit({
+      splId: spl.id,
+      action: "CREATE",
+      actorId: authUser.id,
+      oldStatus: null,
+      newStatus: initialStatus,
+      source: "SYSTEM",
+      note: isAutoMode ? "Mode AUTO (realisasi via fingerprint)" : "Mode MANUAL",
     });
 
     // --- Logika Mengirim Notifikasi (Multi-level approval) ---
@@ -795,8 +893,8 @@ export async function POST(req: NextRequest) {
           : "Pengajuan SPL Baru";
       const notificationBody =
         initialStatus === "PENDING_SUPERADMIN"
-          ? `${session.user.name} mengajukan SPL telat untuk ${formattedDate} (${body.startTime} - ${body.endTime}) dan menunggu review Super Admin.`
-          : `${session.user.name} mengajukan lembur pada ${formattedDate} (${body.startTime} - ${body.endTime}).`;
+          ? `${authUser.name} mengajukan SPL telat untuk ${formattedDate} (${splStartTime} - ${splEndTime}) dan menunggu review Super Admin.`
+          : `${authUser.name} mengajukan lembur pada ${formattedDate} (${splStartTime} - ${splEndTime}).`;
       if (initialStatus === "PENDING_SUPERADMIN") {
         await sendNotificationToRoles(
           ["SUPER_ADMIN"],

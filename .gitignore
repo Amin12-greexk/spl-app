@@ -52,3 +52,10 @@ next-env.d.ts
 *.jpeg
 /backups/
 /public/uploads/
+
+# local test env
+.env*.local
+
+# test artifacts
+scripts/_mock_scans.json
+scripts/_test_results.json

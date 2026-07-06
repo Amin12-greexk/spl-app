@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { startOfDay, makeWindow } from "@/lib/spl-time"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 // Batas maksimal hari tanpa input realisasi sebelum auto-fill
 const MAX_DAYS_WITHOUT_REALIZATION = 3
@@ -104,6 +105,15 @@ export async function GET(req: NextRequest) {
                         plannedStartAt: spl.plannedStartAt ?? actualStartAt,
                         plannedEndAt: spl.plannedEndAt ?? actualEndAt,
                     },
+                })
+                await recordSplAudit({
+                    splId: spl.id,
+                    action: "REALIZATION_AUTOFILL",
+                    actorId: null,
+                    oldStatus: "PENDING_MANAGER",
+                    newStatus: "PENDING_MANAGER",
+                    source: "SYSTEM_CRON",
+                    note: `Auto-fill realisasi dari rencana (>${MAX_DAYS_WITHOUT_REALIZATION} hari tanpa realisasi)`,
                 })
                 filled++
                 filledIds.push(spl.id)

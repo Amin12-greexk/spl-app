@@ -9,6 +9,10 @@ export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD" | "PROD
 
 export type DepartmentApprovalMode = "DIRECT" | "GA" | "DEPARTMENT_HEAD"
 export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
+/** How the overtime REQUEST was input. */
+export type SplInputMode = "AUTO" | "MANUAL"
+/** How REALIZATION was computed. */
+export type RealizationSource = "AUTO_FINGER" | "MANUAL"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
@@ -90,6 +94,12 @@ export interface Spl {
   isManualEntry?: boolean
   requesterSignedAt?: Date | null
 
+  // Dual-mode (Auto + Manual) overtime
+  inputMode?: SplInputMode | null
+  realizationSource?: RealizationSource | null
+  plannedEstimatedEndAt?: Date | string | null
+  fingerprintMatchedAt?: Date | string | null
+
   // Supervisor approval (Level 1)
   supervisorId?: string | null
   supervisor?: User | null
@@ -111,12 +121,18 @@ export interface Spl {
 
 export interface CreateSplInput {
   date: string
-  startTime: string
-  endTime: string
+  /** Required in MANUAL mode; ignored/derived in AUTO mode. */
+  startTime?: string
+  /** Required in MANUAL mode; ignored/derived in AUTO mode. */
+  endTime?: string
   reason: string
   signature: string
   projectName?: string
   proofImage?: string
+  /** "AUTO" = fingerprint-based realization (jam mulai/selesai diturunkan server). Defaults to "MANUAL". */
+  mode?: SplInputMode
+  /** AUTO mode only: optional estimated finish time "HH:MM". */
+  estimatedEndTime?: string
 }
 
 export interface UpdateSplStatusInput {

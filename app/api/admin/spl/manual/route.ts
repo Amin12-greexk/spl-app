@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping"
 import { sendNotificationToUser } from "@/lib/notification-utils"
+import { recordSplAudit } from "@/lib/spl-audit"
 import {
   getJakartaDayOfWeek,
   isSecurityOffShift,
@@ -519,6 +520,16 @@ async function createManualSplEntry(
         },
       },
     },
+  })
+
+  await recordSplAudit({
+    splId: spl.id,
+    action: "ADMIN_MANUAL_CREATE",
+    actorId: manualEntryBy,
+    oldStatus: null,
+    newStatus: splStatus,
+    source: "MANUAL",
+    note: "Telat input oleh Super Admin",
   })
 
   try {
