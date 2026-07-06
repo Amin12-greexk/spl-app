@@ -32,7 +32,7 @@ export function getOvertimeFlags(): OvertimeFlags {
   const autoEnv = process.env.ENABLE_AUTO_OVERTIME
   const manualEnv = process.env.ENABLE_MANUAL_OVERTIME
   return {
-    auto: explicitlySet(autoEnv) ? truthy(autoEnv) : false,
+    auto: explicitlySet(autoEnv) ? truthy(autoEnv) : true,
     manual: explicitlySet(manualEnv) ? truthy(manualEnv) : true,
   }
 }
