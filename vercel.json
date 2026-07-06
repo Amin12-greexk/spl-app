@@ -6,7 +6,7 @@
         },
         {
             "path": "/api/cron/fingerprint-finalize",
-            "schedule": "0 * * * *"
+            "schedule": "0 19 * * *"
         }
     ]
 }
