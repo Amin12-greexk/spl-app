@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const url = `${baseUrl}?pin=${encodeURIComponent(pin)}`
+    const rawUrl = `${baseUrl}?pin=${encodeURIComponent(pin)}`
+    const url = rawUrl.replace(/^http:\/\//i, 'https://')
     const controller = new AbortController()
     const timeout = setTimeout(
       () => controller.abort(),
