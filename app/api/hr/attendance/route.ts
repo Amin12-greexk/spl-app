@@ -66,7 +66,13 @@ export async function GET(req: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text()
       return NextResponse.json(
-        { error: "Gagal mengambil data absensi", detail: errorText },
+        { 
+          error: "Gagal mengambil data absensi", 
+          detail: errorText,
+          upstreamStatus: response.status,
+          upstreamStatusText: response.statusText,
+          requestUrl: url
+        },
         { status: 502 }
       )
     }
