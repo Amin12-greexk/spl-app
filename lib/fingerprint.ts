@@ -28,7 +28,9 @@ export async function fetchAttendanceScans(pin: string): Promise<AttendanceScan[
   const { baseUrl, token } = getApiConfig()
   if (!baseUrl || !token || !pin) return []
 
-  const url = `${baseUrl}?pin=${encodeURIComponent(pin)}`
+  const rawUrl = `${baseUrl}?pin=${encodeURIComponent(pin)}`
+  // Force HTTPS untuk menghindari hilangnya header Authorization saat redirect dari HTTP ke HTTPS
+  const url = rawUrl.replace(/^http:\/\//i, 'https://')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), ATTENDANCE_TIMEOUT_MS)
   try {
