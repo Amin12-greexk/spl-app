@@ -1,8 +1,6 @@
 import admin from "firebase-admin"
 
-// ======================================================
-// 🔐 VALIDATION: Ensure all required environment variables exist
-// ======================================================
+// Validate only when Firebase Admin is actually needed.
 const validateAdminConfig = () => {
   const requiredEnvVars = [
     "FIREBASE_ADMIN_PROJECT_ID",
@@ -13,22 +11,19 @@ const validateAdminConfig = () => {
   const missingVars = requiredEnvVars.filter((varName) => !process.env[varName])
 
   if (missingVars.length > 0) {
-    console.error("❌ Missing Firebase Admin environment variables:", missingVars)
+    console.error("Missing Firebase Admin environment variables:", missingVars)
     throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
   }
 
   return true
 }
 
-// ======================================================
-// 🚀 INITIALIZE FIREBASE ADMIN SDK (only once)
-// ======================================================
-if (!admin.apps.length) {
-  try {
+// Initialize Firebase Admin lazily so Docker builds do not need runtime secrets.
+const getFirebaseAdmin = () => {
+  if (!admin.apps.length) {
     validateAdminConfig()
 
     const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n")
-
     if (!privateKey) {
       throw new Error("FIREBASE_ADMIN_PRIVATE_KEY is not properly formatted")
     }
@@ -41,16 +36,12 @@ if (!admin.apps.length) {
       }),
     })
 
-    console.log("✅ Firebase Admin initialized successfully")
-  } catch (error) {
-    console.error("❌ Firebase Admin initialization failed:", error)
-    throw error
+    console.log("Firebase Admin initialized successfully")
   }
+
+  return admin
 }
 
-// ======================================================
-// 📩 TYPES
-// ======================================================
 export type SendResult =
   | { success: true; messageId: string; timestamp: string }
   | { error: string; token: string }
@@ -79,9 +70,6 @@ export const isLikelyFcmToken = (token?: string | null): boolean => {
   return /^[A-Za-z0-9:_-]+$/.test(normalized)
 }
 
-// ======================================================
-// 🗑️ CLEANUP INVALID TOKEN FROM DATABASE
-// ======================================================
 export const cleanupInvalidToken = async (token: string): Promise<void> => {
   try {
     const normalizedToken = normalizeToken(token)
@@ -96,16 +84,13 @@ export const cleanupInvalidToken = async (token: string): Promise<void> => {
     })
 
     if (deleted.count > 0) {
-      console.log(`🗑️ Cleaned up ${deleted.count} invalid token(s)`)
+      console.log(`Cleaned up ${deleted.count} invalid token(s)`)
     }
   } catch (error) {
-    console.error("❌ Error cleaning up invalid token:", error)
+    console.error("Error cleaning up invalid token:", error)
   }
 }
 
-// ======================================================
-// 📩 SEND A SINGLE NOTIFICATION
-// ======================================================
 export const sendNotification = async (
   token: string,
   title: string,
@@ -137,8 +122,6 @@ export const sendNotification = async (
           }, {} as Record<string, string>)),
       },
       token: normalizedToken,
-
-      // Android config
       android: {
         notification: {
           icon: "ic_notification",
@@ -150,8 +133,6 @@ export const sendNotification = async (
         },
         priority: "high" as const,
       },
-
-      // iOS config (APNs)
       apns: {
         payload: {
           aps: {
@@ -169,8 +150,6 @@ export const sendNotification = async (
           "apns-push-type": "alert",
         },
       },
-
-      // WebPush config
       webpush: {
         notification: {
           title: title.trim(),
@@ -187,11 +166,11 @@ export const sendNotification = async (
       },
     }
 
-    const response = await admin.messaging().send(message)
-    console.log("✅ Notification sent successfully:", response)
+    const response = await getFirebaseAdmin().messaging().send(message)
+    console.log("Notification sent successfully:", response)
 
     return {
-      success: true as const, // ✅ literal true to satisfy SendResult
+      success: true as const,
       messageId: response,
       timestamp: new Date().toISOString(),
     }
@@ -225,9 +204,6 @@ export const sendNotification = async (
   }
 }
 
-// ======================================================
-// 📢 SEND TO MULTIPLE TOKENS (parallel & type-safe)
-// ======================================================
 export const sendNotificationToMultiple = async (
   tokens: string[],
   title: string,
@@ -251,17 +227,13 @@ export const sendNotificationToMultiple = async (
     )
 
     if (malformedTokens.length > 0) {
-      console.warn(
-        `Skipping ${malformedTokens.length} malformed notification token(s)`
-      )
+      console.warn(`Skipping ${malformedTokens.length} malformed notification token(s)`)
       await Promise.allSettled(
         malformedTokens.map((token) => cleanupInvalidToken(token))
       )
     }
 
-    const validTokens = normalizedTokens.filter((token) =>
-      isLikelyFcmToken(token)
-    )
+    const validTokens = normalizedTokens.filter((token) => isLikelyFcmToken(token))
     if (validTokens.length === 0) {
       return {
         total: tokens.length,
@@ -271,7 +243,6 @@ export const sendNotificationToMultiple = async (
       }
     }
 
-    // Send notifications concurrently
     const promises: Promise<SendResult>[] = validTokens.map((token) =>
       sendNotification(token, title, body, data).catch((error) => ({
         error: error.message,
@@ -281,14 +252,13 @@ export const sendNotificationToMultiple = async (
 
     const results = await Promise.allSettled(promises)
 
-    // ✅ SAFE FILTER: Use `"error" in result.value` instead of direct access
     const successful = results.filter(
       (result) => result.status === "fulfilled" && !("error" in result.value)
     ).length
 
     const failed = results.length - successful
 
-    console.log(`📊 Notification results: ${successful} success, ${failed} failed`)
+    console.log(`Notification results: ${successful} success, ${failed} failed`)
 
     return {
       total: tokens.length,
@@ -297,20 +267,16 @@ export const sendNotificationToMultiple = async (
       results,
     }
   } catch (error) {
-    console.error("❌ Error sending multiple notifications:", error)
+    console.error("Error sending multiple notifications:", error)
     throw error
   }
 }
 
-// ======================================================
-// 🔍 VALIDATE TOKEN UTILITY
-// ======================================================
 export const validateToken = async (token: string): Promise<boolean> => {
   try {
     if (!isLikelyFcmToken(token)) return false
 
-    // Dry-run send to test token validity
-    await admin.messaging().send(
+    await getFirebaseAdmin().messaging().send(
       {
         token: normalizeToken(token),
         notification: {
@@ -318,7 +284,7 @@ export const validateToken = async (token: string): Promise<boolean> => {
           body: "Test",
         },
       },
-      true // dry run
+      true
     )
 
     return true
@@ -329,7 +295,7 @@ export const validateToken = async (token: string): Promise<boolean> => {
     ) {
       return false
     }
-    // Other errors (network, etc.) → assume still valid
+
     return true
   }
 }
