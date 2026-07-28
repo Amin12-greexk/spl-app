@@ -5,6 +5,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs']
   },
+  output: 'standalone',
 
   images: {
     formats: ['image/avif', 'image/webp'],
