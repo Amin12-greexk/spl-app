@@ -145,14 +145,19 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      for (const staff of itStaff) {
-        await prisma.user.update({
+      const updatePromises = itStaff.map((staff) =>
+        prisma.user.update({
           where: { id: staff.id },
           data: {
             supervisorId: itHead.id,
             position: staff.position || "IT Staff",
           },
         })
+      )
+      
+      await prisma.$transaction(updatePromises)
+
+      for (const staff of itStaff) {
         results.updated.push({
           type: "IT Staff",
           email: staff.email,
@@ -245,6 +250,9 @@ export async function GET(req: NextRequest) {
             role: true,
           },
         },
+        _count: {
+          select: { subordinates: true }
+        }
       },
       orderBy: {
         role: "asc",
@@ -275,7 +283,7 @@ export async function GET(req: NextRequest) {
       summary: {
         totalSupervisors: supervisors.length,
         totalStaffWithSupervisor: supervisors.reduce(
-          (sum, sup) => sum + sup.subordinates.length,
+          (sum, sup) => sum + sup._count.subordinates,
           0
         ),
         totalStaffWithoutSupervisor: staffWithoutSupervisor.length,

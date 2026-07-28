@@ -73,39 +73,32 @@ export async function GET() {
         ]
 
         // ── 3. Top 5 Departemen ──────────────────────────────────────────────────
-        const deptSplRaw = await prisma.spl.findMany({
-            select: {
-                requester: {
-                    select: {
-                        department: { select: { name: true } },
-                        departmentName: true,
-                    },
-                },
-            },
-        })
+        const deptSplRaw = await prisma.$queryRaw<Array<{ name: string; count: bigint }>>`
+            SELECT 
+                COALESCE(d.name, u.department, 'Tidak Diketahui') as name, 
+                COUNT(s.id) as count
+            FROM spls s
+            JOIN users u ON s."requesterId" = u.id
+            LEFT JOIN departments d ON u."departmentId" = d.id
+            GROUP BY COALESCE(d.name, u.department, 'Tidak Diketahui')
+            ORDER BY count DESC
+            LIMIT 5
+        `
 
-        const deptMap = new Map<string, number>()
-        for (const row of deptSplRaw) {
-            const dept =
-                row.requester?.department?.name ||
-                row.requester?.departmentName ||
-                "Tidak Diketahui"
-            deptMap.set(dept, (deptMap.get(dept) || 0) + 1)
-        }
-
-        const topDepartments = Array.from(deptMap.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([name, count]) => ({ name, count }))
+        const topDepartments = deptSplRaw.map((row) => ({ 
+            name: row.name, 
+            count: Number(row.count) 
+        }))
 
         // ── 4. Jam Lembur per Hari (7 hari terakhir) ─────────────────────────────
         const sevenDaysAgo = new Date(now)
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
         sevenDaysAgo.setHours(0, 0, 0, 0)
 
-        const dailySplRaw = await prisma.spl.findMany({
+        const dailySplRaw = await prisma.spl.groupBy({
+            by: ["date"],
             where: { date: { gte: sevenDaysAgo } },
-            select: { date: true, totalHours: true },
+            _sum: { totalHours: true },
         })
 
         const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"]
@@ -124,7 +117,7 @@ export async function GET() {
             const key = new Date(row.date).toISOString().slice(0, 10)
             if (dailyMap.has(key)) {
                 const entry = dailyMap.get(key)!
-                entry.hours = parseFloat((entry.hours + row.totalHours).toFixed(1))
+                entry.hours = parseFloat((entry.hours + (row._sum.totalHours || 0)).toFixed(1))
             }
         }
 
@@ -135,10 +128,10 @@ export async function GET() {
 
         // ── 5. Summary Cards ─────────────────────────────────────────────────────
         const totalSpl = await prisma.spl.count()
-        const totalEmployees = await prisma.spl.findMany({
-            select: { requesterId: true },
-            distinct: ["requesterId"],
-        })
+        const totalEmployeesResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT COUNT(DISTINCT "requesterId") as count FROM spls
+        `
+        const totalEmployeesCount = Number(totalEmployeesResult[0].count)
         const avgHoursRaw = await prisma.spl.aggregate({
             _avg: { totalHours: true },
         })
@@ -150,7 +143,7 @@ export async function GET() {
             dailyOvertime,
             summary: {
                 totalSpl,
-                totalEmployees: totalEmployees.length,
+                totalEmployees: totalEmployeesCount,
                 avgHours: parseFloat((avgHoursRaw._avg.totalHours || 0).toFixed(1)),
                 pendingSpl: pendingGaCount + pendingManagerCount,
             },

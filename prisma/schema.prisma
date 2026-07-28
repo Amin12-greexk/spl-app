@@ -106,6 +106,8 @@ model Spl {
   @@index([status, createdAt])
   @@index([supervisorId, createdAt])
   @@index([isManualEntry, requesterSignedAt], map: "spls_manual_unsigned_idx")
+  @@index([date])
+  @@index([source])
   @@map("spls")
 }
 

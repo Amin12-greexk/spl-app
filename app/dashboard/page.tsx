@@ -6,13 +6,21 @@ import { useRouter } from "next/navigation"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
 import { Spl, Role } from "@/types"
-import Swal from "sweetalert2"
 import Link from "next/link"
 import TimePicker from "@/components/ui/TimePicker"
 import Modal from "@/components/ui/Modal"
 import Image from "next/image"
 import { isMorningOvertime } from "@/lib/spl-labels"
-import ManagerAnalytics from "@/components/dashboard/ManagerAnalytics"
+import dynamic from "next/dynamic"
+
+const ManagerAnalytics = dynamic(() => import("@/components/dashboard/ManagerAnalytics"), { ssr: false })
+
+const Swal = {
+  fire: async (options: any) => {
+    const sweetalert2 = (await import('sweetalert2')).default
+    return sweetalert2.fire(options)
+  }
+}
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
