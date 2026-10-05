@@ -9,11 +9,16 @@ export type Role = "STAFF" | "HR" | "MANAGER" | "GA" | "DEPARTMENT_HEAD" | "PROD
 
 export type DepartmentApprovalMode = "DIRECT" | "GA" | "DEPARTMENT_HEAD"
 export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
+/** How the overtime REQUEST was input. */
+export type SplInputMode = "AUTO" | "MANUAL"
+/** How REALIZATION was computed. */
+export type RealizationSource = "AUTO_FINGER" | "MANUAL"
 
 /**
  * Mendefinisikan status (SplStatus) pengajuan lembur yang valid.
+ * - PENDING_SUPERADMIN: Pengajuan telat, menunggu review Super Admin
  * - PENDING_SUPERVISOR: Menunggu persetujuan supervisor/GA/Kepala Dept
- * - PENDING_MANAGER: Sudah disetujui supervisor, menunggu persetujuan manager
+ * - PENDING_MANAGER: Sudah disetujui supervisor/super admin, menunggu persetujuan manager
  * - APPROVED: Disetujui oleh manager (final)
  * - REJECTED_BY_SUPERVISOR: Ditolak oleh supervisor
  * - REJECTED_BY_MANAGER: Ditolak oleh manager
@@ -21,6 +26,7 @@ export type SplSource = "SYSTEM" | "MANUAL" | "LEGACY"
  * - REJECTED: Legacy status untuk backward compatibility
  */
 export type SplStatus =
+  | "PENDING_SUPERADMIN"
   | "PENDING_SUPERVISOR"
   | "PENDING_MANAGER"
   | "APPROVED"
@@ -45,6 +51,7 @@ export interface User {
   position?: string | null
   regularStartTime?: string | null
   regularEndTime?: string | null
+  image?: string | null
   supervisorId?: string | null
   supervisor?: User | null
   subordinates?: User[]
@@ -87,6 +94,12 @@ export interface Spl {
   isManualEntry?: boolean
   requesterSignedAt?: Date | null
 
+  // Dual-mode (Auto + Manual) overtime
+  inputMode?: SplInputMode | null
+  realizationSource?: RealizationSource | null
+  plannedEstimatedEndAt?: Date | string | null
+  fingerprintMatchedAt?: Date | string | null
+
   // Supervisor approval (Level 1)
   supervisorId?: string | null
   supervisor?: User | null
@@ -108,12 +121,18 @@ export interface Spl {
 
 export interface CreateSplInput {
   date: string
-  startTime: string
-  endTime: string
+  /** Required in MANUAL mode; ignored/derived in AUTO mode. */
+  startTime?: string
+  /** Required in MANUAL mode; ignored/derived in AUTO mode. */
+  endTime?: string
   reason: string
   signature: string
   projectName?: string
   proofImage?: string
+  /** "AUTO" = fingerprint-based realization (jam mulai/selesai diturunkan server). Defaults to "MANUAL". */
+  mode?: SplInputMode
+  /** AUTO mode only: optional estimated finish time "HH:MM". */
+  estimatedEndTime?: string
 }
 
 export interface UpdateSplStatusInput {
@@ -139,6 +158,8 @@ declare module "next-auth" {
     supervisorId?: string | null
     regularStartTime?: string | null
     regularEndTime?: string | null
+    isSupervisor?: boolean
+    image?: string | null
   }
 
   interface Session {
@@ -152,6 +173,8 @@ declare module "next-auth" {
       supervisorId?: string | null
       regularStartTime?: string | null
       regularEndTime?: string | null
+      isSupervisor?: boolean
+      image?: string | null
     }
   }
 }
@@ -167,6 +190,9 @@ declare module "next-auth/jwt" {
     supervisorId?: string | null
     regularStartTime?: string | null
     regularEndTime?: string | null
+    isSupervisor?: boolean
+    isSupervisorCheckedAt?: number
+    image?: string | null
   }
 }
 

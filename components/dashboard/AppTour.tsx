@@ -221,7 +221,7 @@ const MANAGER_DASHBOARD_STEPS: Step[] = [
 
 const PENGAJUAN_STEPS: Step[] = [
     { target: "body", content: "Ini adalah halaman Pengajuan SPL. Isi semua kolom yang diperlukan untuk mengajukan lembur.", title: "📝 Form Pengajuan SPL", placement: "center", disableBeacon: true },
-    { target: "#spl-tanggal", content: "Pilih tanggal lembur yang akan dilaksanakan. Tanggal tidak boleh sebelum hari ini.", title: "📅 Tanggal Lembur", placement: "bottom", disableBeacon: true },
+    { target: "#spl-tanggal", content: "Pilih tanggal lembur yang akan dilaksanakan. Jika tanggal sudah lewat, pengajuan akan masuk review Super Admin terlebih dahulu.", title: "📅 Tanggal Lembur", placement: "bottom", disableBeacon: true },
     { target: "#spl-waktu", content: "Isi jam mulai dan jam selesai lembur. Klik kolom waktu untuk membuka picker jam.", title: "🕐 Waktu Lembur", placement: "top", disableBeacon: true },
     { target: "#spl-alasan", content: "Jelaskan alasan lembur secara detail agar mudah dipertimbangkan oleh atasan.", title: "📋 Alasan Lembur", placement: "top", disableBeacon: true },
     { target: "#spl-foto", content: "Lampirkan foto bukti lembur jika diperlukan. Klik section untuk membuka upload.", title: "📸 Foto Bukti", placement: "top", disableBeacon: true },

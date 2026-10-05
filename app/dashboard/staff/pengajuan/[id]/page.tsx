@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
 import Button from "@/components/ui/Button"
@@ -94,6 +94,11 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
         bg: "bg-yellow-100",
         text: "text-yellow-800",
         label: "Menunggu Persetujuan",
+      },
+      PENDING_SUPERADMIN: {
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        label: "Review Super Admin",
       },
       PENDING_SUPERVISOR: {
         bg: "bg-orange-100",
@@ -250,7 +255,12 @@ export default function SplDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {(spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") && (
+        {(
+          spl.status === "PENDING" ||
+          spl.status === "PENDING_SUPERADMIN" ||
+          spl.status === "PENDING_SUPERVISOR" ||
+          spl.status === "PENDING_MANAGER"
+        ) && (
           <div className="pt-4 border-t">
             <Button variant="danger" onClick={handleDelete} className="w-full">
               Hapus Pengajuan

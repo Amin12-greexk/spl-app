@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessTeamApprovals } from "@/lib/supervisor-access"
 
 export async function GET(
   _req: NextRequest,
@@ -14,7 +15,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (!["GA", "DEPARTMENT_HEAD", "MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
+    const canViewTeam =
+      session.user.role === "MANAGER" ||
+      (await canAccessTeamApprovals({
+        id: session.user.id,
+        role: session.user.role,
+      }))
+    if (!canViewTeam) {
       return NextResponse.json(
         { error: "Akses ditolak untuk melihat detail SPL tim" },
         { status: 403 }
@@ -48,7 +55,7 @@ export async function GET(
           id: params.id,
           OR: [
             { supervisorId: session.user.id },
-            { supervisorId: null, requester: { supervisorId: session.user.id } },
+            { requester: { supervisorId: session.user.id } },
           ],
           AND: [...andFilters],
         }

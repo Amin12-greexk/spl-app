@@ -129,7 +129,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         const recentUpdates = data
           .filter((spl: any) => {
             // Filter harus sama dengan logic di NotificationProvider
-            const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+            const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
             const isRecent = new Date(spl.approvalDate || spl.supervisorApprovalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             const requesterId = spl.requesterId || spl.requester?.id
             const isOwn = requesterId === sessionUserId
@@ -195,7 +195,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
         allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setNotifications(allNotifications.slice(0, 10))
-      } else if (sessionUserRole === "GA" || sessionUserRole === "DEPARTMENT_HEAD") {
+      } else if (
+        sessionUserRole === "GA" ||
+        sessionUserRole === "DEPARTMENT_HEAD" ||
+        sessionUserRole === "SUPER_ADMIN"
+      ) {
         // GA/DEPT_HEAD punya 2 jenis notifikasi:
         // 1. Update SPL mereka sendiri
         // 2. Pending approval dari team mereka
@@ -207,7 +211,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
-              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               const requesterId = spl.requesterId || spl.requester?.id
               const isOwn = requesterId === sessionUserId
@@ -242,9 +246,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
 
         // 2. Fetch team SPL pending approval
+        const pendingStatus =
+          sessionUserRole === "SUPER_ADMIN"
+            ? "PENDING_SUPERADMIN,PENDING_SUPERVISOR"
+            : "PENDING_SUPERVISOR"
         const teamData = normalizeSpls(
           await fetchJson(
-            "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=50"
+            `/api/spl/my-team?status=${pendingStatus}&lite=1&skipCount=1&page=1&limit=50`
           )
         )
         if (teamData) {
@@ -267,7 +275,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
               return {
                 id: spl.id,
-                title: "SPL Perlu Persetujuan",
+                title: sessionUserRole === "SUPER_ADMIN" ? "SPL Telat Perlu Review" : "SPL Perlu Persetujuan",
                 message: `${spl.requester?.name || "Staff"} mengajukan SPL ${formatDate(spl.date)}`,
                 status: spl.status,
                 createdAt: spl.createdAt,
@@ -304,7 +312,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         if (ownData) {
           const ownUpdates = ownData
             .filter((spl: any) => {
-              const isNotPending = !["PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
+              const isNotPending = !["PENDING_SUPERADMIN", "PENDING_SUPERVISOR", "PENDING_MANAGER"].includes(spl.status)
               const isRecent = new Date(spl.approvalDate || spl.updatedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               const requesterId = spl.requesterId || spl.requester?.id
               const isOwn = requesterId === sessionUserId
@@ -668,8 +676,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       : "bg-white border-gray-200 hover:border-green-200 hover:shadow-sm"
                     }`}
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white">
-                    {session?.user?.name ? getInitials(session.user.name) : "U"}
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-md border-2 border-white overflow-hidden relative">
+                    {session?.user?.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt="Profile"
+                        width={128}
+                        height={128}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      session?.user?.name ? getInitials(session.user.name) : "U"
+                    )}
                   </div>
 
                   <div className="hidden sm:flex flex-col items-start mr-1">
@@ -699,8 +717,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       {/* User Info Header */}
                       <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg">
-                            {session?.user?.name ? getInitials(session.user.name) : "U"}
+                          <div className="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg overflow-hidden relative">
+                            {session?.user?.image ? (
+                              <Image
+                                src={session.user.image}
+                                alt="Profile"
+                                width={128}
+                                height={128}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              session?.user?.name ? getInitials(session.user.name) : "U"
+                            )}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-gray-900 line-clamp-1">{session?.user?.name}</p>

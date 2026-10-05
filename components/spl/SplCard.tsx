@@ -106,9 +106,18 @@ function SplCard({
       supervisorLabel = "GA"
     } else if (supervisorRole === "DEPARTMENT_HEAD") {
       supervisorLabel = "Kepala Dept"
+    } else if (supervisorRole === "SUPER_ADMIN") {
+      supervisorLabel = "Super Admin"
     }
 
     switch (spl.status) {
+      case "PENDING_SUPERADMIN":
+        return {
+          icon: "⏳",
+          label: "Menunggu Super Admin",
+          shortLabel: "Super Admin",
+          description: "Pengajuan telat sedang direview Super Admin",
+        }
       case "PENDING_SUPERVISOR":
         return {
           icon: "⏳",
@@ -178,6 +187,12 @@ function SplCard({
         text: "text-yellow-700",
         border: "border-yellow-200",
         ring: "ring-yellow-100",
+      },
+      PENDING_SUPERADMIN: {
+        bg: "bg-amber-50",
+        text: "text-amber-700",
+        border: "border-amber-200",
+        ring: "ring-amber-100",
       },
       PENDING_SUPERVISOR: {
         bg: "bg-orange-50",
@@ -280,18 +295,49 @@ function SplCard({
       Lembur Pagi
     </span>
   ) : null
+  const autoBadge =
+    spl.realizationSource === "AUTO_FINGER" ? (
+      <span
+        className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-teal-50 text-teal-700 border-teal-200 cursor-help"
+        title="Realisasi terisi otomatis dari data fingerprint"
+      >
+        🔘 Realisasi Fingerprint
+      </span>
+    ) : spl.inputMode === "AUTO" ? (
+      <span
+        className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-teal-50 text-teal-700 border-teal-200 cursor-help"
+        title="Diajukan dengan mode otomatis; realisasi menunggu data fingerprint"
+      >
+        Otomatis
+      </span>
+    ) : null
 
   // Get approval flow for this SPL
   const getApprovalFlow = () => {
     const hasSubordinate = Boolean(requesterDepartmentName && requesterDepartmentName !== "-")
-    const supervisorRole = spl.supervisor?.role || "DEPARTMENT_HEAD"
-    const supervisorLabel = supervisorRole === "GA" ? "GA" : "Kepala Dept"
+    const supervisorRole =
+      spl.supervisor?.role ||
+      (spl.status === "PENDING_SUPERADMIN" ? "SUPER_ADMIN" : "DEPARTMENT_HEAD")
+    const supervisorLabel =
+      supervisorRole === "GA"
+        ? "GA"
+        : supervisorRole === "SUPER_ADMIN"
+        ? "Super Admin"
+        : "Kepala Dept"
 
     // For staff with supervisor
-    if (spl.status === "PENDING_SUPERVISOR" || spl.supervisorApprovalDate) {
+    if (
+      spl.status === "PENDING_SUPERVISOR" ||
+      spl.status === "PENDING_SUPERADMIN" ||
+      spl.supervisorApprovalDate
+    ) {
       return [
         { label: "Staff", done: true, current: false },
-        { label: supervisorLabel, done: !!spl.supervisorApprovalDate, current: spl.status === "PENDING_SUPERVISOR" },
+        {
+          label: supervisorLabel,
+          done: !!spl.supervisorApprovalDate,
+          current: spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_SUPERADMIN",
+        },
         {
           label: "Manager",
           done: spl.status === "APPROVED",
@@ -332,6 +378,7 @@ function SplCard({
             {legacyBadge}
             {expiredBadge}
             {morningBadge}
+            {autoBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -379,7 +426,12 @@ function SplCard({
         <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
           {/* Delete button for staff when SPL is pending */}
           {userRole === "STAFF" &&
-            (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
+            (
+              spl.status === "PENDING" ||
+              spl.status === "PENDING_SUPERADMIN" ||
+              spl.status === "PENDING_SUPERVISOR" ||
+              spl.status === "PENDING_MANAGER"
+            ) &&
             onDelete && (
               <button
                 onClick={(e) => {
@@ -417,6 +469,7 @@ function SplCard({
             {legacyBadge}
             {expiredBadge}
             {morningBadge}
+            {autoBadge}
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
@@ -518,7 +571,7 @@ function SplCard({
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                ✓ Disetujui {spl.supervisor?.role === "GA" ? "GA" : "Kepala Dept"}
+                ✓ Disetujui {spl.supervisor?.role === "GA" ? "GA" : spl.supervisor?.role === "SUPER_ADMIN" ? "Super Admin" : "Kepala Dept"}
               </p>
             </div>
           )}
@@ -572,8 +625,12 @@ function SplCard({
                 </>
               )}
 
-            {(userRole === "GA" || userRole === "DEPARTMENT_HEAD") &&
-              spl.status === "PENDING_SUPERVISOR" && (
+            {(userRole === "GA" ||
+              userRole === "DEPARTMENT_HEAD" ||
+              userRole === "SUPER_ADMIN") &&
+              ((spl.status === "PENDING_SUPERVISOR" &&
+                (userRole === "GA" || userRole === "DEPARTMENT_HEAD")) ||
+                (spl.status === "PENDING_SUPERADMIN" && userRole === "SUPER_ADMIN")) && (
                 <>
                   {onApprove && (
                     <button
@@ -595,7 +652,12 @@ function SplCard({
               )}
 
             {userRole === "STAFF" &&
-              (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
+              (
+                spl.status === "PENDING" ||
+                spl.status === "PENDING_SUPERADMIN" ||
+                spl.status === "PENDING_SUPERVISOR" ||
+                spl.status === "PENDING_MANAGER"
+              ) &&
               onDelete && (
                 <button
                   onClick={() => onDelete(spl.id)}
@@ -627,6 +689,7 @@ function SplCard({
           {legacyBadge}
           {expiredBadge}
           {morningBadge}
+          {autoBadge}
           {getStatusBadge(spl.status, false)}
         </div>
       </div>
@@ -805,7 +868,7 @@ function SplCard({
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Disetujui Supervisor:
+              {spl.supervisor?.role === "SUPER_ADMIN" ? "Direview Super Admin:" : "Disetujui Supervisor:"}
             </p>
             <p className="text-xs text-green-600">
               {spl.supervisor?.name || "Supervisor"} · {format(new Date(spl.supervisorApprovalDate), "dd MMM yyyy HH:mm", { locale: id })}
@@ -863,7 +926,12 @@ function SplCard({
           )}
 
           {userRole === "STAFF" &&
-            (spl.status === "PENDING" || spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_MANAGER") &&
+            (
+              spl.status === "PENDING" ||
+              spl.status === "PENDING_SUPERADMIN" ||
+              spl.status === "PENDING_SUPERVISOR" ||
+              spl.status === "PENDING_MANAGER"
+            ) &&
             onDelete && (
               <button
                 onClick={() => onDelete(spl.id)}
@@ -901,4 +969,5 @@ function SplCard({
 }
 
 export default memo(SplCard)
+
 

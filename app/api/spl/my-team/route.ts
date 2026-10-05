@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessTeamApprovals } from "@/lib/supervisor-access"
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,10 +12,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Only GA, DEPARTMENT_HEAD, MANAGER, or SUPER_ADMIN can view team SPLs
-    if (!["GA", "DEPARTMENT_HEAD", "MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
+    // GA, Kadep, Manager, Super Admin, atau siapa pun yang ditunjuk sebagai atasan
+    // (punya bawahan / SPL yang di-assign) dapat melihat SPL tim.
+    const canViewTeam =
+      session.user.role === "MANAGER" ||
+      (await canAccessTeamApprovals({
+        id: session.user.id,
+        role: session.user.role,
+      }))
+    if (!canViewTeam) {
       return NextResponse.json(
-        { error: "Hanya GA, Kepala Departemen, Manager, atau Super Admin yang dapat melihat SPL tim" },
+        { error: "Anda tidak memiliki bawahan atau SPL yang perlu disetujui" },
         { status: 403 }
       )
     }
@@ -63,16 +71,24 @@ export async function GET(req: NextRequest) {
       : {
           OR: [
             { supervisorId: session.user.id },
-            { supervisorId: null, requester: { supervisorId: session.user.id } },
+            { requester: { supervisorId: session.user.id } },
           ],
           AND: [...andFilters],
         }
 
     if (statusParam) {
-      const statusList = statusParam
+      const requestedStatuses = statusParam
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean)
+      const statusList = isSuperAdmin
+        ? requestedStatuses
+        : requestedStatuses.filter((status) => status !== "PENDING_SUPERADMIN")
+
+      if (requestedStatuses.length > 0 && statusList.length === 0) {
+        where.id = "__forbidden_pending_superadmin__"
+      }
+
       if (statusList.length === 1) {
         where.status = statusList[0]
       } else if (statusList.length > 1) {

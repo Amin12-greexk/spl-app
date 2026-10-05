@@ -35,9 +35,27 @@ ADMIN-CREDENTIALS.md
 *.md
 *.pdf
 
+# database backups
+/backups/*.dump
+/backups/*.sql
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# User requested ignores
+*.sql
+*.jpg
+*.jpeg
+/backups/
+/public/uploads/
+
+# local test env
+.env*.local
+
+# test artifacts
+scripts/_mock_scans.json
+scripts/_test_results.json

@@ -3,14 +3,18 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { sanityClient } from "@/lib/sanity"
 import {
   getJakartaDayOfWeek,
+  isSecurityOffShift,
+  isSecurityWorkShiftCode,
   parseDateOnly,
   SECURITY_SHIFT_DEFINITIONS,
-  SecurityShiftCode,
   startOfDay,
 } from "@/lib/spl-time"
 import { makeRegularOverrideKey, parseRegularOverrideValue } from "@/lib/regular-hours"
+
+export const dynamic = "force-dynamic"
 
 const normalizeTimeValue = (value: unknown) => {
   if (typeof value !== "string") return null
@@ -45,25 +49,34 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date")
     const targetDate = dateParam ? parseDateOnly(dateParam) : null
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        departmentId: true,
-        departmentName: true,
-        department: { select: { id: true, name: true } },
-        position: true,
-        pin: true,
-        regularStartTime: true,
-        regularEndTime: true,
-      },
-    })
+    // Use raw SQL to fetch profile to avoid Prisma Client synchronization issues
+    const users = await prisma.$queryRawUnsafe(`
+      SELECT u.id, u.email, u.name, u.role, u."departmentId", u.department as "departmentName", u.position, u.pin, u.image, u."regularStartTime", u."regularEndTime",
+      d.id as "dept_id", d.name as "dept_name"
+      FROM "users" u
+      LEFT JOIN "departments" d ON u."departmentId" = d.id
+      WHERE u.id = $1
+    `, session.user.id) as any[]
 
-    if (!user) {
+
+    if (!users || users.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    const u = users[0]
+    const user = {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      departmentId: u.departmentId,
+      departmentName: u.departmentName,
+      position: u.position,
+      pin: u.pin,
+      image: u.image,
+      regularStartTime: u.regularStartTime,
+      regularEndTime: u.regularEndTime,
+      department: u.dept_id ? { id: u.dept_id, name: u.dept_name } : null
     }
 
     let effectiveRegularStartTime = user.regularStartTime
@@ -87,18 +100,18 @@ export async function GET(request: NextRequest) {
           select: { shiftCode: true },
         })
 
-        if (shiftAssignment?.shiftCode) {
-          const shiftDefinition =
-            SECURITY_SHIFT_DEFINITIONS[
-              shiftAssignment.shiftCode as SecurityShiftCode
-            ]
-
-          if (!shiftDefinition) {
+        if (isSecurityOffShift(shiftAssignment?.shiftCode)) {
+          effectiveRegularStartTime = null
+          effectiveRegularEndTime = null
+        } else if (shiftAssignment?.shiftCode) {
+          if (!isSecurityWorkShiftCode(shiftAssignment.shiftCode)) {
             return NextResponse.json(
               { error: "Shift security tidak valid" },
               { status: 400 }
             )
           }
+
+          const shiftDefinition = SECURITY_SHIFT_DEFINITIONS[shiftAssignment.shiftCode]
 
           effectiveRegularStartTime = shiftDefinition.start
           effectiveRegularEndTime = shiftDefinition.end
@@ -284,6 +297,58 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error updating profile:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const formData = await request.formData()
+    const file = formData.get("file") as File | null
+
+    if (!file) {
+      return NextResponse.json({ error: "Tidak ada file yang diupload" }, { status: 400 })
+    }
+
+    // Validasi tipe file
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "File harus berupa gambar" }, { status: 400 })
+    }
+
+    // Validasi ukuran file (maks 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      return NextResponse.json({ error: "Ukuran file maksimal 2MB" }, { status: 400 })
+    }
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Upload ke Sanity.io
+    const asset = await sanityClient.assets.upload("image", buffer, {
+      filename: file.name,
+      contentType: file.type,
+    })
+
+    const imageUrl = asset.url
+
+    // Update database menggunakan Raw SQL untuk menghindari masalah Prisma Client Outdated
+    await prisma.$executeRawUnsafe(
+      'UPDATE "users" SET "image" = $1 WHERE "id" = $2',
+      imageUrl,
+      session.user.id
+    )
+
+    return NextResponse.json({
+      message: "Foto profil berhasil diperbarui",
+      imageUrl: imageUrl,
+    })
+  } catch (error) {
+    console.error("Error uploading profile picture to Sanity:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

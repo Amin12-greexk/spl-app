@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Role } from "@/types"
 import { useNotificationContext } from "@/components/notifications/Notificationprovider"
 import { useStaggerAnimation } from "@/hooks/useGSAP"
@@ -13,10 +13,82 @@ interface SidebarProps {
   onClose?: () => void
 }
 
+interface NavItemConfig {
+  name: string
+  href: string
+  icon: React.ReactNode
+  roles: Role[]
+  badge: number | null
+  badgeKey?: "manual" | "team" | "manager"
+  customCondition?: (role: string, position: string) => boolean
+}
+
+interface NavGroupConfig {
+  id: string
+  label: string
+}
+
+const NAV_GROUPS: NavGroupConfig[] = [
+  { id: "overview", label: "Utama" },
+  { id: "personal", label: "Aktivitas Saya" },
+  { id: "approval", label: "Tim & Persetujuan" },
+  { id: "monitoring", label: "Monitoring & Laporan" },
+  { id: "admin", label: "Admin Tools" },
+]
+
+const PRODUCTION_HEAD_HIDDEN_ROUTES = new Set([
+  "/dashboard/data-lama",
+  "/dashboard/telat-input",
+  "/dashboard/ga/pengajuan",
+  "/dashboard/ga/riwayat",
+])
+
+const EXACT_ONLY_HREFS = new Set([
+  "/dashboard",
+  "/dashboard/staff",
+  "/dashboard/ga",
+  "/dashboard/hr",
+  "/dashboard/admin",
+])
+
+const resolveNavGroupId = (href: string) => {
+  if (href.startsWith("/dashboard/admin")) return "admin"
+
+  if (href === "/dashboard" || href === "/dashboard/profile") {
+    return "overview"
+  }
+
+  if (
+    [
+      "/dashboard/staff/pengajuan",
+      "/dashboard/staff",
+      "/dashboard/telat-input",
+      "/dashboard/data-lama",
+      "/dashboard/ga/pengajuan",
+      "/dashboard/ga/riwayat",
+    ].includes(href)
+  ) {
+    return "personal"
+  }
+
+  if (
+    [
+      "/dashboard/ga/persetujuan",
+      "/dashboard/ga",
+      "/dashboard/hr/persetujuan",
+    ].includes(href)
+  ) {
+    return "approval"
+  }
+
+  return "monitoring"
+}
+
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const userRole = session?.user?.role as Role
+  const isSupervisor = Boolean(session?.user?.isSupervisor)
   const userPosition = session?.user?.position || ""
   const isHeadHR = userRole === "HR" && userPosition.toLowerCase().includes("head")
   const normalizedDepartment = (
@@ -30,12 +102,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const isProductionHead =
     userRole === "DEPARTMENT_HEAD" &&
     (normalizedDepartment === "produksi" || normalizedDepartment === "production")
-  const productionHeadHiddenRoutes = new Set([
-    "/dashboard/data-lama",
-    "/dashboard/telat-input",
-    "/dashboard/ga/pengajuan",
-    "/dashboard/ga/riwayat",
-  ])
   const [manualPendingCount, setManualPendingCount] = useState(0)
   const [teamPendingCount, setTeamPendingCount] = useState(0)
   const [managerPendingCount, setManagerPendingCount] = useState(0)
@@ -89,8 +155,12 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
 
     const countTeamPending = async () => {
+      const teamPendingStatus =
+        userRole === "SUPER_ADMIN"
+          ? "PENDING_SUPERADMIN,PENDING_SUPERVISOR"
+          : "PENDING_SUPERVISOR"
       const response = await fetch(
-        "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=100"
+        `/api/spl/my-team?status=${teamPendingStatus}&lite=1&skipCount=1&page=1&limit=100`
       )
       if (!response.ok) return 0
       const data = await response.json()
@@ -121,7 +191,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         setManualPendingCount(0)
       }
 
-      if (userRole === "GA" || userRole === "DEPARTMENT_HEAD" || userRole === "SUPER_ADMIN") {
+      if (userRole === "GA" || userRole === "DEPARTMENT_HEAD" || userRole === "SUPER_ADMIN" || isSupervisor) {
         setTeamPendingCount(await countTeamPending())
       } else {
         setTeamPendingCount(0)
@@ -135,7 +205,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     } catch (error) {
       console.error("Error fetching sidebar notification counts:", error)
     }
-  }, [session?.user?.id, userRole])
+  }, [session?.user?.id, userRole, isSupervisor])
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -156,15 +226,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
   }
 
-  const navItems: Array<{
-    name: string
-    href: string
-    icon: React.ReactNode
-    roles: Role[]
-    badge: number | null
-    badgeKey?: "manual" | "team" | "manager"
-    customCondition?: (role: string, position: string) => boolean
-  }> = [
+  const navItems = useMemo<NavItemConfig[]>(() => [
       {
         name: "Dashboard",
         href: "/dashboard",
@@ -290,6 +352,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         badge: null,
       },
       {
+        name: "Generate Jadwal Security",
+        href: "/dashboard/ga/security-schedule",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2zm4-6l2 2 4-4" />
+          </svg>
+        ),
+        roles: ["GA", "SUPER_ADMIN"],
+        badge: null,
+      },
+      {
         name: "Persetujuan SPL",
         href: "/dashboard/hr/persetujuan",
         icon: (
@@ -350,11 +423,33 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         badge: null,
       },
       {
+        name: "Mirror Karyawan",
+        href: "/dashboard/admin/employee-mirror",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+        roles: ["SUPER_ADMIN"],
+        badge: null,
+      },
+      {
         name: "Kelola Departemen",
         href: "/dashboard/admin/departments",
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
+          </svg>
+        ),
+        roles: ["SUPER_ADMIN"],
+        badge: null,
+      },
+      {
+        name: "Cek Absensi",
+        href: "/dashboard/admin/absensi",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-7 9h4" />
           </svg>
         ),
         roles: ["SUPER_ADMIN"],
@@ -404,66 +499,196 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         roles: ["SUPER_ADMIN"],
         badge: null,
       },
-    ]
+    ], [managerPendingCount, manualPendingCount, teamPendingCount])
 
-  const filteredNavItems = navItems.filter((item) => {
-    // Check basic role permission
-    if (!item.roles.includes(userRole)) return false
+  const isItemActive = useCallback(
+    (href: string) => {
+      if (EXACT_ONLY_HREFS.has(href)) {
+        return pathname === href
+      }
+      return pathname === href || pathname.startsWith(`${href}/`)
+    },
+    [pathname]
+  )
 
-    if (isProductionHead && productionHeadHiddenRoutes.has(item.href)) {
-      return false
-    }
+  const filteredNavItems = useMemo(
+    () =>
+      navItems.filter((item) => {
+        // Atasan hasil penugasan (role apa pun) tetap mendapat menu persetujuan tim.
+        const allowedBySupervisorFlag =
+          isSupervisor && item.href === "/dashboard/ga/persetujuan"
+        if (!item.roles.includes(userRole) && !allowedBySupervisorFlag) return false
 
-    // Check custom condition if exists
-    if (item.customCondition) {
-      return item.customCondition(userRole, userPosition)
-    }
+        if (isProductionHead && PRODUCTION_HEAD_HIDDEN_ROUTES.has(item.href)) {
+          return false
+        }
 
-    return true
-  })
+        if (item.customCondition) {
+          return item.customCondition(userRole, userPosition)
+        }
+
+        return true
+      }),
+    [isProductionHead, isSupervisor, navItems, userPosition, userRole]
+  )
+
+  const groupedNavItems = useMemo(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: filteredNavItems.filter(
+          (item) => resolveNavGroupId(item.href) === group.id
+        ),
+      })).filter((group) => group.items.length > 0),
+    [filteredNavItems]
+  )
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setExpandedGroups((prev) => {
+      const next: Record<string, boolean> = {}
+
+      groupedNavItems.forEach((group, index) => {
+        const hasActiveItem = group.items.some((item) => isItemActive(item.href))
+        next[group.id] = prev[group.id] ?? (hasActiveItem || index === 0)
+
+        if (hasActiveItem) {
+          next[group.id] = true
+        }
+      })
+
+      const prevKeys = Object.keys(prev)
+      const nextKeys = Object.keys(next)
+      const isSameState =
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((key) => prev[key] === next[key])
+
+      return isSameState ? prev : next
+    })
+  }, [groupedNavItems, isItemActive])
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }
+
+  const renderNavLink = (item: NavItemConfig, isMobile = false) => {
+    const isActive = isItemActive(item.href)
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        data-animate
+        onClick={() => {
+          handleBadgeClick(item.badgeKey)
+          if (isMobile) {
+            onClose?.()
+          }
+        }}
+        className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")} ${
+          isActive
+            ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
+            : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
+        }`}
+      >
+        <div
+          className={`transition-transform duration-300 group-hover:scale-110 ${
+            isActive
+              ? "text-white"
+              : "text-gray-400 group-hover:text-green-600"
+          }`}
+        >
+          {item.icon}
+        </div>
+        <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">
+          {item.name}
+        </span>
+        {item.badge && (
+          <span className="ml-auto min-w-[20px] rounded-full bg-red-500 px-2 py-1 text-center text-xs text-white motion-safe:animate-pulse-subtle shadow-md">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
+  const renderNavGroup = (
+    group: NavGroupConfig & { items: NavItemConfig[] },
+    isMobile = false
+  ) => {
+    const isExpanded = expandedGroups[group.id] ?? false
+    const hasActiveItem = group.items.some((item) => isItemActive(item.href))
+
+    return (
+      <div
+        key={group.id}
+        data-animate
+        className="rounded-2xl border border-gray-100 bg-gray-50/70 p-2"
+      >
+        <button
+          type="button"
+          onClick={() => toggleGroup(group.id)}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
+            hasActiveItem
+              ? "bg-green-50 text-green-800"
+              : "text-gray-700 hover:bg-white"
+          }`}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+              {group.label}
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {group.items.length} menu
+            </p>
+          </div>
+          <svg
+            className={`h-5 w-5 text-gray-400 transition-transform ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        {isExpanded && (
+          <div className="mt-2 space-y-1">
+            {group.items.map((item) => renderNavLink(item, isMobile))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40 mt-[85px]">
+      <aside className="hidden lg:block fixed left-0 top-[76px] h-[calc(100vh-76px)] w-64 bg-white border-r border-gray-200 shadow-lg z-40">
         <div className="flex flex-col h-full">
-          <nav ref={navRef} className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-animate
-                  onClick={() => handleBadgeClick(item.badgeKey)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
-                    ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
-                    : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
-                    }`}
-                >
-                  <div
-                    className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400 group-hover:text-green-600"
-                      }`}
-                  >
-                    {item.icon}
-                  </div>
-                  <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">{item.name}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
+          <nav ref={navRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
+            {groupedNavItems.map((group) => renderNavGroup(group))}
           </nav>
         </div>
       </aside>
 
       {/* Mobile Sidebar */}
       <aside
-        className={`lg:hidden fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform motion-safe:transition-transform motion-safe:duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
-          } mt-[85px]`}
+        className={`lg:hidden fixed left-0 top-[76px] h-[calc(100vh-76px)] w-72 bg-white border-r border-gray-200 shadow-2xl z-50 transform motion-safe:transition-transform motion-safe:duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -480,38 +705,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav ref={mobileNavRef} className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-animate
-                  onClick={() => {
-                    handleBadgeClick(item.badgeKey)
-                    onClose?.()
-                  }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative transform motion-safe:hover:scale-[1.02] tour-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} ${isActive
-                    ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-green-200 shadow-lg"
-                    : "text-gray-600 hover:bg-green-50 hover:text-green-700 hover:shadow-sm"
-                    }`}
-                >
-                  <div
-                    className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400 group-hover:text-green-600"
-                      }`}
-                  >
-                    {item.icon}
-                  </div>
-                  <span className="font-medium text-sm transition-transform duration-300 group-hover:translate-x-1">{item.name}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center motion-safe:animate-pulse-subtle shadow-md">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
+          <nav ref={mobileNavRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
+            {groupedNavItems.map((group) => renderNavGroup(group, true))}
           </nav>
         </div>
       </aside>

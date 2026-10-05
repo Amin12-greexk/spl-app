@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendNotificationToUser } from "@/lib/notification-utils"
 import { JAKARTA_TIME_ZONE } from "@/lib/spl-time"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,15 +15,10 @@ export async function POST(req: NextRequest) {
     }
 
     const isSuperAdmin = session.user.role === "SUPER_ADMIN"
-    const canApproveAsSupervisor = ["GA", "DEPARTMENT_HEAD"].includes(session.user.role)
 
-    // Only GA, DEPARTMENT_HEAD, or SUPER_ADMIN can approve as supervisor
-    if (!canApproveAsSupervisor && !isSuperAdmin) {
-      return NextResponse.json(
-        { error: "Hanya GA, Kepala Departemen, atau Super Admin yang dapat menyetujui SPL di level supervisor" },
-        { status: 403 }
-      )
-    }
+    // Hak menyetujui di level supervisor ditentukan oleh penugasan atasan
+    // (requester.supervisorId / spl.supervisorId, dicek di bawah), bukan oleh role.
+    // SUPER_ADMIN adalah mirror supervisor untuk semua pemohon.
 
     const body = await req.json()
     const { splId, signature } = body
@@ -59,33 +55,53 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate: SPL must be in PENDING_SUPERVISOR status
-    if (spl.status !== "PENDING_SUPERVISOR") {
+    if (!isSuperAdmin && spl.requesterId === session.user.id) {
+      return NextResponse.json(
+        { error: "Anda tidak dapat menyetujui SPL milik sendiri" },
+        { status: 403 }
+      )
+    }
+
+    const isPendingSuperAdmin = spl.status === "PENDING_SUPERADMIN"
+    const isPendingSupervisor = spl.status === "PENDING_SUPERVISOR"
+
+    if (!isPendingSuperAdmin && !isPendingSupervisor) {
       return NextResponse.json(
         { error: "SPL ini tidak dalam status menunggu persetujuan supervisor" },
         { status: 400 }
       )
     }
 
-    // Determine assigned supervisor for proxy approval by Super Admin
-    const assignedSupervisorId = spl.supervisorId || spl.requester.supervisorId || null
-
-    // Validate: Non-super-admin must be the supervisor of the requester
-    if (!isSuperAdmin && spl.requester.supervisorId !== session.user.id && spl.supervisorId !== session.user.id) {
+    if (isPendingSuperAdmin && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Anda bukan atasan dari karyawan ini" },
+        { error: "SPL telat hanya bisa direview oleh Super Admin" },
         { status: 403 }
       )
     }
 
-    if (isSuperAdmin && !assignedSupervisorId) {
-      return NextResponse.json(
-        { error: "Supervisor untuk SPL ini tidak ditemukan. Assign supervisor terlebih dahulu." },
-        { status: 400 }
-      )
+    const assignedSupervisorId = spl.supervisorId || spl.requester.supervisorId || null
+
+    if (!isPendingSuperAdmin) {
+      if (!isSuperAdmin && spl.requester.supervisorId !== session.user.id && spl.supervisorId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Anda bukan atasan dari karyawan ini" },
+          { status: 403 }
+        )
+      }
+
+      if (isSuperAdmin && !assignedSupervisorId) {
+        return NextResponse.json(
+          { error: "Supervisor untuk SPL ini tidak ditemukan. Assign supervisor terlebih dahulu." },
+          { status: 400 }
+        )
+      }
     }
 
-    const effectiveSupervisorId = isSuperAdmin ? assignedSupervisorId : session.user.id
+    const effectiveSupervisorId = isPendingSuperAdmin
+      ? session.user.id
+      : isSuperAdmin
+      ? assignedSupervisorId
+      : session.user.id
 
     // Update SPL: Approve by supervisor
     const updatedSpl = await prisma.spl.update({
@@ -115,6 +131,16 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    await recordSplAudit({
+      splId: updatedSpl.id,
+      action: "SUPERVISOR_APPROVE",
+      actorId: session.user.id,
+      oldStatus: spl.status,
+      newStatus: "PENDING_MANAGER",
+      source: spl.source,
+      note: isPendingSuperAdmin ? "Direview Super Admin (telat)" : undefined,
+    })
+
     // Send notifications
     try {
       const splDate = new Date(updatedSpl.date)
@@ -125,14 +151,18 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       })
 
-      const supervisorActor = isSuperAdmin
+      const supervisorActor = isPendingSuperAdmin
+        ? session.user.name || "Super Admin"
+        : isSuperAdmin
         ? `${updatedSpl.supervisor?.name || "Supervisor"} (diwakili Super Admin ${session.user.name || "-"})`
         : session.user.name || updatedSpl.supervisor?.name || "Supervisor"
 
       await sendNotificationToUser(
         updatedSpl.requesterId,
-        "SPL Disetujui Supervisor",
-        `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${supervisorActor}. Silakan input realisasi agar diteruskan ke Manager.`,
+        isPendingSuperAdmin ? "SPL Direview Super Admin" : "SPL Disetujui Supervisor",
+        isPendingSuperAdmin
+          ? `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) selesai direview ${supervisorActor} dan diteruskan ke Manager.`
+          : `SPL ${formattedDate} (${updatedSpl.startTime}-${updatedSpl.endTime}) disetujui ${supervisorActor}. Silakan input realisasi agar diteruskan ke Manager.`,
         { splId: updatedSpl.id, click_action: "/dashboard/staff" }
       )
       console.log("Notifikasi supervisor approval telah dikirim")
@@ -141,7 +171,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      message: "SPL berhasil disetujui oleh supervisor",
+      message: isPendingSuperAdmin
+        ? "SPL telat berhasil direview Super Admin dan diteruskan ke manager"
+        : "SPL berhasil disetujui oleh supervisor",
       spl: updatedSpl,
     })
   } catch (error) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Spl } from "@/types"
@@ -15,6 +15,10 @@ import Image from "next/image"
 export default function GAApprovalPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const isSuperAdminQueue = session?.user.role === "SUPER_ADMIN"
+  const pendingStatus = isSuperAdminQueue
+    ? "PENDING_SUPERADMIN,PENDING_SUPERVISOR"
+    : "PENDING_SUPERVISOR"
   const [spls, setSpls] = useState<Spl[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -33,13 +37,17 @@ export default function GAApprovalPage() {
 
   // Check authorization
   useEffect(() => {
-    if (session && !["GA", "DEPARTMENT_HEAD", "SUPER_ADMIN"].includes(session.user.role)) {
+    if (
+      session &&
+      !["GA", "DEPARTMENT_HEAD", "SUPER_ADMIN"].includes(session.user.role) &&
+      !session.user.isSupervisor
+    ) {
       toast.error("Akses ditolak!")
       router.push("/dashboard")
     }
   }, [session, router])
 
-  const fetchPendingSpls = async (showLoader = true) => {
+  const fetchPendingSpls = useCallback(async (showLoader = true) => {
     if (showLoader) {
       setIsLoading(true)
     } else {
@@ -48,7 +56,7 @@ export default function GAApprovalPage() {
 
     try {
       const response = await fetch(
-        "/api/spl/my-team?status=PENDING_SUPERVISOR&lite=1&skipCount=1&page=1&limit=30",
+        `/api/spl/my-team?status=${pendingStatus}&lite=1&skipCount=1&page=1&limit=30`,
         { cache: "no-store" }
       )
       if (!response.ok) throw new Error("Gagal mengambil data")
@@ -65,7 +73,7 @@ export default function GAApprovalPage() {
         setIsRefreshing(false)
       }
     }
-  }
+  }, [pendingStatus])
 
   const fetchSplDetail = async (splId: string): Promise<Spl> => {
     const cached = detailCacheRef.current[splId]
@@ -89,11 +97,12 @@ export default function GAApprovalPage() {
     if (
       session?.user.role === "GA" ||
       session?.user.role === "DEPARTMENT_HEAD" ||
-      session?.user.role === "SUPER_ADMIN"
+      session?.user.role === "SUPER_ADMIN" ||
+      session?.user.isSupervisor
     ) {
       fetchPendingSpls()
     }
-  }, [session])
+  }, [session, fetchPendingSpls])
 
   const handleApprove = async (spl: Spl) => {
     const cached = detailCacheRef.current[spl.id]
@@ -190,6 +199,9 @@ export default function GAApprovalPage() {
     }
   }
 
+  const isLateSuperAdminReview = (spl?: Spl | null) =>
+    Boolean(isSuperAdminQueue && spl?.status === "PENDING_SUPERADMIN")
+
   const submitRejection = async () => {
     if (!selectedSpl) return
 
@@ -241,8 +253,14 @@ export default function GAApprovalPage() {
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-6 text-white shadow-xl">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Persetujuan SPL Tim</h1>
-        <p className="text-green-100">Review dan setujui pengajuan lembur dari tim Anda</p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+          {isSuperAdminQueue ? "Mirror Persetujuan SPL" : "Persetujuan SPL Tim"}
+        </h1>
+        <p className="text-green-100">
+          {isSuperAdminQueue
+            ? "Review SPL telat dan bantu persetujuan supervisor bila diperlukan"
+            : "Review dan setujui pengajuan lembur dari tim Anda"}
+        </p>
         {isRefreshing && (
           <p className="text-xs text-green-100/90 mt-2">Memperbarui data...</p>
         )}
@@ -258,7 +276,11 @@ export default function GAApprovalPage() {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Semua SPL Sudah Diproses</h3>
-              <p className="text-gray-500 text-sm">Tidak ada SPL yang menunggu persetujuan Anda saat ini</p>
+              <p className="text-gray-500 text-sm">
+                {isSuperAdminQueue
+                  ? "Tidak ada SPL yang menunggu review Super Admin atau persetujuan supervisor saat ini"
+                  : "Tidak ada SPL yang menunggu persetujuan Anda saat ini"}
+              </p>
             </div>
           </div>
         </div>
@@ -332,7 +354,13 @@ export default function GAApprovalPage() {
             setIsLoadingSelectedSpl(false)
             setSelectedSpl(null)
           }}
-          title="Setujui SPL"
+          title={
+            isLateSuperAdminReview(selectedSpl)
+              ? "Review SPL Telat"
+              : isSuperAdminQueue
+              ? "Setujui SPL Supervisor"
+              : "Setujui SPL"
+          }
         >
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -340,7 +368,11 @@ export default function GAApprovalPage() {
                 Anda akan menyetujui SPL dari <strong>{selectedSpl.requester.name}</strong>
               </p>
               <p className="text-xs text-blue-700 mt-1">
-                Setelah disetujui, SPL akan diteruskan ke Manager untuk persetujuan final.
+                {isLateSuperAdminReview(selectedSpl)
+                  ? "Setelah direview, SPL telat akan diteruskan ke Manager untuk persetujuan final."
+                  : isSuperAdminQueue
+                  ? "Super Admin akan menyetujui SPL ini sebagai mirror supervisor, lalu SPL diteruskan ke Manager."
+                  : "Setelah disetujui, SPL akan diteruskan ke Manager untuk persetujuan final."}
               </p>
             </div>
 
@@ -413,7 +445,13 @@ export default function GAApprovalPage() {
                 className="flex-1 bg-green-600 hover:bg-green-700"
                 disabled={isSubmitting || isLoadingSelectedSpl}
               >
-                {isSubmitting ? "Memproses..." : "Setujui SPL"}
+                {isSubmitting
+                  ? "Memproses..."
+                  : isLateSuperAdminReview(selectedSpl)
+                  ? "Review & Teruskan"
+                  : isSuperAdminQueue
+                  ? "Setujui sebagai Supervisor"
+                  : "Setujui SPL"}
               </Button>
             </div>
           </div>
@@ -428,7 +466,13 @@ export default function GAApprovalPage() {
             setSelectedSpl(null)
             setRejectionReason("")
           }}
-          title="Tolak SPL"
+          title={
+            isLateSuperAdminReview(selectedSpl)
+              ? "Tolak SPL Telat"
+              : isSuperAdminQueue
+              ? "Tolak SPL Supervisor"
+              : "Tolak SPL"
+          }
         >
           <div className="space-y-4">
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -469,7 +513,13 @@ export default function GAApprovalPage() {
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Memproses..." : "Tolak SPL"}
+                {isSubmitting
+                  ? "Memproses..."
+                  : isLateSuperAdminReview(selectedSpl)
+                  ? "Tolak SPL Telat"
+                  : isSuperAdminQueue
+                  ? "Tolak sebagai Supervisor"
+                  : "Tolak SPL"}
               </Button>
             </div>
           </div>

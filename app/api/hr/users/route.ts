@@ -3,10 +3,12 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !["HR", "MANAGER"].includes(session.user.role)) {
+    if (!session || !["HR", "MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
@@ -19,6 +21,7 @@ export async function GET() {
         role: true,
         position: true,
         regularStartTime: true,
+        regularEndTime: true,
         departmentName: true,
         department: { select: { name: true } },
       },

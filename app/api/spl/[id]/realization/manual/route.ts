@@ -10,6 +10,7 @@ import {
   makeWindowWithOffset,
   startOfDay,
 } from "@/lib/spl-time"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 const REJECTED_STATUSES = new Set([
   "REJECTED",
@@ -214,8 +215,19 @@ export async function POST(
         overrunReason: overrunValue || null,
         plannedStartAt: spl.plannedStartAt ?? plannedStart,
         plannedEndAt: spl.plannedEndAt ?? plannedEnd,
+        realizationSource: "MANUAL",
         status: "PENDING_MANAGER",
       },
+    })
+
+    await recordSplAudit({
+      splId: spl.id,
+      action: "REALIZATION_MANUAL",
+      actorId: session.user.id,
+      oldStatus: spl.status,
+      newStatus: "PENDING_MANAGER",
+      source: spl.source,
+      note: hasOverrun ? `Overrun: ${overrunValue}` : undefined,
     })
 
     try {

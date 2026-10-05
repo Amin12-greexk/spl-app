@@ -24,6 +24,7 @@ const SECURITY_SHIFT_PRESETS = [
   { id: "P2", label: "P2 (11:00-19:00)", start: "11:00", end: "19:00" },
   { id: "M1", label: "M1 (16:00-04:00)", start: "16:00", end: "04:00" },
   { id: "M2", label: "M2 (23:00-07:00)", start: "23:00", end: "07:00" },
+  { id: "F1", label: "F1 FINA (08:00-16:30)", start: "08:00", end: "16:30" },
 ]
 
 const getSecurityShiftPresetId = (

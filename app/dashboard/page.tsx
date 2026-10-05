@@ -6,13 +6,21 @@ import { useRouter } from "next/navigation"
 import NotificationToggle from "@/components/notifications/NotificationToggle"
 import { getRoleLabel } from "@/lib/utils"
 import { Spl, Role } from "@/types"
-import Swal from "sweetalert2"
 import Link from "next/link"
 import TimePicker from "@/components/ui/TimePicker"
 import Modal from "@/components/ui/Modal"
 import Image from "next/image"
 import { isMorningOvertime } from "@/lib/spl-labels"
-import ManagerAnalytics from "@/components/dashboard/ManagerAnalytics"
+import dynamic from "next/dynamic"
+
+const ManagerAnalytics = dynamic(() => import("@/components/dashboard/ManagerAnalytics"), { ssr: false })
+
+const Swal = {
+  fire: async (options: any) => {
+    const sweetalert2 = (await import('sweetalert2')).default
+    return sweetalert2.fire(options)
+  }
+}
 
 const DIRECT_TO_MANAGER_ROLES: Role[] = [
   "GA",
@@ -80,6 +88,7 @@ export default function DashboardPage() {
   const [supervisorLabel, setSupervisorLabel] = useState<string | null>(null)
   const [hasSupervisor, setHasSupervisor] = useState<boolean | null>(null)
   const [isFinishing, setIsFinishing] = useState(false)
+  const [autoPullingId, setAutoPullingId] = useState<string | null>(null)
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [selectedSpl, setSelectedSpl] = useState<Spl | null>(null)
   const [realizationStartTime, setRealizationStartTime] = useState("")
@@ -626,6 +635,43 @@ export default function DashboardPage() {
     }
   }
 
+  const handleAutoRealization = async (spl: Spl) => {
+    setAutoPullingId(spl.id)
+    try {
+      const response = await fetch(`/api/spl/${spl.id}/realization/auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      const data = await response.json()
+      if (response.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "Realisasi otomatis tersimpan",
+          text: "Data fingerprint berhasil ditarik dan dikirim ke Manager.",
+        })
+        await Promise.allSettled([fetchUserSpls(), fetchStats()])
+      } else if (response.status === 409) {
+        await Swal.fire({
+          icon: "info",
+          title: "Fingerprint belum tersedia",
+          text:
+            (data?.error as string) ||
+            "Data fingerprint belum masuk. Coba lagi nanti atau gunakan input manual.",
+        })
+      } else {
+        throw new Error(data?.error || "Gagal menarik realisasi otomatis")
+      }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: error.message || "Terjadi kesalahan",
+      })
+    } finally {
+      setAutoPullingId(null)
+    }
+  }
+
   const getGreeting = useCallback(() => {
     const hour = new Date().getHours()
     if (hour < 12) return "Selamat pagi"
@@ -639,6 +685,11 @@ export default function DashboardPage() {
         bg: "bg-yellow-100",
         text: "text-yellow-800",
         label: "Menunggu",
+      },
+      PENDING_SUPERADMIN: {
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        label: "Review Super Admin",
       },
       PENDING_SUPERVISOR: {
         bg: "bg-yellow-100",
@@ -1008,13 +1059,27 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
+                              {canInputRealization(spl) && spl.inputMode === "AUTO" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAutoRealization(spl)}
+                                  disabled={autoPullingId === spl.id}
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-60"
+                                >
+                                  {autoPullingId === spl.id ? "Menarik..." : "Tarik Realisasi"}
+                                </button>
+                              )}
                               {canInputRealization(spl) && (
                                 <button
                                   type="button"
                                   onClick={() => openFinishModal(spl)}
-                                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
+                                    spl.inputMode === "AUTO"
+                                      ? "text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"
+                                      : "text-white bg-blue-600 hover:bg-blue-700"
+                                  }`}
                                 >
-                                  Input Realisasi
+                                  {spl.inputMode === "AUTO" ? "Input Manual" : "Input Realisasi"}
                                 </button>
                               )}
                               {!canInputRealization(spl) && isGaApprovalBlocked(spl) && (

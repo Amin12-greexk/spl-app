@@ -2,12 +2,26 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Modal from "@/components/ui/Modal"
 import Button from "@/components/ui/Button"
 import Swal from "sweetalert2"
-import { getEffectiveHours } from "@/lib/spl-hours"
+import toast from "react-hot-toast"
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval } from "date-fns"
+import { id } from "date-fns/locale" // Import locale Indonesia
+import { getEffectiveHours, getEffectiveMinutes } from "@/lib/spl-hours"
 import { isMorningOvertime } from "@/lib/spl-labels"
+
+interface AttendanceRecord {
+  pin?: string | null
+  scan_date: string
+}
+
+type ExportRow = Record<string, string | number>
+type ExportContext = {
+  resolvePin: (spl: Spl) => string
+  attendanceByPin: Map<string, AttendanceRecord[]>
+}
 
 interface Spl {
   id: string
@@ -22,6 +36,11 @@ interface Spl {
   regularStartAt?: Date | string | null
   plannedStartAt?: Date | string | null
   plannedEndAt?: Date | string | null
+  supervisorApprovalDate?: Date | null
+  approvalDate?: Date | null
+  signature?: string | null
+  supervisorSignature?: string | null
+  rejectionReason?: string | null
   reason: string
   status: string
   projectName: string | null
@@ -30,6 +49,7 @@ interface Spl {
     id: string
     name: string
     email: string
+    pin?: string | null
     departmentId: string | null
     departmentName: string | null
     department: {
@@ -52,13 +72,16 @@ interface Spl {
 export default function SplHistoryPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const PAGE_SIZE = 10
+  const PAGE_SIZE = 50
   const [spls, setSpls] = useState<Spl[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("ALL")
+  const [dateFilter, setDateFilter] = useState("ALL")
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState({
@@ -68,6 +91,14 @@ export default function SplHistoryPage() {
     rejected: 0,
   })
   const [editingSpl, setEditingSpl] = useState<Spl | null>(null)
+
+  const focusedUser = useMemo(() => {
+    if (!searchQuery.trim() || spls.length === 0) return null
+    const firstUserId = spls[0].requester.id
+    const isSingleUser = spls.every((s) => s.requester.id === firstUserId)
+    if (isSingleUser) return spls[0].requester
+    return null
+  }, [spls, searchQuery])
   const [editForm, setEditForm] = useState({
     date: "",
     startTime: "",
@@ -80,6 +111,12 @@ export default function SplHistoryPage() {
     projectName: "",
   })
   const [isSaving, setIsSaving] = useState(false)
+
+  const focusOnUser = (name: string) => {
+    setSearchInput(name)
+    setSearchQuery(name)
+    setPage(1)
+  }
 
   const fetchSpls = useCallback(async () => {
     setIsFetching(true)
@@ -94,6 +131,10 @@ export default function SplHistoryPage() {
       if (filterStatus !== "ALL") {
         params.set("status", filterStatus)
       }
+      
+      // Khusus Super Admin Export: Ambil SEMUA data jika skipStats = 1 dan fetch lite agar bisa diexport semua
+      // karena page ini punya pagination server side. Untuk export kita butuh fetch all
+      params.set("lite", "1")
 
       const response = await fetch(`/api/spl?${params.toString()}`)
       if (response.ok) {
@@ -314,6 +355,7 @@ export default function SplHistoryPage() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
+      PENDING_SUPERADMIN: { bg: "bg-amber-100", text: "text-amber-800", label: "Pending Super Admin" },
       PENDING_SUPERVISOR: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Supervisor" },
       PENDING_MANAGER: { bg: "bg-blue-100", text: "text-blue-800", label: "Pending Manager" },
       APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "Approved" },
@@ -342,10 +384,54 @@ export default function SplHistoryPage() {
     return `${hours} jam ${minutes} menit`
   }
 
+  const sortedSpls = useMemo(() => {
+    return [...spls].sort((a, b) => {
+      const dateCompare =
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+  }, [spls])
+
+  const formatDateShort = (value: Date | string) =>
+    new Date(value).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+
+  const formatDateTimeShort = (value: Date | string) =>
+    new Date(value).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+
+  const shortId = (value: string) =>
+    value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
+
+  const getSourceBadge = (spl: Spl) => {
+    if (spl.isManualEntry) {
+      return (
+        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+          Manual
+        </span>
+      )
+    }
+
+    return (
+      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+        Sistem
+      </span>
+    )
+  }
+
   const paginationControls = (
     <div className="flex flex-col gap-3 px-4 py-3 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-gray-600">
-        Menampilkan {spls.length} dari {total} data
+        Menampilkan {sortedSpls.length} dari {total} data
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -369,6 +455,819 @@ export default function SplHistoryPage() {
     </div>
   )
 
+  // =============================== EXPORT EXCEL & PDF UTILS ===============================
+  
+  // Karena export HR Butuh semua data bukan hanya per page, kita fetch all untuk print
+  const fetchAllForExport = async () => {
+    try {
+      const limit = 5000 // Tentukan limit yang wajar atau endpoint all
+      const params = new URLSearchParams()
+      params.set("page", "1")
+      params.set("limit", String(limit))
+      params.set("skipStats", "1")
+      params.set("lite", "1")
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim())
+      }
+      if (filterStatus !== "ALL") {
+        params.set("status", filterStatus)
+      }
+      
+      const response = await fetch(`/api/spl?${params.toString()}`)
+      if (!response.ok) throw new Error("Gagal mengambil semua data untuk export")
+      const data = await response.json()
+      
+      let allSpls: Spl[] = []
+      if (Array.isArray(data)) {
+        allSpls = data
+      } else {
+        allSpls = data.data || []
+      }
+      
+      // Filter by Date for Export
+      const now = new Date()
+      let filtered = allSpls
+      
+      switch (dateFilter) {
+        case "THIS_WEEK": {
+          const weekStart = startOfWeek(now, { weekStartsOn: 1 })
+          const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
+          filtered = filtered.filter((spl) =>
+            isWithinInterval(new Date(spl.date), { start: weekStart, end: weekEnd })
+          )
+          break
+        }
+        case "THIS_MONTH": {
+          const monthStart = startOfMonth(now)
+          const monthEnd = endOfMonth(now)
+          filtered = filtered.filter((spl) =>
+            isWithinInterval(new Date(spl.date), { start: monthStart, end: monthEnd })
+          )
+          break
+        }
+        case "LAST_MONTH": {
+          const lastMonth = subMonths(now, 1)
+          const lastMonthStart = startOfMonth(lastMonth)
+          const lastMonthEnd = endOfMonth(lastMonth)
+          filtered = filtered.filter((spl) =>
+            isWithinInterval(new Date(spl.date), { start: lastMonthStart, end: lastMonthEnd })
+          )
+          break
+        }
+        case "LAST_3_MONTHS": {
+          const threeMonthsAgo = subMonths(now, 3)
+          filtered = filtered.filter(
+            (spl) => new Date(spl.date) >= threeMonthsAgo
+          )
+          break
+        }
+        case "CUSTOM": {
+          if (customStartDate && customEndDate) {
+            const start = new Date(customStartDate)
+            const end = new Date(customEndDate)
+            filtered = filtered.filter((spl) =>
+              isWithinInterval(new Date(spl.date), { start, end })
+            )
+          }
+          break
+        }
+        default:
+          break
+      }
+      return filtered
+    } catch (e) {
+      console.error(e)
+      return []
+    }
+  }
+
+  const getSupervisorApprovalLabels = (spl: Spl) => {
+    if (spl.supervisor?.role === "GA") {
+      return { ga: spl.supervisor.name, deptHead: "-" }
+    }
+    if (spl.supervisor?.role === "DEPARTMENT_HEAD") {
+      return { ga: "-", deptHead: spl.supervisor.name }
+    }
+    return { ga: "Langsung Manager", deptHead: "Langsung Manager" }
+  }
+
+  const isExportEligible = (spl: Spl) => {
+    return spl.status === "APPROVED"
+  }
+
+  const exportHeaders = [
+    "No",
+    "Nama Karyawan",
+    "PIN",
+    "Departemen",
+    "Tanggal Lembur",
+    "Waktu Mulai",
+    "Waktu Selesai",
+    "Absensi Masuk",
+    "Absensi Pulang",
+    "Total Jam",
+    "Alasan Lembur",
+    "Status",
+    "Disetujui Oleh GA",
+    "Disetujui Oleh",
+    "Tanggal Persetujuan",
+    "Alasan Penolakan",
+    "Tanggal Pengajuan",
+    "Tanda Tangan",
+  ]
+
+  const exportColWidths = [
+    { wch: 5 }, { wch: 20 }, { wch: 10 }, { wch: 15 },
+    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+    { wch: 10 }, { wch: 40 }, { wch: 12 }, { wch: 20 },
+    { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 18 },
+    { wch: 12 },
+  ]
+
+  const roundHoursFromMinutes = (minutes: number | null): number | string | null => {
+    if (minutes === null || !Number.isFinite(minutes)) return null
+    if (minutes < 30) return 0
+    if (minutes === 30) return "30 menit"
+    const hours = Math.floor(minutes / 60)
+    const remainder = minutes % 60
+    return remainder > 30 ? hours + 1 : hours
+  }
+
+  const formatTotalHoursExport = (spl: Spl): number | string => {
+    const effectiveMinutes = getEffectiveMinutes(spl as any)
+    const roundedFromEffective = roundHoursFromMinutes(effectiveMinutes)
+    if (roundedFromEffective !== null) return roundedFromEffective
+
+    const fallback = Number(spl.totalHours)
+    if (!Number.isFinite(fallback)) return "-"
+    const fallbackMinutes = Math.round(fallback * 60)
+    const roundedFromStored = roundHoursFromMinutes(fallbackMinutes)
+    return roundedFromStored ?? "-"
+  }
+
+  const formatScanTime = (value: string) => {
+    const trimmed = (value || "").trim()
+    if (!trimmed) return "-"
+    const parts = trimmed.split(" ")
+    if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
+      return parts[1].slice(0, 5)
+    }
+    const normalized = trimmed.replace(" ", "T")
+    const parsed = new Date(normalized)
+    if (Number.isNaN(parsed.getTime())) return trimmed
+    return format(parsed, "HH:mm")
+  }
+
+  const getAttendanceTimes = (
+    records: AttendanceRecord[],
+    dateKey: string
+  ) => {
+    if (!dateKey || records.length === 0) {
+      return { checkIn: "-", checkOut: "-" }
+    }
+    const dayRecords = records.filter((record) => {
+      const recordDateKey = record.scan_date.split(" ")[0]
+      return recordDateKey === dateKey
+    })
+    if (dayRecords.length === 0) {
+      return { checkIn: "-", checkOut: "-" }
+    }
+    dayRecords.sort((a, b) => a.scan_date.localeCompare(b.scan_date))
+    return {
+      checkIn: formatScanTime(dayRecords[0].scan_date),
+      checkOut: formatScanTime(dayRecords[dayRecords.length - 1].scan_date),
+    }
+  }
+
+  const sortSplsForExport = (items: Spl[]) => {
+    return [...items].sort((a, b) => {
+      // Urutkan berdasarkan tanggal paling baru (descending)
+      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime()
+      if (dateCompare !== 0) return dateCompare
+
+      const nameCompare = a.requester.name.localeCompare(
+        b.requester.name,
+        "id-ID",
+        { sensitivity: "base" }
+      )
+      if (nameCompare !== 0) return nameCompare
+      
+      const aPin = (a.requester as any).pin || ""
+      const bPin = (b.requester as any).pin || ""
+      return aPin.localeCompare(bPin)
+    })
+  }
+
+  const buildExportContext = async (exportableSpls: Spl[]): Promise<ExportContext> => {
+    const needsPinLookup = exportableSpls.some(
+      (spl) => !((spl.requester as any).pin || "").toString().trim()
+    )
+    const nameToPin = new Map<string, string>()
+
+    if (needsPinLookup) {
+      try {
+        const response = await fetch("/api/hr/users")
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data)) {
+            data.forEach((user) => {
+              const name = (user?.name || "").toString().toLowerCase().trim()
+              const pin = (user?.pin || "").toString().trim()
+              if (name && pin && !nameToPin.has(name)) {
+                nameToPin.set(name, pin)
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user pins for attendance:", error)
+      }
+    }
+
+    const resolvePin = (spl: Spl) => {
+      const directPin = ((spl.requester as any).pin || "").toString().trim()
+      if (directPin) return directPin
+      const nameKey = spl.requester.name.toLowerCase().trim()
+      return nameToPin.get(nameKey) || ""
+    }
+
+    const uniquePins = Array.from(
+      new Set(exportableSpls.map(resolvePin).filter(Boolean))
+    )
+    const attendanceByPin = new Map<string, AttendanceRecord[]>()
+
+    if (uniquePins.length > 0) {
+      await Promise.all(
+        uniquePins.map(async (pin) => {
+          try {
+            const response = await fetch(
+              `/api/hr/attendance?pin=${encodeURIComponent(pin)}`
+            )
+            if (!response.ok) {
+              attendanceByPin.set(pin, [])
+              return
+            }
+            const data = await response.json()
+            const records = Array.isArray(data?.data) ? data.data : []
+            attendanceByPin.set(pin, records)
+          } catch (error) {
+            console.error("Error fetching attendance for pin:", pin, error)
+            attendanceByPin.set(pin, [])
+          }
+        })
+      )
+    }
+
+    return { resolvePin, attendanceByPin }
+  }
+
+  const buildRowsFromSpls = (items: Spl[], context: ExportContext): ExportRow[] => {
+    return items.map((spl, index) => {
+      const { resolvePin, attendanceByPin } = context
+      const supervisorLabels = getSupervisorApprovalLabels(spl)
+      const resolvedPin = resolvePin(spl)
+      const dateValue = new Date(spl.date)
+      const dateKey = Number.isNaN(dateValue.getTime())
+        ? ""
+        : format(dateValue, "yyyy-MM-dd")
+      const attendanceRecords = resolvedPin
+        ? attendanceByPin.get(resolvedPin) || []
+        : []
+      const attendanceTimes = getAttendanceTimes(attendanceRecords, dateKey)
+
+      const getStatusTextLabel = (status: string) => {
+        const statusMap: Record<string, string> = {
+          'PENDING': 'Menunggu',
+          'PENDING_SUPERADMIN': 'Review Super Admin',
+          'PENDING_SUPERVISOR': 'Menunggu Supervisor',
+          'PENDING_MANAGER': 'Menunggu Manager',
+          'APPROVED': 'Disetujui',
+          'IN_PROGRESS': 'Berjalan',
+          'DONE': 'Selesai',
+          'REJECTED': 'Ditolak',
+          'REJECTED_BY_SUPERVISOR': 'Ditolak Supervisor',
+          'REJECTED_BY_MANAGER': 'Ditolak Manager',
+        }
+        return statusMap[status] || status
+      }
+
+      return {
+        No: index + 1,
+        "Nama Karyawan": spl.requester.name,
+        PIN: resolvedPin || "-",
+        Departemen:
+          spl.requester.department?.name ||
+          spl.requester.departmentName ||
+          "-",
+        "Tanggal Lembur": Number.isNaN(dateValue.getTime())
+          ? "-"
+          : format(dateValue, "dd/MM/yyyy"),
+        "Waktu Mulai": spl.actualStartAt ? format(new Date(spl.actualStartAt), "HH:mm") : spl.startTime,
+        "Waktu Selesai": spl.actualEndAt ? format(new Date(spl.actualEndAt), "HH:mm") : spl.endTime,
+        "Absensi Masuk": attendanceTimes.checkIn,
+        "Absensi Pulang": attendanceTimes.checkOut,
+        "Total Jam": formatTotalHoursExport(spl),
+        "Alasan Lembur": spl.reason,
+        Status: getStatusTextLabel(spl.status),
+        "Disetujui Oleh GA": supervisorLabels.ga,
+        "Disetujui Oleh": spl.approver?.name || "-",
+        "Tanggal Persetujuan": spl.approvalDate
+          ? format(new Date(spl.approvalDate), "dd/MM/yyyy HH:mm")
+          : "-",
+        "Alasan Penolakan": spl.rejectionReason || "-",
+        "Tanggal Pengajuan": format(new Date(spl.createdAt), "dd/MM/yyyy HH:mm"),
+        "Tanda Tangan": spl.signature ? "Ada" : "Tidak",
+      }
+    })
+  }
+
+  const buildExportRows = async (): Promise<ExportRow[]> => {
+    const allSplsForExport = await fetchAllForExport()
+    const sortedSpls = sortSplsForExport(allSplsForExport)
+    const exportableSpls = sortedSpls.filter(isExportEligible)
+    if (exportableSpls.length === 0) return []
+
+    const exportContext = await buildExportContext(exportableSpls)
+    return buildRowsFromSpls(exportableSpls, exportContext)
+  }
+
+  const exportToExcel = async () => {
+    try {
+      const XLSX = await import("xlsx")
+      const allSplsForExport = await fetchAllForExport()
+      const sortedSpls = sortSplsForExport(allSplsForExport)
+      const exportableSpls = sortedSpls.filter(isExportEligible)
+
+      if (exportableSpls.length === 0) {
+        toast.error("Tidak ada data untuk diexport")
+        return
+      }
+
+      toast.loading("Mempersiapkan data dan membuat file Excel...", { id: "export-excel"})
+      const exportContext = await buildExportContext(exportableSpls)
+      const exportData = buildRowsFromSpls(exportableSpls, exportContext)
+
+      const ws = XLSX.utils.json_to_sheet(exportData, { header: exportHeaders })
+      const wb = XLSX.utils.book_new()
+
+      ws["!cols"] = exportColWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, "Data SPL")
+
+      const periodText = dateFilter === "ALL" ? "Semua_Periode" :
+        dateFilter === "THIS_WEEK" ? "Minggu_Ini" :
+          dateFilter === "THIS_MONTH" ? "Bulan_Ini" :
+            dateFilter === "LAST_MONTH" ? "Bulan_Lalu" :
+              dateFilter === "LAST_3_MONTHS" ? "3_Bulan_Terakhir" :
+                `${customStartDate}_sampai_${customEndDate}`
+
+      const fileName = `Data_SPL_Admin_${filterStatus}_${periodText}_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`
+      XLSX.writeFile(wb, fileName)
+
+      toast.success("Data berhasil diexport ke Excel!", { id: "export-excel"})
+    } catch (error) {
+      console.error("Error exporting to Excel:", error)
+      toast.error("Gagal export data", { id: "export-excel"})
+    }
+  }
+
+  const copyTableData = async () => {
+    try {
+      toast.loading("Mempersiapkan penyalinan data...", { id: "copy-table"})
+      const exportData = await buildExportRows()
+      if (exportData.length === 0) {
+        toast.error("Tidak ada data untuk disalin", { id: "copy-table"})
+        return
+      }
+
+      const tableData = exportData.map((row) =>
+        exportHeaders.map((header) => String(row[header] ?? ""))
+      )
+
+      const csvContent = [exportHeaders, ...tableData]
+        .map(row => row.map(cell => `"${cell}"`).join("\t"))
+        .join("\n")
+
+      await navigator.clipboard.writeText(csvContent)
+      toast.success("Data berhasil disalin ke clipboard!", { id: "copy-table"})
+    } catch (error) {
+      console.error("Error copying data:", error)
+      toast.error("Gagal menyalin data", { id: "copy-table"})
+    }
+  }
+
+  const wrapText = (text: string, maxChars: number) => {
+    const words = text.split(" ")
+    const lines: string[] = []
+    let current = ""
+    words.forEach((w) => {
+      if ((current + " " + w).trim().length > maxChars) {
+        if (current) lines.push(current.trim())
+        current = w
+      } else {
+        current += " " + w
+      }
+    })
+    if (current.trim()) lines.push(current.trim())
+    return lines
+  }
+
+  const fitTextToWidth = (text: string, maxWidth: number, font: any, size: number) => {
+    const normalized = text.replace(/\s+/g, " ").trim()
+    if (!normalized) return "-"
+    if (font.widthOfTextAtSize(normalized, size) <= maxWidth) return normalized
+    const ellipsis = "..."
+    const ellipsisWidth = font.widthOfTextAtSize(ellipsis, size)
+    let trimmed = normalized
+    while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed, size) + ellipsisWidth > maxWidth) {
+      trimmed = trimmed.slice(0, -1)
+    }
+    return trimmed.length > 0 ? `${trimmed}${ellipsis}` : ellipsis
+  }
+
+  const wrapTextByWidth = (
+    text: string,
+    maxWidth: number,
+    font: any,
+    size: number,
+    maxLines = 2
+  ) => {
+    const normalized = text.replace(/\s+/g, " ").trim()
+    if (!normalized) return ["-"]
+    const words = normalized.split(" ")
+    const lines: string[] = []
+    let current = ""
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word
+      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+        current = candidate
+      } else {
+        if (current) lines.push(current)
+        current = word
+      }
+      if (lines.length === maxLines) break
+    }
+
+    if (lines.length < maxLines && current) {
+      lines.push(current)
+    }
+
+    if (lines.length > maxLines) {
+      lines.length = maxLines
+    }
+
+    if (lines.length === maxLines) {
+      const lastIndex = maxLines - 1
+      lines[lastIndex] = fitTextToWidth(lines[lastIndex], maxWidth, font, size)
+    }
+
+    return lines
+  }
+
+  const generateRekapPdf = async () => {
+    const allSplsForExport = await fetchAllForExport()
+    if (allSplsForExport.length === 0) {
+      toast.error("Tidak ada data untuk direkap")
+      return
+    }
+
+    toast.loading("Membuat rekap dokumen PDF...", { id: "generate-pdf" })
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
+      const pdfDoc = await PDFDocument.create()
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+      const pageWidth = 595.28 // A4 width
+      const pageHeight = 841.89 // A4 height
+      const margin = 30
+
+      const colWidths = [25, 90, 40, 60, 45, 45, 100, 65, 65]
+      const headers = [
+        "No",
+        "Nama",
+        "PIN",
+        "Tanggal",
+        "Mulai",
+        "Selesai",
+        "Keterangan",
+        "TTD Pemohon",
+        "TTD Atasan",
+      ]
+      const tableWidth = colWidths.reduce((sum, width) => sum + width, 0)
+
+      const rowsPerPage = 8
+      const rowHeight = 60
+
+      const splsPerPage: Spl[][] = []
+      // We sort the results identical to hr page here too although order shouldn't matter too much
+      const sortedAllSpls = sortSplsForExport(allSplsForExport)
+      for (let i = 0; i < sortedAllSpls.length; i += rowsPerPage) {
+        splsPerPage.push(sortedAllSpls.slice(i, i + rowsPerPage))
+      }
+
+      let logoImage: any = null
+      try {
+        const logoResponse = await fetch("/logo.png")
+        if (logoResponse.ok) {
+          const logoBytes = await logoResponse.arrayBuffer()
+          logoImage = await pdfDoc.embedPng(logoBytes)
+        }
+      } catch (error) {
+        logoImage = null
+      }
+
+      const dataUrlToBytes = (dataUrl: string) => {
+        const base64 = dataUrl.split(",")[1]
+        if (!base64) return null
+        const binary = atob(base64)
+        const len = binary.length
+        const bytes = new Uint8Array(len)
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+        return bytes
+      }
+
+      for (let pageIndex = 0; pageIndex < splsPerPage.length; pageIndex++) {
+        const page = pdfDoc.addPage([pageWidth, pageHeight])
+        const pageSPLs = splsPerPage[pageIndex]
+        let y = pageHeight - margin
+
+        // --- HEADER ---
+        const logoSize = 40
+        if (logoImage) {
+          const scale = Math.min(
+            logoSize / logoImage.width,
+            logoSize / logoImage.height
+          )
+          const dims = logoImage.scale(scale)
+          const logoX = margin + (logoSize - dims.width) / 2
+          const logoY = y - logoSize + (logoSize - dims.height) / 2
+          page.drawImage(logoImage, { x: logoX, y: logoY, width: dims.width, height: dims.height })
+        } else {
+          page.drawRectangle({
+            x: margin, y: y - logoSize, width: logoSize, height: logoSize,
+            color: rgb(0.1, 0.6, 0.3), opacity: 0.2
+          })
+          page.drawCircle({ x: margin + 15, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+          page.drawCircle({ x: margin + 25, y: y - 20, size: 10, color: rgb(0.1, 0.6, 0.3) })
+        }
+
+        page.drawText("REKAP ABSEN MANUAL STAFF PT TUNAS ESTA INDONESIA", {
+          x: margin + logoSize + 15,
+          y: y - 25,
+          size: 14,
+          font: bold
+        })
+        y -= 60
+
+        // --- TABEL HEADER ---
+        const tableX = margin
+        let currentX = tableX
+
+        page.drawRectangle({
+          x: tableX, y: y - 25,
+          width: tableWidth, height: 25,
+          color: rgb(0.9, 0.9, 0.9)
+        })
+
+        for (let i = 0; i < headers.length; i++) {
+          const textWidth = bold.widthOfTextAtSize(headers[i], 9)
+          const centerX = currentX + (colWidths[i] - textWidth) / 2
+
+          page.drawText(headers[i], {
+            x: centerX, y: y - 17,
+            size: 9, font: bold
+          })
+
+          page.drawLine({
+            start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 },
+            thickness: 0.5, color: rgb(0, 0, 0)
+          })
+          currentX += colWidths[i]
+        }
+
+        page.drawLine({ start: { x: currentX, y: y }, end: { x: currentX, y: y - 25 }, thickness: 0.5, color: rgb(0, 0, 0) })
+        page.drawLine({ start: { x: tableX, y: y }, end: { x: currentX, y: y }, thickness: 0.5 })
+        page.drawLine({ start: { x: tableX, y: y - 25 }, end: { x: currentX, y: y - 25 }, thickness: 0.5 })
+        y -= 25
+
+        // --- TABEL ROWS ---
+        for (let index = 0; index < rowsPerPage; index++) {
+          const spl = pageSPLs[index]
+          const rowY = y - (index + 1) * rowHeight
+          currentX = tableX
+
+          page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+          if (spl) {
+            const rowData = [
+              `${pageIndex * rowsPerPage + index + 1}`,
+              spl.requester.name,
+              (spl.requester as any).pin || "-",
+              format(new Date(spl.date), "dd/MM/yyyy"),
+              spl.startTime,
+              spl.endTime,
+            ]
+
+            for (let i = 0; i < 6; i++) {
+              const isCenter = i !== 1
+              const rawText = rowData[i]
+              const textSize = 9
+              const displayText = fitTextToWidth(rawText, colWidths[i] - 10, font, textSize)
+              const textWidth = font.widthOfTextAtSize(displayText, textSize)
+              let textX = currentX + 5
+              if (isCenter) textX = currentX + (colWidths[i] - textWidth) / 2
+
+              page.drawText(displayText, {
+                x: textX, y: rowY + (rowHeight / 2) - 4,
+                size: textSize, font: font
+              })
+              currentX += colWidths[i]
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+
+            // Keterangan
+            const ketIndex = 6
+            const ketText = spl.reason || "-"
+            const ketLines = wrapText(ketText, 25)
+            let ketY = rowY + rowHeight - 15
+            ketLines.slice(0, 4).forEach((line) => {
+              page.drawText(line, { x: currentX + 5, y: ketY, size: 8, font })
+              ketY -= 10
+            })
+            currentX += colWidths[ketIndex]
+            page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+
+            const signatureCells = [
+              {
+                name: spl.requester.name,
+                signature: spl.signature || null,
+              },
+              {
+                name:
+                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                    ? spl.supervisor?.name || "-"
+                    : "-",
+                signature:
+                  spl.supervisor?.role === "GA" || spl.supervisor?.role === "DEPARTMENT_HEAD"
+                    ? spl.supervisorSignature || null
+                    : null,
+              },
+            ]
+
+            const drawSignatureImage = async (
+              dataUrl: string,
+              boxX: number,
+              boxY: number,
+              boxWidth: number,
+              boxHeight: number
+            ) => {
+              try {
+                const bytes = dataUrlToBytes(dataUrl)
+                if (!bytes) return
+                
+                let image
+                if (dataUrl.startsWith("data:image/png")) {
+                  image = await pdfDoc.embedPng(bytes)
+                } else if (dataUrl.startsWith("data:image/jpeg")) {
+                  image = await pdfDoc.embedJpg(bytes)
+                } else {
+                  return
+                }
+
+                const imgDims = image.scale(1)
+                const scale = Math.min(
+                  (boxWidth - 4) / imgDims.width,
+                  (boxHeight - 10) / imgDims.height
+                )
+                const finalDims = image.scale(scale)
+                
+                const imgX = boxX + (boxWidth - finalDims.width) / 2
+                const imgY = boxY + 5 + (boxHeight - 10 - finalDims.height) / 2
+                
+                page.drawImage(image, {
+                  x: imgX,
+                  y: imgY,
+                  width: finalDims.width,
+                  height: finalDims.height,
+                  opacity: 0.8
+                })
+              } catch (e) {
+                console.error("Error drawing signature image:", e)
+              }
+            }
+
+            for (let i = 0; i < 2; i++) {
+              const cellWidth = colWidths[7 + i]
+              const sigData = signatureCells[i]
+              
+              const lines = wrapTextByWidth(sigData.name, cellWidth - 4, font, 7, 2)
+              lines.forEach((line, lineIdx) => {
+                const lineWidth = font.widthOfTextAtSize(line, 7)
+                page.drawText(line, {
+                  x: currentX + (cellWidth - lineWidth) / 2,
+                  y: rowY + 5 + (lines.length - 1 - lineIdx) * 8,
+                  size: 7,
+                  font,
+                })
+              })
+
+              const signatureBoxY = rowY + 15
+              const signatureBoxHeight = rowHeight - 20
+              const signatureBoxWidth = cellWidth
+              const signatureBoxX = currentX
+
+              if (sigData.signature && sigData.signature.startsWith("data:image")) {
+                await drawSignatureImage(
+                  sigData.signature,
+                  signatureBoxX,
+                  signatureBoxY,
+                  signatureBoxWidth,
+                  signatureBoxHeight
+                )
+              } else {
+                page.drawText("-", {
+                  x: signatureBoxX + signatureBoxWidth / 2 - 2,
+                  y: signatureBoxY + signatureBoxHeight / 2 - 4,
+                  size: 8,
+                  font,
+                })
+              }
+
+              currentX += cellWidth
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+          } else {
+            for (let i = 0; i < colWidths.length; i++) {
+              currentX += colWidths[i]
+              page.drawLine({ start: { x: currentX, y: rowY }, end: { x: currentX, y: rowY + rowHeight }, thickness: 0.5 })
+            }
+          }
+          page.drawLine({ start: { x: tableX, y: rowY }, end: { x: tableX + tableWidth, y: rowY }, thickness: 0.5 })
+        }
+
+        const footerY = 80
+        const boxWidth = 140
+        const totalFooterWidth = pageWidth - (margin * 2)
+        const gap = (totalFooterWidth - (boxWidth * 3)) / 2
+
+        const signatures = [
+          { role: "Diajukan Oleh", name: "..........................", title: "Pemohon / Leader" },
+          { role: "Disetujui Oleh", name: "Zhalilla Viola R.S.", title: "HR & GA Supervisor" },
+          { role: "Mengetahui", name: "Tiyas Indah S.", title: "Plant Manager" },
+        ]
+
+        const dateText = `Demak, ${format(new Date(), "dd MMMM yyyy", { locale: id })}`
+        const dateXPos = margin + (2 * (boxWidth + gap))
+        const dateWidth = font.widthOfTextAtSize(dateText, 10)
+        const centeredDateX = dateXPos + (boxWidth - dateWidth) / 2
+
+        page.drawText(dateText, {
+          x: centeredDateX,
+          y: footerY + 85,
+          size: 10, font
+        })
+
+        signatures.forEach((sig, idx) => {
+          const xPos = margin + (idx * (boxWidth + gap))
+
+          const drawCentered = (text: string, y: number, f: any, s: number) => {
+            const w = f.widthOfTextAtSize(text, s)
+            page.drawText(text, { x: xPos + (boxWidth - w) / 2, y, size: s, font: f })
+          }
+
+          drawCentered(sig.role + " :", footerY + 60, bold, 9)
+
+          page.drawLine({
+            start: { x: xPos, y: footerY + 25 },
+            end: { x: xPos + boxWidth, y: footerY + 25 },
+            thickness: 0.5
+          })
+
+          drawCentered(sig.name, footerY + 12, bold, 9)
+          drawCentered(sig.title, footerY, font, 9)
+        })
+
+      } // End Page Loop
+
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `Rekap_Lembur_Manual_${format(new Date(), "yyyyMMdd_HHmmss")}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success("Rekap PDF berhasil dibuat", { id: "generate-pdf" })
+    } catch (error) {
+      console.error("Gagal membuat rekap PDF:", error)
+      toast.error("Gagal membuat rekap PDF", { id: "generate-pdf" })
+    }
+  }
+
   if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -378,12 +1277,72 @@ export default function SplHistoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Riwayat SPL</h1>
-        <p className="text-gray-600 text-sm mt-1">View dan delete riwayat semua SPL</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Riwayat SPL</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Tabel otomatis diurutkan dari tanggal lembur terbaru.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            Urut: Tanggal Terbaru
+          </span>
+          {searchQuery.trim() && (
+            <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+              Hasil pencarian: {total}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Focused User Insight */}
+      {focusedUser && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500 mb-2">
+          <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl shadow-md p-5 text-white">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold border-2 border-white/30">
+                  {focusedUser.name.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold leading-tight">{focusedUser.name}</h2>
+                  <p className="text-red-100 text-xs">
+                    PIN: {focusedUser.pin || "-"} • {(focusedUser.department?.name || focusedUser.departmentName || "-")}
+                  </p>
+                  <p className="text-red-100 text-[10px] mt-0.5 opacity-80">{focusedUser.position || "-"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push(`/dashboard/admin/employee-mirror/${focusedUser.id}`)}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-semibold transition-all backdrop-blur-sm border border-white/20 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Lihat Profil Lengkap
+                </button>
+                <button
+                  onClick={() => {
+                    setSearchInput("")
+                    setSearchQuery("")
+                  }}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
+                  title="Tutup Fokus"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -413,23 +1372,55 @@ export default function SplHistoryPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Cari user, email, atau alasan..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_0.7fr_auto]">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Cari nama, email, ID SPL, ID user, PIN, project, atau alasan..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <svg
+              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("")
+                  setSearchQuery("")
+                  setPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                title="Bersihkan pencarian"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
           <select
             value={filterStatus}
             onChange={(e) => {
               setFilterStatus(e.target.value)
               setPage(1)
             }}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="ALL">Semua Status</option>
+            <option value="PENDING_SUPERADMIN">Pending Super Admin</option>
             <option value="PENDING_SUPERVISOR">Pending Supervisor</option>
             <option value="PENDING_MANAGER">Pending Manager</option>
             <option value="APPROVED">Approved</option>
@@ -438,7 +1429,103 @@ export default function SplHistoryPage() {
             <option value="REJECTED_BY_SUPERVISOR">Rejected (Supervisor)</option>
             <option value="REJECTED_BY_MANAGER">Rejected (Manager)</option>
           </select>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchInput("")
+              setSearchQuery("")
+              setFilterStatus("ALL")
+              setPage(1)
+            }}
+            className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Reset
+          </button>
         </div>
+        {/* Date Filter */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-3">Filter Periode:</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+            {[
+              { value: "ALL", label: "Semua Periode" },
+              { value: "THIS_WEEK", label: "Minggu Ini" },
+              { value: "THIS_MONTH", label: "Bulan Ini" },
+              { value: "LAST_MONTH", label: "Bulan Lalu" },
+              { value: "LAST_3_MONTHS", label: "3 Bulan Terakhir" },
+              { value: "CUSTOM", label: "Custom" }
+            ].map((period) => (
+              <button
+                key={period.value}
+                onClick={() => setDateFilter(period.value)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${dateFilter === period.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Date Range */}
+          {dateFilter === "CUSTOM" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Tanggal Mulai</label>
+                <input
+                className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Tanggal Selesai</label>
+                <input
+                className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Export Buttons */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end gap-4 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+            <Button
+              onClick={copyTableData}
+              variant="outline"
+              className="flex items-center justify-center gap-2 flex-1 lg:flex-none"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy Table
+            </Button>
+            <Button
+              onClick={exportToExcel}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 flex-1 lg:flex-none text-white hover:from-green-700 hover:to-green-800"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Excel
+            </Button>
+            <Button
+              onClick={generateRekapPdf}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700 flex-1 lg:flex-none text-white hover:from-purple-700 hover:to-purple-800"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Export PDF
+            </Button>
+          </div>
+        </div>
+
         {isFetching && (
           <p className="text-xs text-gray-500">Memuat data terbaru...</p>
         )}
@@ -463,9 +1550,14 @@ export default function SplHistoryPage() {
                 {getStatusBadge(spl.status)}
               </div>
               <div>
-                <div className="font-semibold text-gray-900">{spl.requester.name}</div>
+                <div 
+                  className="font-semibold text-gray-900 cursor-pointer hover:text-red-600 transition-colors"
+                  onClick={() => focusOnUser(spl.requester.name)}
+                >
+                  {spl.requester.name}
+                </div>
                 <div className="text-xs text-gray-500">
-                  {(spl.requester.department?.name || spl.requester.departmentName || "-")} â€¢ {spl.requester.position || "-"}
+                  {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
                 </div>
               </div>
               <div className="text-sm text-gray-600">
@@ -520,78 +1612,102 @@ export default function SplHistoryPage() {
       {/* SPL Table (Desktop) */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[1000px] w-full whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Waktu</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jam</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alasan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Waktu</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jam</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">Alasan</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Type</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200">
               {spls.map((spl) => (
-                <tr key={spl.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                <tr key={spl.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                     {new Date(spl.date).toLocaleDateString("id-ID", {
                       day: "2-digit",
                       month: "short",
-                      year: "numeric",
                     })}
+                    <span className="hidden lg:inline"> {new Date(spl.date).getFullYear()}</span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="font-medium text-gray-900">{spl.requester.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {(spl.requester.department?.name || spl.requester.departmentName || "-")} • {spl.requester.position || "-"}
+                  <td className="px-4 py-4">
+                    <div className="max-w-[150px] lg:max-w-[200px]">
+                      <div 
+                        className="font-semibold text-gray-900 cursor-pointer hover:text-red-600 transition-colors truncate"
+                        onClick={() => focusOnUser(spl.requester.name)}
+                        title={spl.requester.name}
+                      >
+                        {spl.requester.name}
+                      </div>
+                      <div className="text-[10px] text-gray-500 truncate">
+                        {(spl.requester.department?.name || spl.requester.departmentName || "-")}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {spl.startTime} - {spl.endTime}
+                  <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-600 hidden lg:table-cell">
+                    <div className="flex flex-col">
+                      <span>{spl.startTime}</span>
+                      <span className="text-gray-400">s/d</span>
+                      <span>{spl.endTime}</span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm font-bold text-gray-900">
+                      {formatHoursDisplay(getEffectiveHours(spl) ?? spl.totalHours)}
+                    </div>
+                    <div className="lg:hidden text-[10px] text-gray-400">
+                      {spl.startTime}-{spl.endTime}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                    {spl.reason}
+                  <td className="px-4 py-4 text-xs text-gray-600 max-w-[200px] hidden xl:table-cell">
+                    <div className="line-clamp-2 italic" title={spl.reason}>
+                      &quot;{spl.reason}&quot;
+                    </div>
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(spl.status)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {getStatusBadge(spl.status)}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
+                    <div className="flex flex-col gap-1">
                       {spl.isManualEntry && (
-                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
-                          Manual
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded text-center border border-purple-200">
+                          MANUAL
                         </span>
                       )}
                       {isMorningOvertime(spl) && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded">
-                          Lembur Pagi
+                        <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded text-center border border-orange-200">
+                          PAGI
+                        </span>
+                      )}
+                      {!spl.isManualEntry && !isMorningOvertime(spl) && (
+                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded text-center">
+                          SYSTEM
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEdit(spl)}
-                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
                         title="Edit Data"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
                         onClick={() => handleDelete(spl.id, spl.requester.name, spl.date)}
-                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Hapus Permanen"
+                        className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                        title="Hapus"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
@@ -808,4 +1924,5 @@ export default function SplHistoryPage() {
     </div>
   )
 }
+
 

@@ -11,6 +11,7 @@ import {
   parseTimeToMinutes,
 } from "@/lib/spl-time"
 import { windowsOverlap } from "@/lib/regular-hours"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 // DELETE - Delete SPL (by Super Admin)
 export async function DELETE(
@@ -44,6 +45,16 @@ export async function DELETE(
     // Delete SPL
     await prisma.spl.delete({
       where: { id: params.id },
+    })
+
+    await recordSplAudit({
+      splId: spl.id,
+      action: "ADMIN_DELETE",
+      actorId: session.user.id,
+      oldStatus: spl.status,
+      newStatus: null,
+      source: spl.source,
+      note: "Dihapus oleh Super Admin",
     })
 
     return NextResponse.json({
@@ -260,6 +271,19 @@ export async function PATCH(
     const updated = await prisma.spl.update({
       where: { id: params.id },
       data: updateData,
+    })
+
+    await recordSplAudit({
+      splId: updated.id,
+      action: "ADMIN_EDIT",
+      actorId: session.user.id,
+      oldStatus: updated.status,
+      newStatus: updated.status,
+      source: updated.source,
+      note:
+        actualStartTime && actualEndTime
+          ? "Edit detail + realisasi oleh Super Admin"
+          : "Edit detail oleh Super Admin",
     })
 
     return NextResponse.json({

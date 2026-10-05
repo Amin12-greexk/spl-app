@@ -3,6 +3,17 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+const normalizeEndpoint = (value?: string | null) => value?.trim() || ""
+
+const isLikelyFcmToken = (value?: string | null) => {
+  const endpoint = normalizeEndpoint(value)
+  if (!endpoint) return false
+  if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) return false
+  if (endpoint === "user-token" || endpoint.startsWith("fallback-")) return false
+  if (endpoint.length < 80) return false
+  return /^[A-Za-z0-9:_-]+$/.test(endpoint)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,10 +24,11 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { endpoint, keys } = body
+    const normalizedEndpoint = normalizeEndpoint(endpoint)
 
-    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    if (!isLikelyFcmToken(normalizedEndpoint)) {
       return NextResponse.json(
-        { error: "Invalid subscription data" },
+        { error: "FCM token tidak valid" },
         { status: 400 }
       )
     }
@@ -24,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Pastikan endpoint tidak terdaftar untuk user lain (hindari notifikasi tercampur)
     await prisma.userNotification.deleteMany({
       where: {
-        endpoint,
+        endpoint: normalizedEndpoint,
         userId: {
           not: session.user.id,
         },
@@ -35,7 +47,7 @@ export async function POST(req: NextRequest) {
     const existingSubscription = await prisma.userNotification.findFirst({
       where: {
         userId: session.user.id,
-        endpoint,
+        endpoint: normalizedEndpoint,
       },
     })
 
@@ -47,9 +59,9 @@ export async function POST(req: NextRequest) {
     await prisma.userNotification.create({
       data: {
         userId: session.user.id,
-        endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
+        endpoint: normalizedEndpoint,
+        p256dh: keys?.p256dh || normalizedEndpoint,
+        auth: keys?.auth || normalizedEndpoint,
       },
     })
 
@@ -73,8 +85,9 @@ export async function DELETE(req: NextRequest) {
 
     const body = await req.json()
     const { endpoint } = body
+    const normalizedEndpoint = normalizeEndpoint(endpoint)
 
-    if (!endpoint) {
+    if (!normalizedEndpoint) {
       return NextResponse.json(
         { error: "Endpoint required" },
         { status: 400 }
@@ -85,7 +98,7 @@ export async function DELETE(req: NextRequest) {
     await prisma.userNotification.deleteMany({
       where: {
         userId: session.user.id,
-        endpoint,
+        endpoint: normalizedEndpoint,
       },
     })
 

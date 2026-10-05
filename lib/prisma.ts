@@ -15,4 +15,6 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 
-if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma
+// Cache di SEMUA environment termasuk production
+// Di self-hosted (long-running server), tanpa ini setiap request buat PrismaClient baru → connection exhaustion
+globalThis.prisma = prisma

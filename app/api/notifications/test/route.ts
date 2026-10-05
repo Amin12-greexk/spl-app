@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { isLikelyFcmToken } from "@/lib/firebase-admin"
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,17 +45,9 @@ export async function POST(req: NextRequest) {
     console.log(`   Message: ${message.trim()}`)
     console.log(`   Tokens: ${userNotifications.length}`)
 
-    // Filter only valid FCM tokens (start with specific patterns or have proper length)
+    // Filter with the same validator used by real notification delivery.
     const validFcmTokens = userNotifications.filter(token => {
-      const endpoint = token.endpoint
-      // FCM tokens typically start with specific patterns and are long
-      return (
-        endpoint.startsWith('c') && endpoint.length > 50 ||
-        endpoint.startsWith('f') && endpoint.length > 50 ||
-        endpoint.startsWith('e') && endpoint.length > 50 ||
-        endpoint.includes('fcm') ||
-        endpoint.includes('firebase')
-      )
+      return isLikelyFcmToken(token.endpoint)
     })
 
     // Try to send real Firebase notifications if valid tokens exist

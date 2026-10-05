@@ -44,18 +44,30 @@ export default function NotificationToggle() {
 
     setIsUnsubscribing(true)
     try {
-      // Coba dapatkan token untuk unsubscribe
+      const { revokeNotificationToken } = await import("@/lib/firebase")
+      const storedToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("fcm_notification_token")
+          : null
+      const currentToken = await revokeNotificationToken()
+      const tokenToDelete = currentToken || storedToken
+
+      if (!tokenToDelete) {
+        throw new Error("FCM token tidak ditemukan di browser")
+      }
+
       const response = await fetch("/api/notifications/subscribe", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          endpoint: "user-token", // Placeholder
+          endpoint: tokenToDelete,
         }),
       })
 
       if (response.ok) {
+        localStorage.removeItem("fcm_notification_token")
         toast.success("Notifikasi berhasil dinonaktifkan")
         window.location.reload()
       } else {

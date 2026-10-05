@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { startOfDay, makeWindow } from "@/lib/spl-time"
+import { recordSplAudit } from "@/lib/spl-audit"
 
 // Batas maksimal hari tanpa input realisasi sebelum auto-fill
 const MAX_DAYS_WITHOUT_REALIZATION = 3
@@ -68,10 +69,10 @@ export async function GET(req: NextRequest) {
 
         let filled = 0
         const filledIds: string[] = []
+        const updateOps = []
+        const validSpls = []
 
         for (const spl of overdueSpls) {
-            // Tentukan actualStart dan actualEnd dari plannedStart/plannedEnd
-            // atau dari startTime/endTime SPL
             let actualStartAt: Date
             let actualEndAt: Date
 
@@ -79,7 +80,6 @@ export async function GET(req: NextRequest) {
                 actualStartAt = new Date(spl.plannedStartAt)
                 actualEndAt = new Date(spl.plannedEndAt)
             } else {
-                // Fallback: hitung dari startTime/endTime + date
                 const baseDay = startOfDay(new Date(spl.date))
                 const window = makeWindow(baseDay, spl.startTime, spl.endTime)
                 if (!window) continue
@@ -87,28 +87,44 @@ export async function GET(req: NextRequest) {
                 actualEndAt = window.end
             }
 
-            // Hitung total jam realisasi
             const durationMinutes = Math.round(
                 (actualEndAt.getTime() - actualStartAt.getTime()) / 60000
             )
             const actualTotalHours = durationMinutes / 60
 
-            try {
-                await prisma.spl.update({
+            updateOps.push(
+                prisma.spl.update({
                     where: { id: spl.id },
                     data: {
                         actualStartAt,
                         actualEndAt,
                         actualTotalHours,
-                        // Jika plannedStartAt/plannedEndAt belum terisi, isi sekarang
                         plannedStartAt: spl.plannedStartAt ?? actualStartAt,
                         plannedEndAt: spl.plannedEndAt ?? actualEndAt,
                     },
                 })
-                filled++
-                filledIds.push(spl.id)
+            )
+            validSpls.push(spl)
+        }
+
+        if (updateOps.length > 0) {
+            try {
+                await prisma.$transaction(updateOps)
+                for (const spl of validSpls) {
+                    await recordSplAudit({
+                        splId: spl.id,
+                        action: "REALIZATION_AUTOFILL",
+                        actorId: null,
+                        oldStatus: "PENDING_MANAGER",
+                        newStatus: "PENDING_MANAGER",
+                        source: "SYSTEM_CRON",
+                        note: `Auto-fill realisasi dari rencana (>${MAX_DAYS_WITHOUT_REALIZATION} hari tanpa realisasi)`,
+                    })
+                    filled++
+                    filledIds.push(spl.id)
+                }
             } catch (err) {
-                console.error(`[AutoFill] Gagal update SPL ${spl.id}:`, err)
+                console.error(`[AutoFill] Gagal melakukan batch update SPL:`, err)
             }
         }
 

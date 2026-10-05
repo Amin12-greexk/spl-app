@@ -16,6 +16,39 @@ function extractEnvValue(text: string, key: string): string | null {
   return raw;
 }
 
+function toCsv<T extends Record<string, any>>(data: T[]): string {
+  if (data.length === 0) {
+    return "";
+  }
+
+  const headers = Object.keys(data[0]);
+  const headerRow = headers.map(header => `"${header}"`).join(",");
+
+  const rows = data.map(row => {
+    return headers.map(header => {
+      let value = row[header];
+      if (value === null || value === undefined) {
+        value = "";
+      } else if (typeof value === "object" && value instanceof Date) {
+        value = value.toISOString();
+      } else if (typeof value === "object") {
+        // For nested objects, stringify them to JSON
+        value = JSON.stringify(value);
+      } else {
+        value = String(value);
+      }
+
+      // Escape double quotes and wrap in double quotes if value contains comma, double quote, or newline
+      if (value.includes(",") || value.includes("\"") || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    }).join(",");
+  });
+
+  return [headerRow, ...rows].join("\n");
+}
+
 async function main() {
   // Load DATABASE_URL from .env without mutating the file.
   const envPath = path.join(process.cwd(), ".env");
@@ -74,7 +107,12 @@ async function main() {
     const summaryPath = path.join(backupDir, "summary.json");
     await fs.writeFile(summaryPath, JSON.stringify(payload.meta, null, 2), "utf8");
 
-    console.log(JSON.stringify({ backupDir, outPath, summaryPath }, null, 2));
+    // Export SPLs to CSV
+    const splsCsv = toCsv(spls);
+    const splsCsvPath = path.join(backupDir, "spls.csv");
+    await fs.writeFile(splsCsvPath, splsCsv, "utf8");
+
+    console.log(JSON.stringify({ backupDir, outPath, summaryPath, splsCsvPath }, null, 2));
   } finally {
     await prisma.$disconnect();
   }
