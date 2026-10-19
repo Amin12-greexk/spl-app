@@ -115,10 +115,22 @@ export async function GET(request: NextRequest) {
 
           effectiveRegularStartTime = shiftDefinition.start
           effectiveRegularEndTime = shiftDefinition.end
-        } else if (dayOfWeek === 6) {
-          // Security 5-day rule: Saturday without assigned shift is treated as holiday.
-          effectiveRegularStartTime = null
-          effectiveRegularEndTime = null
+        } else {
+          // Jam per hari khusus (mis. Sabtu setengah hari) berlaku untuk Security hanya bila
+          // orangnya punya pengaturan; tanpa itu perilaku lama (Sabtu = libur) tetap.
+          const securityOverrideSetting = await prisma.setting.findUnique({
+            where: { key: makeRegularOverrideKey(user.id, dayOfWeek) },
+            select: { value: true },
+          })
+          const securityOverride = parseRegularOverrideValue(securityOverrideSetting?.value)
+          if (securityOverride) {
+            effectiveRegularStartTime = securityOverride.startTime
+            effectiveRegularEndTime = securityOverride.endTime
+          } else if (dayOfWeek === 6) {
+            // Security 5-day rule: Saturday without assigned shift is treated as holiday.
+            effectiveRegularStartTime = null
+            effectiveRegularEndTime = null
+          }
         }
       } else {
         const overrideKey = makeRegularOverrideKey(user.id, dayOfWeek)

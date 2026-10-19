@@ -250,6 +250,16 @@ async function createManualSplEntry(
       select: { shiftCode: true },
     })
 
+    // Jam per hari khusus (mis. Sabtu setengah hari) berlaku untuk Security hanya bila
+    // orangnya punya pengaturan; tanpa itu perilaku lama (Sabtu = libur) tetap.
+    const securityOverrideSetting = await prisma.setting.findUnique({
+      where: { key: makeRegularOverrideKey(user.id, dayOfWeek) },
+      select: { value: true },
+    })
+    const securityOverride = parseRegularOverrideValue(securityOverrideSetting?.value)
+    const securityRegularStartTime = securityOverride?.startTime || user.regularStartTime
+    const securityRegularEndTime = securityOverride?.endTime || user.regularEndTime
+
     if (isSecurityOffShift(shiftAssignment?.shiftCode)) {
       isSecurityWeeklyHoliday = true
     } else if (shiftAssignment?.shiftCode) {
@@ -277,12 +287,12 @@ async function createManualSplEntry(
       }
       regularStartAt = regularWindow.start
       regularEndAt = regularWindow.end
-    } else if (dayOfWeek === 6) {
+    } else if (dayOfWeek === 6 && !securityOverride) {
       // Security 5-day rule: Saturday without assigned shift is treated as weekly holiday.
       isSecurityWeeklyHoliday = true
-    } else if (user.regularStartTime && user.regularEndTime) {
-      const regularStartMinutes = parseTimeToMinutes(user.regularStartTime)
-      const regularEndMinutes = parseTimeToMinutes(user.regularEndTime)
+    } else if (securityRegularStartTime && securityRegularEndTime) {
+      const regularStartMinutes = parseTimeToMinutes(securityRegularStartTime)
+      const regularEndMinutes = parseTimeToMinutes(securityRegularEndTime)
       if (regularStartMinutes === null || regularEndMinutes === null) {
         return {
           ok: false as const,
@@ -299,8 +309,8 @@ async function createManualSplEntry(
       }
       const regularWindow = makeWindow(
         requestedDate,
-        user.regularStartTime,
-        user.regularEndTime
+        securityRegularStartTime,
+        securityRegularEndTime
       )
       if (!regularWindow) {
         return {
