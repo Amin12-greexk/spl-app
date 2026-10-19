@@ -21,7 +21,6 @@ export default function SplForm() {
   const router = useRouter()
   const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
-  const [minStart, setMinStart] = useState("16:30")
   const [regularHours, setRegularHours] = useState<{
     start: string | null
     end: string | null
@@ -64,21 +63,6 @@ export default function SplForm() {
     const day = String(now.getDate()).padStart(2, "0")
     return `${year}-${month}-${day}`
   })()
-
-  useEffect(() => {
-    const loadMin = async () => {
-      try {
-        const res = await fetch("/api/settings/min-overtime")
-        const data = await res.json()
-        if (res.ok && data?.value) {
-          setMinStart(data.value)
-        }
-      } catch (err) {
-        console.error("Gagal mengambil setting jam minimal lembur", err)
-      }
-    }
-    loadMin()
-  }, [])
 
   useEffect(() => {
     const loadFlags = async () => {
@@ -599,9 +583,9 @@ const capturePhoto = async () => {
         icon: "success",
         title: "Berhasil",
         text:
-          data.status === "PENDING_SUPERADMIN"
-            ? "SPL telat berhasil diajukan dan sedang direview Super Admin sebelum diteruskan ke Manager."
-            : "SPL berhasil diajukan!",
+          data.status === "PENDING_MANAGER"
+            ? "SPL berhasil diajukan dan diteruskan ke Manager."
+            : "SPL berhasil diajukan dan diteruskan ke atasan.",
       })
       router.push("/dashboard")
       router.refresh()
@@ -883,7 +867,7 @@ const capturePhoto = async () => {
                   hint={
                     isSecurityDepartment
                       ? "Security: sesuaikan dengan waktu pulang"
-                      : `Batas normal: ${minStart}. Lewat batas akan direview Super Admin`
+                      : "Isi sesuai jam mulai lembur sebenarnya"
                   }
                   selectClassName="border-gray-200 focus:ring-green-500 focus:border-green-500"
                 />

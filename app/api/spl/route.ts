@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { CreateSplInput, SplStatus, Role } from "@/types"; // <-- IMPORT DIPERBAIKI
-import { sendNotificationToRoles, sendNotificationToUser } from "@/lib/notification-utils";
+import { sendNotificationToUser } from "@/lib/notification-utils";
 import { getSupervisorForDepartment } from "@/lib/supervisor-mapping";
 import { recordSplAudit } from "@/lib/spl-audit";
 import {
@@ -489,25 +489,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let isLateCutoffSubmission = false
-
-    // Validasi waktu pengajuan (tidak berlaku untuk Security)
-    if (!isSecurityDepartment) {
-      // Ambil batas maksimal waktu pengajuan yang diset manager (default 16:30)
-      const minSetting = await prisma.setting.findUnique({
-        where: { key: "MIN_OVERTIME_START" },
-      })
-      const minTime = minSetting?.value || "16:30"
-      const [minHour, minMin] = minTime.split(":").map(Number)
-
-      // Hard stop: jika waktu pengajuan (saat ini) melewati batas maksimal
-      const nowMinutes = getJakartaTimeMinutes(new Date())
-      const minTotalMinutes = minHour * 60 + minMin
-      if (nowMinutes > minTotalMinutes) {
-        isLateCutoffSubmission = true
-      }
-    }
-
     if (!isAutoMode) {
       const startMinutes = parseTimeToMinutes(body.startTime as string)
       const endMinutes = parseTimeToMinutes(body.endTime as string)
@@ -796,18 +777,15 @@ export async function POST(req: NextRequest) {
 
     const totalHours = parseFloat((totalMinutes / 60).toFixed(2))
 
-    const needsSuperAdminReview = isPastDateSubmission || isLateCutoffSubmission
-
     // Check user's role and supervisor
     // Determine initial status based on role and department approval rules
     let initialStatus = "PENDING_MANAGER"
     let supervisorId: string | null = null
     const routingDepartmentName = currentDepartmentName || null
 
-    if (needsSuperAdminReview) {
-      initialStatus = "PENDING_SUPERADMIN"
-      supervisorId = null
-    } else if (userRecord.supervisorId) {
+    // Pengajuan telat (tanggal lampau / lewat jam) tidak lagi direview Super Admin:
+    // alurnya sama dengan pengajuan biasa, langsung ke atasan (atau Manager bila tanpa atasan).
+    if (userRecord.supervisorId) {
       initialStatus = "PENDING_SUPERVISOR"
       supervisorId = userRecord.supervisorId
     } else if (
@@ -872,7 +850,12 @@ export async function POST(req: NextRequest) {
       oldStatus: null,
       newStatus: initialStatus,
       source: "SYSTEM",
-      note: isAutoMode ? "Mode AUTO (realisasi via fingerprint)" : "Mode MANUAL",
+      note: [
+        isAutoMode ? "Mode AUTO (realisasi via fingerprint)" : "Mode MANUAL",
+        isPastDateSubmission ? "Pengajuan telat (tanggal lembur sudah lewat)" : null,
+      ]
+        .filter(Boolean)
+        .join("; "),
     });
 
     // --- Logika Mengirim Notifikasi (Multi-level approval) ---
@@ -887,22 +870,9 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       });
 
-      const notificationTitle =
-        initialStatus === "PENDING_SUPERADMIN"
-          ? "SPL Telat Perlu Review Super Admin"
-          : "Pengajuan SPL Baru";
-      const notificationBody =
-        initialStatus === "PENDING_SUPERADMIN"
-          ? `${authUser.name} mengajukan SPL telat untuk ${formattedDate} (${splStartTime} - ${splEndTime}) dan menunggu review Super Admin.`
-          : `${authUser.name} mengajukan lembur pada ${formattedDate} (${splStartTime} - ${splEndTime}).`;
-      if (initialStatus === "PENDING_SUPERADMIN") {
-        await sendNotificationToRoles(
-          ["SUPER_ADMIN"],
-          notificationTitle,
-          notificationBody,
-          { splId: spl.id, click_action: "/dashboard/ga/persetujuan" }
-        );
-      } else if (spl.supervisorId) {
+      const notificationTitle = "Pengajuan SPL Baru";
+      const notificationBody = `${authUser.name} mengajukan lembur pada ${formattedDate} (${splStartTime} - ${splEndTime}).`;
+      if (spl.supervisorId) {
         await sendNotificationToUser(
           spl.supervisorId,
           notificationTitle,
