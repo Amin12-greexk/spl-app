@@ -6,7 +6,7 @@ import { memo, useMemo } from "react"
 import { makeWindow, startOfDay } from "@/lib/spl-time"
 import { isMorningOvertime } from "@/lib/spl-labels"
 import { getEffectiveHours } from "@/lib/spl-hours"
-import { getSplStatusInfo } from "@/lib/spl-status"
+import { getSplStatusInfo, getSupervisorDisplayName } from "@/lib/spl-status"
 import SplProgress from "./SplProgress"
 
 interface SplCardProps {
@@ -107,11 +107,21 @@ function SplCard({
     return (
       <div className="flex flex-col items-end gap-1">
         <span
-          className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${statusInfo.badgeColor.bg} ${statusInfo.badgeColor.text} ${statusInfo.badgeColor.border} shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
+          className={`${
+            isCompact
+              ? "px-2 py-0.5 text-[10px] font-semibold"
+              : "px-2.5 py-1 text-xs font-bold"
+          } rounded-md border ${statusInfo.badgeColor.bg} ${statusInfo.badgeColor.text} ${statusInfo.badgeColor.border} shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
           title={statusInfo.description}
         >
-          <span className={`w-2 h-2 rounded-full ${statusInfo.badgeColor.dot}`} />
-          {displayLabel}
+          <span
+            className={`${
+              isCompact ? "w-1.5 h-1.5" : "w-2 h-2"
+            } rounded-full shrink-0 ${statusInfo.badgeColor.dot}`}
+          />
+          <span className={isCompact ? "max-w-[120px] truncate" : ""}>
+            {displayLabel}
+          </span>
         </span>
         {!isCompact && (statusInfo.key.startsWith("PENDING") || statusInfo.needsRealization) && (
           <span className="text-[10px] text-gray-500 italic max-w-[190px] text-right truncate">
@@ -165,67 +175,101 @@ function SplCard({
 
   // Mini version - ultra-compact for grid views with many records
   if (mini) {
+    const hasExtraBadges = Boolean(
+      manualBadge || legacyBadge || expiredBadge || morningBadge || autoBadge
+    )
+    const supervisorDisplayName = getSupervisorDisplayName(spl)
+
     return (
       <div
         onClick={onClick}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 p-2.5 hover:shadow-md hover:border-green-300 transition-all cursor-pointer group"
+        className="bg-white rounded-lg shadow-sm border border-gray-200 p-2.5 sm:p-3 hover:shadow-md hover:border-green-300 transition-all cursor-pointer group flex flex-col justify-between"
       >
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-xs font-bold text-gray-900 truncate group-hover:text-green-600 transition-colors">
-              {spl.requester.name}
-            </h3>
-            <p className="text-[10px] text-gray-500 truncate">
-              {requesterDepartmentName}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-0.5">
-            {manualBadge}
-            {legacyBadge}
-            {expiredBadge}
-            {morningBadge}
-            {autoBadge}
-            {getStatusBadge(spl.status, true)}
-          </div>
-        </div>
-
-        <div className="space-y-1 text-[10px]">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">📅</span>
-            <span className="font-medium text-gray-900 text-[10px]">
-              {format(new Date(spl.date), "dd/MM/yy")}
-            </span>
+        <div>
+          {/* Header Baris 1: Nama Pemohon & Badge Status */}
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div className="min-w-0 flex-1">
+              <h3
+                className="text-xs font-bold text-gray-900 truncate group-hover:text-green-600 transition-colors"
+                title={spl.requester.name}
+              >
+                {spl.requester.name}
+              </h3>
+              <p className="text-[10px] text-gray-500 truncate">
+                {requesterDepartmentName}
+              </p>
+            </div>
+            <div className="shrink-0">
+              {getStatusBadge(spl.status, true)}
+            </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">⏰</span>
-            <span className="font-medium text-gray-900 text-[10px]">
-              {spl.startTime} - {spl.endTime}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">⏱️</span>
-            <span className="font-semibold text-green-600 text-[10px]">
-              {displayHoursText}
-            </span>
-          </div>
-
-          {realizationRange() && (
-            <div className="pt-1 mt-1 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500 text-[9px]">Realisasi:</span>
-                <span className="text-gray-900 text-[9px] font-medium">
-                  {realizationRange()}
-                </span>
-              </div>
+          {/* Header Baris 2: Tag Tambahan (Telat Input, Kadaluarsa, Lembur Pagi, dll) */}
+          {hasExtraBadges && (
+            <div className="flex flex-wrap items-center gap-1 mb-2">
+              {manualBadge}
+              {legacyBadge}
+              {expiredBadge}
+              {morningBadge}
+              {autoBadge}
             </div>
           )}
 
-          <div className="pt-1 mt-1 border-t border-gray-100">
-            <p className="text-gray-900 text-[10px] line-clamp-2 leading-tight">
-              {spl.reason}
-            </p>
+          {/* Info Waktu, Total Jam & Alasan */}
+          <div className="space-y-1 text-[10px]">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">📅</span>
+              <span className="font-medium text-gray-900 text-[10px]">
+                {format(new Date(spl.date), "dd/MM/yy")}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">⏰</span>
+              <span className="font-medium text-gray-900 text-[10px]">
+                {spl.startTime} - {spl.endTime}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">⏱️</span>
+              <span className="font-semibold text-green-600 text-[10px]">
+                {displayHoursText}
+              </span>
+            </div>
+
+            {/* Atasan spesifik jika relevan (mis. untuk antrean Super Admin di GA) */}
+            {supervisorDisplayName && supervisorDisplayName !== "Atasan" && (
+              <div className="flex items-center justify-between text-gray-500 text-[10px] pt-0.5">
+                <span>👤 Atasan:</span>
+                <span
+                  className="font-medium text-gray-700 truncate max-w-[120px]"
+                  title={supervisorDisplayName}
+                >
+                  {supervisorDisplayName}
+                </span>
+              </div>
+            )}
+
+            {realizationRange() && (
+              <div className="pt-1 mt-1 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 text-[9px]">Realisasi:</span>
+                  <span className="text-gray-900 text-[9px] font-medium">
+                    {realizationRange()}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-1 mt-1 border-t border-gray-100">
+              <p
+                className="text-gray-900 text-[10px] line-clamp-2 leading-tight"
+                title={spl.reason}
+              >
+                {spl.reason}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -259,26 +303,38 @@ function SplCard({
 
   // Compact version for HR view with many records
   if (compact) {
+    const hasExtraBadges = Boolean(
+      manualBadge || legacyBadge || expiredBadge || morningBadge || autoBadge
+    )
+
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover-lift glow-green text-gray-900">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-gray-900 truncate">
+            <h3
+              className="text-sm font-semibold text-gray-900 truncate"
+              title={spl.requester.name}
+            >
               {spl.requester.name}
             </h3>
             <p className="text-xs text-gray-500 truncate">
               {requesterDepartmentName} · PIN: {spl.requester.pin || "-"}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="shrink-0">
+            {getStatusBadge(spl.status, true)}
+          </div>
+        </div>
+
+        {hasExtraBadges && (
+          <div className="flex flex-wrap items-center gap-1 mb-2">
             {manualBadge}
             {legacyBadge}
             {expiredBadge}
             {morningBadge}
             {autoBadge}
-            {getStatusBadge(spl.status, true)}
           </div>
-        </div>
+        )}
 
         <SplProgress spl={spl} compact={true} showDetails={false} className="my-2" />
 

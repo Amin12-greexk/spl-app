@@ -117,11 +117,16 @@ export function getSplStatusInfo(spl: Partial<Spl>): SplStatusMeta {
       }
 
     case "PENDING_SUPERVISOR":
-    case "PENDING":
+    case "PENDING": {
+      const supLabel =
+        supervisorName && supervisorName !== "Atasan"
+          ? `Menunggu Atasan: ${supervisorName}`
+          : "Menunggu Atasan"
+
       return {
         key: "PENDING_SUPERVISOR",
-        label: `Menunggu Atasan: ${supervisorName}`,
-        shortLabel: `Atasan: ${supervisorName}`,
+        label: supLabel,
+        shortLabel: "Menunggu Atasan",
         description: `Menunggu persetujuan ${supervisorName}.`,
         nextAction: `Menunggu ${supervisorName} memeriksa dan menyetujui pengajuan ini.`,
         waitedPerson: supervisorName,
@@ -137,6 +142,7 @@ export function getSplStatusInfo(spl: Partial<Spl>): SplStatusMeta {
         needsRealization: false,
         needsSignature: false,
       }
+    }
 
     case "PENDING_MANAGER": {
       if (splRequiresRealization(spl)) {
@@ -161,10 +167,15 @@ export function getSplStatusInfo(spl: Partial<Spl>): SplStatusMeta {
         }
       }
 
+      const mgrLabel =
+        managerName && managerName !== "Manager"
+          ? `Menunggu Manager: ${managerName}`
+          : "Menunggu Manager"
+
       return {
         key: "PENDING_MANAGER",
-        label: `Menunggu ${managerName}`,
-        shortLabel: "Manager",
+        label: mgrLabel,
+        shortLabel: "Menunggu Manager",
         description: spl.actualEndAt
           ? `Realisasi sudah diisi, menunggu persetujuan ${managerName}.`
           : `Menunggu persetujuan ${managerName}. Realisasi tidak wajib untuk SPL ini.`,
