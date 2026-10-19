@@ -6,6 +6,8 @@ import { memo, useMemo } from "react"
 import { makeWindow, startOfDay } from "@/lib/spl-time"
 import { isMorningOvertime } from "@/lib/spl-labels"
 import { getEffectiveHours } from "@/lib/spl-hours"
+import { getSplStatusInfo } from "@/lib/spl-status"
+import SplProgress from "./SplProgress"
 
 interface SplCardProps {
   spl: Spl
@@ -96,174 +98,23 @@ function SplCard({
   const displayHours = effectiveHours ?? spl.totalHours
   const displayHoursText = formatTotalHours(displayHours)
 
-  // Determine detailed status label based on supervisor and role - memoized
-  const detailedStatus = useMemo(() => {
-    // Determine supervisor type
-    const supervisorRole = spl.supervisor?.role || requesterDepartmentName
-    let supervisorLabel = "Supervisor"
-
-    if (supervisorRole === "GA") {
-      supervisorLabel = "GA"
-    } else if (supervisorRole === "DEPARTMENT_HEAD") {
-      supervisorLabel = "Kepala Dept"
-    } else if (supervisorRole === "SUPER_ADMIN") {
-      supervisorLabel = "Super Admin"
-    }
-
-    switch (spl.status) {
-      case "PENDING_SUPERADMIN":
-        return {
-          icon: "⏳",
-          label: "Menunggu Super Admin",
-          shortLabel: "Super Admin",
-          description: "Pengajuan telat sedang direview Super Admin",
-        }
-      case "PENDING_SUPERVISOR":
-        return {
-          icon: "⏳",
-          label: `Menunggu ${supervisorLabel}`,
-          shortLabel: supervisorLabel,
-          description: `Menunggu persetujuan ${supervisorLabel}`,
-        }
-      case "PENDING_MANAGER":
-        return {
-          icon: "⏳",
-          label: "Menunggu Manager",
-          shortLabel: "Manager",
-          description: "Menunggu persetujuan Manager",
-        }
-      case "APPROVED":
-        const approver = spl.approver?.name || "Manager"
-        return {
-          icon: "✅",
-          label: "Disetujui",
-          shortLabel: "Disetujui",
-          description: `Disetujui oleh ${approver}`,
-        }
-      case "IN_PROGRESS":
-        return {
-          icon: "⏳",
-          label: "Sedang Berjalan",
-          shortLabel: "Berjalan",
-          description: "Realisasi lembur sedang berjalan",
-        }
-      case "DONE":
-        return {
-          icon: "✅",
-          label: "Selesai",
-          shortLabel: "Selesai",
-          description: "Realisasi lembur telah selesai",
-        }
-      case "REJECTED_BY_SUPERVISOR":
-        return {
-          icon: "❌",
-          label: `Ditolak ${supervisorLabel}`,
-          shortLabel: "Ditolak",
-          description: `Ditolak oleh ${supervisorLabel}`,
-        }
-      case "REJECTED_BY_MANAGER":
-        return {
-          icon: "❌",
-          label: "Ditolak Manager",
-          shortLabel: "Ditolak",
-          description: "Ditolak oleh Manager",
-        }
-      default:
-        return {
-          icon: "📝",
-          label: "Pending",
-          shortLabel: "Pending",
-          description: "Menunggu proses",
-        }
-    }
-  }, [spl.status, spl.supervisor?.role, requesterDepartmentName, spl.approver?.name])
+  // Status metadata lengkap dari modul terpusat
+  const statusInfo = useMemo(() => getSplStatusInfo(spl), [spl])
 
   const getStatusBadge = (status: string, isCompact = false) => {
-    const statusInfo = detailedStatus
-
-    const statusConfig = {
-      PENDING: {
-        bg: "bg-yellow-50",
-        text: "text-yellow-700",
-        border: "border-yellow-200",
-        ring: "ring-yellow-100",
-      },
-      PENDING_SUPERADMIN: {
-        bg: "bg-amber-50",
-        text: "text-amber-700",
-        border: "border-amber-200",
-        ring: "ring-amber-100",
-      },
-      PENDING_SUPERVISOR: {
-        bg: "bg-orange-50",
-        text: "text-orange-700",
-        border: "border-orange-200",
-        ring: "ring-orange-100",
-      },
-      PENDING_MANAGER: {
-        bg: "bg-blue-50",
-        text: "text-blue-700",
-        border: "border-blue-200",
-        ring: "ring-blue-100",
-      },
-      APPROVED: {
-        bg: "bg-green-50",
-        text: "text-green-700",
-        border: "border-green-200",
-        ring: "ring-green-100",
-      },
-      IN_PROGRESS: {
-        bg: "bg-yellow-50",
-        text: "text-yellow-700",
-        border: "border-yellow-200",
-        ring: "ring-yellow-100",
-      },
-      DONE: {
-        bg: "bg-green-50",
-        text: "text-green-700",
-        border: "border-green-200",
-        ring: "ring-green-100",
-      },
-      REJECTED: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-        ring: "ring-red-100",
-      },
-      REJECTED_BY_SUPERVISOR: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-        ring: "ring-red-100",
-      },
-      REJECTED_BY_MANAGER: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-        ring: "ring-red-100",
-      },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || {
-      bg: "bg-gray-50",
-      text: "text-gray-700",
-      border: "border-gray-200",
-      ring: "ring-gray-100",
-    }
-
     const displayLabel = isCompact ? statusInfo.shortLabel : statusInfo.label
 
     return (
       <div className="flex flex-col items-end gap-1">
         <span
-          className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${config.bg} ${config.text} ${config.border} shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
+          className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${statusInfo.badgeColor.bg} ${statusInfo.badgeColor.text} ${statusInfo.badgeColor.border} shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
           title={statusInfo.description}
         >
-          <span className="text-sm">{statusInfo.icon}</span>
+          <span className={`w-2 h-2 rounded-full ${statusInfo.badgeColor.dot}`} />
           {displayLabel}
         </span>
-        {!isCompact && status.includes("PENDING") && (
-          <span className="text-[10px] text-gray-500 italic">
+        {!isCompact && (statusInfo.key.startsWith("PENDING") || statusInfo.needsRealization) && (
+          <span className="text-[10px] text-gray-500 italic max-w-[190px] text-right truncate">
             {statusInfo.description}
           </span>
         )}
@@ -311,51 +162,6 @@ function SplCard({
         Otomatis
       </span>
     ) : null
-
-  // Get approval flow for this SPL
-  const getApprovalFlow = () => {
-    const hasSubordinate = Boolean(requesterDepartmentName && requesterDepartmentName !== "-")
-    const supervisorRole =
-      spl.supervisor?.role ||
-      (spl.status === "PENDING_SUPERADMIN" ? "SUPER_ADMIN" : "DEPARTMENT_HEAD")
-    const supervisorLabel =
-      supervisorRole === "GA"
-        ? "GA"
-        : supervisorRole === "SUPER_ADMIN"
-        ? "Super Admin"
-        : "Kepala Dept"
-
-    // For staff with supervisor
-    if (
-      spl.status === "PENDING_SUPERVISOR" ||
-      spl.status === "PENDING_SUPERADMIN" ||
-      spl.supervisorApprovalDate
-    ) {
-      return [
-        { label: "Staff", done: true, current: false },
-        {
-          label: supervisorLabel,
-          done: !!spl.supervisorApprovalDate,
-          current: spl.status === "PENDING_SUPERVISOR" || spl.status === "PENDING_SUPERADMIN",
-        },
-        {
-          label: "Manager",
-          done: spl.status === "APPROVED",
-          current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
-        },
-      ]
-    }
-
-    // For GA/Dept Head (direct to manager)
-    return [
-      { label: "Pemohon", done: true, current: false },
-      {
-        label: "Manager",
-        done: spl.status === "APPROVED",
-        current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
-      },
-    ]
-  }
 
   // Mini version - ultra-compact for grid views with many records
   if (mini) {
@@ -473,6 +279,8 @@ function SplCard({
             {getStatusBadge(spl.status, true)}
           </div>
         </div>
+
+        <SplProgress spl={spl} compact={true} showDetails={false} className="my-2" />
 
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center justify-between">
@@ -694,62 +502,8 @@ function SplCard({
         </div>
       </div>
 
-      {/* Approval Flow Progress */}
-      {!["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
-        <div className="mb-4 p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
-          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Alur Persetujuan:
-          </p>
-          <div className="flex items-center gap-2">
-            {getApprovalFlow().map((step, index) => (
-              <div key={index} className="flex items-center gap-2 flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step.done
-                      ? "bg-green-500 border-green-600 text-white shadow-md"
-                      : step.current
-                        ? "bg-blue-500 border-blue-600 text-white shadow-md animate-pulse"
-                        : "bg-gray-100 border-gray-300 text-gray-400"
-                      }`}
-                  >
-                    {step.done ? "✓" : index + 1}
-                  </div>
-                  <span
-                    className={`text-[10px] font-semibold mt-1 ${step.current ? "text-blue-700" : step.done ? "text-green-700" : "text-gray-500"
-                      }`}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-                {index < getApprovalFlow().length - 1 && (
-                  <div
-                    className={`h-0.5 flex-1 ${step.done ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Rejection Notice */}
-      {["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status) && (
-        <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
-          <p className="text-xs font-semibold text-red-700 mb-1 flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {detailedStatus.label}
-          </p>
-          <p className="text-xs text-red-600">
-            {detailedStatus.description}
-          </p>
-        </div>
-      )}
+      {/* Approval Flow Progress Stepper */}
+      <SplProgress spl={spl} compact={false} showDetails={true} className="mb-4" />
 
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm">

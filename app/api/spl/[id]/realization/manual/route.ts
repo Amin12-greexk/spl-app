@@ -134,7 +134,7 @@ export async function POST(
 
     if (spl.status === "PENDING_SUPERVISOR") {
       return NextResponse.json(
-        { error: "Menunggu persetujuan GA sebelum input realisasi" },
+        { error: "Menunggu persetujuan atasan sebelum input realisasi" },
         { status: 400 }
       )
     }
@@ -186,9 +186,9 @@ export async function POST(
     }
 
     const hasOverrun = actualEnd > plannedEnd
-    if (!overrunValue) {
+    if (hasOverrun && !overrunValue) {
       return NextResponse.json(
-        { error: "Alasan realisasi wajib diisi" },
+        { error: "Alasan realisasi wajib diisi bila waktu realisasi melebihi rencana" },
         { status: 400 }
       )
     }

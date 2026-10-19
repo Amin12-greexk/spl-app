@@ -502,11 +502,26 @@ const capturePhoto = async () => {
 
       if (regularStartMinutes !== null && startMinutes !== null) {
         if (startMinutes < regularStartMinutes) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Lembur pagi dibatasi",
-            text: "Lembur sebelum jam reguler hanya bisa dibuat oleh Super Admin. Silakan hubungi admin.",
+          const result = await Swal.fire({
+            icon: "info",
+            title: "Pengajuan Lembur Pagi Khusus",
+            html: `
+              <div class="text-left text-sm space-y-2">
+                <p>Jam mulai lembur Anda (<strong>${formData.startTime}</strong>) mendahului jam kerja reguler (<strong>${normalizedRegularStart}</strong>).</p>
+                <p class="text-gray-600">Sesuai kebijakan perusahaan, lembur sebelum jam kerja reguler hanya dapat diproses melalui pembuatan SPL khusus oleh Super Admin / IT.</p>
+                <div class="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-blue-900 text-xs">
+                  <strong>Langkah selanjutnya:</strong> Hubungi admin/atasan Anda untuk dibuatkan SPL manual. Jika sudah dibuatkan, dokumen akan muncul di menu <strong>Telat Input</strong> untuk ditandatangani.
+                </div>
+              </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: "Buka Menu Telat Input",
+            cancelButtonText: "Tutup",
+            confirmButtonColor: "#2563eb",
           })
+          if (result.isConfirmed) {
+            router.push("/dashboard/telat-input")
+          }
           return
         }
       }

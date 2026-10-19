@@ -5,6 +5,8 @@ import Image from "next/image"
 import Modal from "@/components/ui/Modal"
 import { getEffectiveHours, getRealizationMinutes } from "@/lib/spl-hours"
 import { isMorningOvertime } from "@/lib/spl-labels"
+import { getSplStatusInfo } from "@/lib/spl-status"
+import SplProgress from "./SplProgress"
 
 interface SplDetailModalProps {
   spl: Spl | null
@@ -59,153 +61,22 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
       ? null
       : formatTotalHours(realizationHours)
 
-  const getDetailedStatus = () => {
-    const supervisorRole = spl.supervisor?.role || requesterDepartmentName
-    let supervisorLabel = "Supervisor"
-
-    if (supervisorRole === "GA") {
-      supervisorLabel = "GA"
-    } else if (supervisorRole === "DEPARTMENT_HEAD") {
-      supervisorLabel = "Kepala Dept"
-    } else if (supervisorRole === "SUPER_ADMIN") {
-      supervisorLabel = "Super Admin"
-    }
-
-    switch (spl.status) {
-      case "PENDING_SUPERADMIN":
-        return {
-          icon: "⏳",
-          label: "Menunggu Super Admin",
-          description: "Pengajuan telat sedang direview Super Admin",
-        }
-      case "PENDING_SUPERVISOR":
-        return {
-          icon: "⏳",
-          label: `Menunggu ${supervisorLabel}`,
-          description: `Menunggu persetujuan ${supervisorLabel}`,
-        }
-      case "PENDING_MANAGER":
-        return {
-          icon: "⏳",
-          label: "Menunggu Manager",
-          description: "Menunggu persetujuan Manager",
-        }
-      case "APPROVED":
-        const approver = spl.approver?.name || "Manager"
-        return {
-          icon: "✅",
-          label: "Disetujui",
-          description: `Disetujui oleh ${approver}`,
-        }
-      case "IN_PROGRESS":
-        return {
-          icon: "⏳",
-          label: "Sedang Berjalan",
-          description: "Realisasi lembur sedang berjalan",
-        }
-      case "DONE":
-        return {
-          icon: "✅",
-          label: "Selesai",
-          description: "Realisasi lembur telah selesai",
-        }
-      case "REJECTED_BY_SUPERVISOR":
-        return {
-          icon: "❌",
-          label: `Ditolak ${supervisorLabel}`,
-          description: `Ditolak oleh ${supervisorLabel}`,
-        }
-      case "REJECTED_BY_MANAGER":
-        return {
-          icon: "❌",
-          label: "Ditolak Manager",
-          description: "Ditolak oleh Manager",
-        }
-      default:
-        return {
-          icon: "📝",
-          label: "Pending",
-          description: "Menunggu proses",
-        }
-    }
-  }
-
-  const statusInfo = getDetailedStatus()
+  const statusInfo = getSplStatusInfo(spl)
   const showMorningBadge = isMorningOvertime(spl)
 
   const getStatusBadge = () => {
-    const isApproved = ["APPROVED", "DONE"].includes(spl.status)
-    const isRejected = ["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status)
-    const isPending = [
-      "PENDING",
-      "PENDING_SUPERVISOR",
-      "PENDING_MANAGER",
-      "PENDING_SUPERADMIN",
-      "IN_PROGRESS",
-    ].includes(spl.status)
-
-    const cls = isApproved
-      ? "bg-green-50 text-green-700 border-green-200"
-      : isRejected
-        ? "bg-red-50 text-red-700 border-red-200"
-        : isPending
-          ? "bg-amber-50 text-amber-700 border-amber-200"
-          : "bg-gray-50 text-gray-600 border-gray-200"
-
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border ${cls}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border ${statusInfo.badgeColor.bg} ${statusInfo.badgeColor.text} ${statusInfo.badgeColor.border}`}
       >
-        <span className="text-sm leading-none">{statusInfo.icon}</span>
+        <span className={`w-2 h-2 rounded-full ${statusInfo.badgeColor.dot}`} />
         {statusInfo.label}
       </span>
     )
   }
 
-  const getApprovalFlow = () => {
-    const supervisorRole =
-      spl.supervisor?.role ||
-      (spl.status === "PENDING_SUPERADMIN" ? "SUPER_ADMIN" : "DEPARTMENT_HEAD")
-    const supervisorLabel =
-      supervisorRole === "GA"
-        ? "GA"
-        : supervisorRole === "SUPER_ADMIN"
-          ? "Super Admin"
-          : "Kepala Dept"
-
-    if (
-      spl.status === "PENDING_SUPERVISOR" ||
-      spl.status === "PENDING_SUPERADMIN" ||
-      spl.supervisorApprovalDate
-    ) {
-      return [
-        { label: "Pemohon", done: true, current: false },
-        {
-          label: supervisorLabel,
-          done: !!spl.supervisorApprovalDate,
-          current: spl.status === "PENDING_SUPERADMIN" || spl.status === "PENDING_SUPERVISOR",
-        },
-        {
-          label: "Manager",
-          done: spl.status === "APPROVED",
-          current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
-        },
-      ]
-    }
-
-    return [
-      { label: "Pemohon", done: true, current: false },
-      {
-        label: "Manager",
-        done: spl.status === "APPROVED",
-        current: ["PENDING_MANAGER", "IN_PROGRESS", "DONE"].includes(spl.status),
-      },
-    ]
-  }
-
-  const approvalFlow = getApprovalFlow()
-  const isRejected = ["REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"].includes(spl.status)
   const isManual = spl.source === "MANUAL" || spl.isManualEntry
+  const isRejected = statusInfo.isRejected
 
   // Inisial nama untuk avatar approver
   const approverInitials = spl.approver?.name
@@ -255,48 +126,10 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
           </div>
         </div>
 
-        {/* ── Alur persetujuan ── */}
-        {!isRejected && (
-          <div className="py-4 border-b border-gray-100">
-            <p className="text-xs text-gray-400 font-medium mb-3 uppercase tracking-wide">
-              Alur persetujuan
-            </p>
-            <div className="flex items-center">
-              {approvalFlow.map((step, index) => (
-                <div key={index} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border transition-colors ${step.done
-                          ? "bg-green-500 border-green-500 text-white"
-                          : step.current
-                            ? "bg-blue-500 border-blue-500 text-white"
-                            : "bg-white border-gray-200 text-gray-400"
-                        }`}
-                    >
-                      {step.done ? "✓" : index + 1}
-                    </div>
-                    <span
-                      className={`text-xs mt-1.5 font-medium ${step.done
-                          ? "text-green-600"
-                          : step.current
-                            ? "text-blue-600"
-                            : "text-gray-400"
-                        }`}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                  {index < approvalFlow.length - 1 && (
-                    <div
-                      className={`flex-1 h-px mx-2 mb-5 ${step.done ? "bg-green-400" : "bg-gray-200"
-                        }`}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* ── Alur persetujuan & Status Stepper ── */}
+        <div className="py-4 border-b border-gray-100">
+          <SplProgress spl={spl} compact={false} showDetails={true} />
+        </div>
 
         {/* ── Penolakan ── */}
         {isRejected && (
