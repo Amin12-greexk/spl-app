@@ -185,6 +185,27 @@ export default function SplDetailModal({ spl, isOpen, onClose }: SplDetailModalP
           <p className="text-sm text-gray-700 leading-relaxed">{spl.reason}</p>
         </div>
 
+        {/* ── Alasan keterlambatan (pengajuan telat oleh karyawan) ── */}
+        {spl.isLate && (
+          <div className="mt-4 p-3 rounded-lg border border-orange-200 bg-orange-50">
+            <p className="text-xs text-orange-700 uppercase tracking-wide mb-1.5 font-semibold">
+              ⏰ Pengajuan telat
+            </p>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {spl.lateReason || "-"}
+            </p>
+            <p
+              className={`text-xs mt-2 font-medium ${
+                spl.lateFingerprintStatus === "UNVERIFIED" ? "text-red-700" : "text-teal-700"
+              }`}
+            >
+              {spl.lateFingerprintStatus === "UNVERIFIED"
+                ? "Fingerprint belum terverifikasi (data scan tanggal tersebut tidak ditemukan)"
+                : "Jam lembur cocok dengan data fingerprint"}
+            </p>
+          </div>
+        )}
+
         {/* ── Catatan realisasi ── */}
         {spl.realizationNote && (
           <div className="mt-4 pt-4 border-t border-gray-100">

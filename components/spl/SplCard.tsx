@@ -140,8 +140,27 @@ function SplCard({
     >
       ⚠️ Telat Input
     </span>
+  ) : spl.isLate ? (
+    <>
+      <span
+        className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-orange-50 text-orange-700 border-orange-200 cursor-help"
+        title={`Diajukan sendiri oleh karyawan setelah tanggal lembur lewat.${
+          spl.lateReason ? ` Alasan telat: ${spl.lateReason}` : ""
+        }`}
+      >
+        ⏰ Telat
+      </span>
+      {spl.lateFingerprintStatus === "UNVERIFIED" && (
+        <span
+          className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-red-50 text-red-700 border-red-200 cursor-help"
+          title="Data fingerprint pada tanggal lembur tidak ditemukan sehingga jam lembur belum bisa diverifikasi"
+        >
+          Fingerprint belum terverifikasi
+        </span>
+      )}
+    </>
   ) : null
-  const legacyBadge = spl.source === "LEGACY" ? (
+  const legacyBadge =spl.source === "LEGACY" ? (
     <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md border bg-blue-50 text-blue-700 border-blue-200">
       Data Lama
     </span>

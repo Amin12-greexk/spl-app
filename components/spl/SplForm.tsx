@@ -37,9 +37,12 @@ export default function SplForm() {
     endTime: "",
     estimatedEndTime: "",
     reason: "",
+    lateReason: "",
     projectName: "",
     proofImage: "",
   })
+  // Batas mundur pengajuan telat (hari), diatur di Setting
+  const [lateMaxDays, setLateMaxDays] = useState(7)
   // Dual-mode (Auto + Manual) overtime
   const [overtimeFlags, setOvertimeFlags] = useState<{ auto: boolean; manual: boolean }>({
     auto: false,
@@ -63,6 +66,31 @@ export default function SplForm() {
     const day = String(now.getDate()).padStart(2, "0")
     return `${year}-${month}-${day}`
   })()
+  const earliestDateInputValue = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - lateMaxDays)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  })()
+  const isLateSubmission = Boolean(formData.date) && formData.date < todayInputValue
+  const MIN_LATE_TEXT_LENGTH = 20
+
+  useEffect(() => {
+    const loadLateMaxDays = async () => {
+      try {
+        const res = await fetch("/api/settings/late-submission")
+        const data = await res.json()
+        if (res.ok && Number.isInteger(data?.maxDays)) {
+          setLateMaxDays(data.maxDays)
+        }
+      } catch (err) {
+        console.error("Gagal mengambil batas mundur pengajuan telat", err)
+      }
+    }
+    loadLateMaxDays()
+  }, [])
 
   useEffect(() => {
     const loadFlags = async () => {
@@ -83,8 +111,10 @@ export default function SplForm() {
     loadFlags()
   }, [])
 
-  const isAutoMode = mode === "AUTO"
-  const showModeToggle = overtimeFlags.auto && overtimeFlags.manual
+  // Pengajuan telat (tanggal sudah lewat) selalu manual: jam lembur sudah terjadi.
+  const isAutoMode = mode === "AUTO" && !isLateSubmission
+  const showModeToggle =
+    overtimeFlags.auto && overtimeFlags.manual && !isLateSubmission
 
   useEffect(() => {
     const loadRegularHours = async () => {
@@ -392,6 +422,33 @@ const capturePhoto = async () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
+    if (isLateSubmission) {
+      if (formData.date < earliestDateInputValue) {
+        await Swal.fire({
+          icon: "error",
+          title: "Melewati batas pengajuan telat",
+          text: `Pengajuan telat maksimal ${lateMaxDays} hari ke belakang. Hubungi Super Admin untuk tanggal yang lebih lama.`,
+        })
+        return
+      }
+      if (formData.reason.trim().length < MIN_LATE_TEXT_LENGTH) {
+        await Swal.fire({
+          icon: "error",
+          title: "Alasan lembur terlalu singkat",
+          text: `Alasan lembur pengajuan telat minimal ${MIN_LATE_TEXT_LENGTH} karakter.`,
+        })
+        return
+      }
+      if (formData.lateReason.trim().length < MIN_LATE_TEXT_LENGTH) {
+        await Swal.fire({
+          icon: "error",
+          title: "Alasan keterlambatan terlalu singkat",
+          text: `Jelaskan kenapa SPL baru diajukan sekarang (minimal ${MIN_LATE_TEXT_LENGTH} karakter).`,
+        })
+        return
+      }
+    }
+
     if (!isAutoMode && (!formData.startTime || !formData.endTime)) {
       await Swal.fire({
         icon: "error",
@@ -563,6 +620,7 @@ const capturePhoto = async () => {
             projectName: formData.projectName,
             proofImage: formData.proofImage,
             mode: "MANUAL",
+            ...(isLateSubmission ? { lateReason: formData.lateReason.trim() } : {}),
           }
 
       const response = await fetch("/api/spl", {
@@ -583,9 +641,13 @@ const capturePhoto = async () => {
         icon: "success",
         title: "Berhasil",
         text:
-          data.status === "PENDING_MANAGER"
-            ? "SPL berhasil diajukan dan diteruskan ke Manager."
-            : "SPL berhasil diajukan dan diteruskan ke atasan.",
+          (isLateSubmission ? "SPL telat berhasil diajukan" : "SPL berhasil diajukan") +
+          (data.status === "PENDING_MANAGER"
+            ? " dan diteruskan ke Manager."
+            : " dan diteruskan ke atasan.") +
+          (data.lateFingerprintStatus === "UNVERIFIED"
+            ? " Data fingerprint tanggal tersebut tidak ditemukan sehingga ditandai belum terverifikasi."
+            : ""),
       })
       router.push("/dashboard")
       router.refresh()
@@ -681,7 +743,7 @@ const capturePhoto = async () => {
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 className="border-gray-200 focus:border-green-500 focus:ring-green-500"
-                min={todayInputValue}
+                min={earliestDateInputValue}
                 required
               />
 
@@ -697,6 +759,23 @@ const capturePhoto = async () => {
                 className="border-gray-200 focus:border-green-500 focus:ring-green-500"
               />
             </div>
+
+            {isLateSubmission && (
+              <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="text-xs text-orange-800 space-y-1">
+                  <p className="font-semibold">Pengajuan telat</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>Maksimal {lateMaxDays} hari ke belakang. Tanggal lebih lama diinput oleh Super Admin.</li>
+                    <li>Wajib mode Manual, dengan alasan lembur dan alasan keterlambatan minimal {MIN_LATE_TEXT_LENGTH} karakter.</li>
+                    <li>Jam lembur dicocokkan dengan data fingerprint (scan pulang). Jika tidak cocok, pengajuan ditolak sistem.</li>
+                    <li>Pengajuan akan ditandai &quot;Telat&quot; di layar persetujuan atasan dan Manager.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
 
             {/* Jam Reguler - Collapsible */}
             {session?.user?.id && session?.user?.role !== "MANAGER" && (
@@ -925,7 +1004,31 @@ const capturePhoto = async () => {
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                 required
               />
+              {isLateSubmission && (
+                <p className={`mt-1 text-xs ${formData.reason.trim().length >= MIN_LATE_TEXT_LENGTH ? "text-gray-500" : "text-orange-600"}`}>
+                  {formData.reason.trim().length}/{MIN_LATE_TEXT_LENGTH} karakter minimal
+                </p>
+              )}
             </div>
+
+            {/* Alasan Keterlambatan - hanya untuk pengajuan telat */}
+            {isLateSubmission && (
+              <div id="spl-alasan-telat">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alasan Keterlambatan Pengajuan <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  placeholder="Jelaskan kenapa SPL baru diajukan sekarang..."
+                  className="flex w-full rounded-xl border-2 border-orange-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[80px] motion-safe:transition-all motion-safe:duration-200"
+                  value={formData.lateReason}
+                  onChange={(e) => setFormData({ ...formData, lateReason: e.target.value })}
+                  required
+                />
+                <p className={`mt-1 text-xs ${formData.lateReason.trim().length >= MIN_LATE_TEXT_LENGTH ? "text-gray-500" : "text-orange-600"}`}>
+                  {formData.lateReason.trim().length}/{MIN_LATE_TEXT_LENGTH} karakter minimal
+                </p>
+              </div>
+            )}
 
             {/* Foto Bukti - Collapsible */}
             <div id="spl-foto" className="border border-gray-200 rounded-lg overflow-visible">

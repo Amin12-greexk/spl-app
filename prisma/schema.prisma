@@ -98,7 +98,13 @@ model Spl {
   plannedEstimatedEndAt     DateTime?
   // Set when fingerprint data finalized the realization.
   fingerprintMatchedAt      DateTime?
-  approver                  User?     @relation("approver", fields: [approverId], references: [id])
+  // --- Pengajuan telat oleh karyawan (tanggal lembur sudah lewat) ---
+  // isLate dihitung server dari tanggal lembur < hari ini. lateFingerprintStatus:
+  // "MATCHED" (scan pulang cocok) atau "UNVERIFIED" (data fingerprint tidak tersedia).
+  isLate                    Boolean   @default(false)
+  lateReason                String?
+  lateFingerprintStatus     String?
+  approver                User?     @relation("approver", fields: [approverId], references: [id])
   requester                 User      @relation("requester", fields: [requesterId], references: [id])
   supervisor                User?     @relation("supervisor", fields: [supervisorId], references: [id])
 

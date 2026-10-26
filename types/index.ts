@@ -100,6 +100,11 @@ export interface Spl {
   plannedEstimatedEndAt?: Date | string | null
   fingerprintMatchedAt?: Date | string | null
 
+  // Pengajuan telat oleh karyawan (tanggal lembur sudah lewat)
+  isLate?: boolean
+  lateReason?: string | null
+  lateFingerprintStatus?: "MATCHED" | "UNVERIFIED" | null
+
   // Supervisor approval (Level 1)
   supervisorId?: string | null
   supervisor?: User | null
@@ -133,6 +138,8 @@ export interface CreateSplInput {
   mode?: SplInputMode
   /** AUTO mode only: optional estimated finish time "HH:MM". */
   estimatedEndTime?: string
+  /** Wajib (min. 20 karakter) bila tanggal lembur sudah lewat. */
+  lateReason?: string
 }
 
 export interface UpdateSplStatusInput {

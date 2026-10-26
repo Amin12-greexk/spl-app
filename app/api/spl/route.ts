@@ -29,6 +29,12 @@ import {
   AUTO_DEFAULT_OVERTIME_MINUTES,
   getOvertimeFlagsWithSettings,
 } from "@/lib/feature-flags"
+import {
+  getLateSubmissionMaxDays,
+  MIN_LATE_TEXT_LENGTH,
+  verifyLateFingerprint,
+} from "@/lib/late-submission"
+import { computeAutoRealization } from "@/lib/fingerprint"
 
 /**
  * GET /api/spl
@@ -170,6 +176,9 @@ export async function GET(req: NextRequest) {
       source: true,
       isManualEntry: true,
       requesterSignedAt: true,
+      isLate: true,
+      lateReason: true,
+      lateFingerprintStatus: true,
       actualStartAt: true,
       actualEndAt: true,
       actualTotalHours: true,
@@ -454,11 +463,51 @@ export async function POST(req: NextRequest) {
     const today = startOfDay(new Date())
     const isPastDateSubmission = requestedDate < today
 
+    // Pengajuan telat oleh karyawan: tanggal lembur sudah lewat. Dibatasi H-N (Setting),
+    // wajib memakai mode manual, alasan lembur & alasan keterlambatan minimal 20 karakter.
+    const isLate = isPastDateSubmission
+    const lateReason =
+      typeof body.lateReason === "string" ? body.lateReason.trim() : ""
+    let daysLate = 0
+    if (isLate) {
+      if (isAutoMode) {
+        return NextResponse.json(
+          { error: "Pengajuan telat harus memakai mode Manual (isi jam mulai dan selesai)" },
+          { status: 400 }
+        )
+      }
+
+      const maxDays = await getLateSubmissionMaxDays(prisma)
+      daysLate = Math.round((today.getTime() - requestedDate.getTime()) / 86400000)
+      if (daysLate > maxDays) {
+        return NextResponse.json(
+          {
+            error: `Pengajuan telat maksimal ${maxDays} hari ke belakang. Untuk tanggal yang lebih lama, hubungi Super Admin untuk input telat manual.`,
+          },
+          { status: 400 }
+        )
+      }
+
+      if (typeof body.reason !== "string" || body.reason.trim().length < MIN_LATE_TEXT_LENGTH) {
+        return NextResponse.json(
+          { error: `Alasan lembur pengajuan telat minimal ${MIN_LATE_TEXT_LENGTH} karakter` },
+          { status: 400 }
+        )
+      }
+      if (lateReason.length < MIN_LATE_TEXT_LENGTH) {
+        return NextResponse.json(
+          { error: `Alasan keterlambatan pengajuan minimal ${MIN_LATE_TEXT_LENGTH} karakter` },
+          { status: 400 }
+        )
+      }
+    }
+
     const userRecord = await prisma.user.findUnique({
       where: { id: authUser.id },
       select: {
         id: true,
         role: true,
+        pin: true,
         supervisorId: true,
         departmentId: true,
         departmentName: true,
@@ -789,6 +838,64 @@ export async function POST(req: NextRequest) {
 
     const totalHours = parseFloat((totalMinutes / 60).toFixed(2))
 
+    // Validasi khusus pengajuan telat: cek duplikat (termasuk SPL yang sudah direalisasi)
+    // dan cocokkan dengan data fingerprint.
+    let lateFingerprintStatus: "MATCHED" | "UNVERIFIED" | null = null
+    let lateRealization: ReturnType<typeof computeAutoRealization> = null
+    let lateFingerprintNote = ""
+    if (isLate) {
+      const duplicate = await prisma.spl.findFirst({
+        where: {
+          requesterId: authUser.id,
+          status: {
+            notIn: ["REJECTED", "REJECTED_BY_SUPERVISOR", "REJECTED_BY_MANAGER"],
+          },
+          OR: [
+            {
+              plannedStartAt: { lt: plannedEndAt },
+              plannedEndAt: { gt: plannedStartAt },
+            },
+            {
+              actualStartAt: { lt: plannedEndAt },
+              actualEndAt: { gt: plannedStartAt },
+            },
+            // Data lama tanpa window terencana: bandingkan per tanggal
+            { plannedStartAt: null, date: requestedDate },
+          ],
+        },
+        select: { id: true },
+      })
+      if (duplicate) {
+        return NextResponse.json(
+          { error: "Sudah ada SPL (termasuk yang sudah direalisasi) pada tanggal dan jam yang sama" },
+          { status: 400 }
+        )
+      }
+
+      const fingerprint = await verifyLateFingerprint({
+        pin: userRecord.pin,
+        dayStart: requestedDate,
+        plannedStartAt,
+        plannedEndAt,
+      })
+      if (fingerprint.status === "MISMATCH") {
+        return NextResponse.json({ error: fingerprint.error }, { status: 400 })
+      }
+      lateFingerprintStatus = fingerprint.status
+      if (fingerprint.status === "MATCHED") {
+        // Lembur sudah terjadi: realisasi langsung diisi dari scan pulang,
+        // sehingga tidak perlu input realisasi lagi setelah atasan menyetujui.
+        lateRealization = computeAutoRealization(
+          plannedStartAt,
+          plannedEndAt,
+          fingerprint.departure.at
+        )
+        lateFingerprintNote = `Fingerprint cocok (pulang ${fingerprint.departure.scan_date})`
+      } else {
+        lateFingerprintNote = `Fingerprint belum terverifikasi: ${fingerprint.reason}`
+      }
+    }
+
     // Check user's role and supervisor
     // Determine initial status based on role and department approval rules
     let initialStatus = "PENDING_MANAGER"
@@ -847,6 +954,23 @@ export async function POST(req: NextRequest) {
         status: initialStatus,
         supervisorId,
         source: "SYSTEM",
+        isLate,
+        lateReason: isLate ? lateReason : null,
+        lateFingerprintStatus,
+        ...(lateRealization
+          ? {
+              actualStartAt: lateRealization.actualStartAt,
+              actualEndAt: lateRealization.actualEndAt,
+              actualTotalHours: lateRealization.actualTotalHours,
+              realizedMinutes: lateRealization.realizedMinutes,
+              realizationCounted: lateRealization.realizedMinutes > 0,
+              realizationSource: "AUTO_FINGER",
+              fingerprintMatchedAt: new Date(),
+              overrunReason: lateRealization.overrun
+                ? "(Otomatis) Realisasi melebihi rencana berdasarkan data fingerprint"
+                : null,
+            }
+          : {}),
       },
       include: {
         requester: {
@@ -864,7 +988,9 @@ export async function POST(req: NextRequest) {
       source: "SYSTEM",
       note: [
         isAutoMode ? "Mode AUTO (realisasi via fingerprint)" : "Mode MANUAL",
-        isPastDateSubmission ? "Pengajuan telat (tanggal lembur sudah lewat)" : null,
+        isLate ? `Pengajuan telat ${daysLate} hari (tanggal lembur sudah lewat)` : null,
+        isLate ? `Alasan telat: ${lateReason}` : null,
+        isLate ? lateFingerprintNote : null,
       ]
         .filter(Boolean)
         .join("; "),
@@ -882,8 +1008,10 @@ export async function POST(req: NextRequest) {
         timeZone: JAKARTA_TIME_ZONE,
       });
 
-      const notificationTitle = "Pengajuan SPL Baru";
-      const notificationBody = `${authUser.name} mengajukan lembur pada ${formattedDate} (${splStartTime} - ${splEndTime}).`;
+      const notificationTitle = isLate ? "Pengajuan SPL Telat" : "Pengajuan SPL Baru";
+      const notificationBody = isLate
+        ? `${authUser.name} mengajukan SPL telat (${daysLate} hari) untuk ${formattedDate} (${splStartTime} - ${splEndTime}).`
+        : `${authUser.name} mengajukan lembur pada ${formattedDate} (${splStartTime} - ${splEndTime}).`;
       if (spl.supervisorId) {
         await sendNotificationToUser(
           spl.supervisorId,
