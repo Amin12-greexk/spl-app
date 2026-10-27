@@ -781,9 +781,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (hasRegularWindow) {
-      if (plannedEndAt <= regularStartAt!) {
+      // Lembur pagi (selesai sebelum jam kerja reguler) boleh diajukan karyawan
+      // selama jam kerja reguler hari itu belum dimulai.
+      if (plannedEndAt <= regularStartAt! && new Date() >= regularStartAt!) {
         return NextResponse.json(
-          { error: "Lembur pagi hanya bisa diajukan oleh Super Admin" },
+          {
+            error: `Lembur pagi harus diajukan sebelum jam kerja reguler dimulai (${formatJakartaHHMM(regularStartAt!)} WIB). Jika sudah lewat, hubungi Super Admin.`,
+          },
           { status: 400 }
         )
       }

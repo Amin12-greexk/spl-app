@@ -542,14 +542,20 @@ const capturePhoto = async () => {
       }
 
       if (regularStartMinutes !== null && startMinutes !== null) {
-        if (startMinutes < regularStartMinutes) {
+        // Lembur pagi boleh diajukan sendiri selama jam kerja reguler hari itu belum dimulai.
+        const nowForMorning = new Date()
+        const nowMinutes = nowForMorning.getHours() * 60 + nowForMorning.getMinutes()
+        const morningWindowClosed =
+          isLateSubmission ||
+          (formData.date === todayInputValue && nowMinutes >= regularStartMinutes)
+        if (startMinutes < regularStartMinutes && morningWindowClosed) {
           const result = await Swal.fire({
             icon: "info",
-            title: "Pengajuan Lembur Pagi Khusus",
+            title: "Pengajuan Lembur Pagi Sudah Lewat Batas",
             html: `
               <div class="text-left text-sm space-y-2">
                 <p>Jam mulai lembur Anda (<strong>${formData.startTime}</strong>) mendahului jam kerja reguler (<strong>${normalizedRegularStart}</strong>).</p>
-                <p class="text-gray-600">Sesuai kebijakan perusahaan, lembur sebelum jam kerja reguler hanya dapat diproses melalui pembuatan SPL khusus oleh Super Admin / IT.</p>
+                <p class="text-gray-600">Lembur pagi harus diajukan <strong>sebelum jam kerja reguler dimulai (${normalizedRegularStart})</strong>. Karena batas itu sudah lewat, SPL ini hanya dapat dibuatkan oleh Super Admin / IT.</p>
                 <div class="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-blue-900 text-xs">
                   <strong>Langkah selanjutnya:</strong> Hubungi admin/atasan Anda untuk dibuatkan SPL manual. Jika sudah dibuatkan, dokumen akan muncul di menu <strong>Telat Input</strong> untuk ditandatangani.
                 </div>
