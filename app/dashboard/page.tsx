@@ -13,6 +13,7 @@ import Image from "next/image"
 import { isMorningOvertime } from "@/lib/spl-labels"
 import { getSplStatusInfo, getSupervisorDisplayName, splRequiresRealization } from "@/lib/spl-status"
 import SplProgress from "@/components/spl/SplProgress"
+import LateSubmissionAnnouncement from "@/components/announcements/LateSubmissionAnnouncement"
 import dynamic from "next/dynamic"
 
 const ManagerAnalytics = dynamic(() => import("@/components/dashboard/ManagerAnalytics"), { ssr: false })
@@ -1002,6 +1003,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {userRole && userRole !== "MANAGER" && <LateSubmissionAnnouncement />}
 
       {/* Banner Perlu Tindakan Anda */}
       {(pendingRealizationSpls.length > 0 || unsignedTelatCount > 0 || teamPendingCount > 0) && (
